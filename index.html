@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>HUST 校园互助</title>
 <style>
 :root {
@@ -197,6 +200,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <a href="#" class="nav-link" data-page="errand" onclick="navigate('errand')">跑腿代取</a>
       <a href="#" class="nav-link" data-page="secondhand" onclick="navigate('secondhand')">二手交易</a>
       <a href="#" class="nav-link" data-page="skill" onclick="navigate('skill')">技能服务</a>
+      <a href="#" class="nav-link" data-page="my" onclick="navigate('my')">我的</a>
     </nav>
     <div class="header-actions" id="headerActions">
       <button class="btn btn-outline btn-sm" onclick="showAuthModal()" id="btnLogin">登录</button>
@@ -406,6 +410,19 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     </form>
   </div>
 </div>
+
+
+<section class="page" id="page-my" style="display:none">
+  <div class="container">
+    <div class="page-header">
+      <h2>👤 我的</h2>
+      <p>查看你发布的订单和已接的订单。</p>
+    </div>
+    <div id="myContent">
+      <p style="color:var(--text-secondary)">请先登录...</p>
+    </div>
+  </div>
+</section>
 
 <!-- Detail Modal -->
 <div class="modal-overlay" id="detailModal">
@@ -724,14 +741,23 @@ async function handleAuth(e) {
 
       if (email && !email.endsWith('@hust.edu.cn')) { err.textContent = '请使用华科邮箱（@hust.edu.cn）'; err.style.display = 'block'; return; }
       const userData = { student_id: sid, name, phone, email, password: pw, balance: 0, created_at: new Date().toISOString() };
-      const newIssue = await ghCreateIssue(sid, JSON.stringify(userData), ['user']);
+      if (userData.email && userData.email.length > 60) { userData.email = userData.email.substring(0, 60); }
+      let newIssue;
+      try {
+        newIssue = await ghCreateIssue(sid, JSON.stringify(userData), ['user']);
+      } catch(ex) {
+        err.textContent = '创建用户失败：' + ex.message;
+        err.style.display = 'block';
+        console.error(ex);
+        return;
+      }
       userData._issue_number = newIssue.number;
       S.user = userData;
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       updateUI();
       closeAuthModal();
       toast('注册成功，已实名认证', 'success');
-    } catch(ex) { err.textContent = '注册失败：' + ex.message; err.style.display = 'block'; return; }
+    } catch(ex) { console.error(ex); err.textContent = '注册失败：' + ex.message; err.style.display = 'block'; return; }
   } else {
     try {
       const issues = await ghIssues('user');
@@ -850,6 +876,13 @@ function updateUI() {
   }
 }
 
+
+// 自动刷新：每15秒刷新一次当前页面数据
+setInterval(function(){
+  if(S.page==='home')loadStats();
+  else if(S.page==='my')loadMyOrders();
+  else if(S.filter[S.page])loadOrders(S.page,S.filter[S.page]||'all');
+},15000);
 // ============ TOAST ============
 function toast(msg, type) {
   const c = document.getElementById('toastContainer');
