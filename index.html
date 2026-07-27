@@ -465,8 +465,13 @@ async function ghCreateIssue(title, body, labels) {
     body: JSON.stringify({ title, body, labels })
   });
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.message || 'Create failed ' + res.status);
+    const errText = await res.text();
+    let errMsg = errText;
+    try {
+      const errJson = JSON.parse(errText);
+      errMsg = errJson.message || errText;
+    } catch(e) {}
+    throw new Error(errMsg);
   }
   return res.json();
 }
@@ -946,7 +951,12 @@ async function handlePublish(e) {
   let imageData = '';
   if (imgFile) {
     if (imgFile.size > 2 * 1024 * 1024) { err.textContent = '图片太大，请选择 2MB 以内的图片'; err.style.display = 'block'; return; }
-    imageData = await compressImage(imgFile, 800, 0.6);
+    imageData = await compressImage(imgFile, 500, 0.5);
+    if (imageData && imageData.length > 30000) {
+      err.textContent = '图片压缩后仍过大，请尝试更小的图片或截图后再上传';
+      err.style.display = 'block';
+      return;
+    }
   }
 
   const order = {
