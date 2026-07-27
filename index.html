@@ -205,7 +205,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     <nav class="nav-links" id="navLinks">
       <a href="#" class="nav-link active" data-page="home" onclick="navigate('home')">首页</a>
       <a href="#" class="nav-link" data-page="task" onclick="navigate('task')">任务大厅</a>
-      <a href="#" class="nav-link" data-page="secondhand" onclick="navigate('secondhand')">二手交易</a>
       <a href="#" class="nav-link" data-page="my" onclick="navigate('my')">我的</a>
     </nav>
     <div class="header-actions" id="headerActions">
@@ -224,7 +223,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   <div class="hero">
     <div class="container">
       <h1 class="hero-title">校园生活，<span class="highlight">互相帮忙</span></h1>
-      <p class="hero-subtitle">任务大厅 · 二手交易 — 华科学子的互助平台</p>
+      <p class="hero-subtitle">代拿快递、代取外卖、二手交易、帮打印…华科学子的校园互助平台</p>
       <div class="hero-stats" id="heroStats">
         <div class="stat-item"><span class="stat-num" id="statOrders">0</span><span class="stat-label">订单总数</span></div>
         <div class="stat-item"><span class="stat-num" id="statCompleted">0</span><span class="stat-label">已完成</span></div>
@@ -239,15 +238,15 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 
   <div class="container">
     <div class="section">
-      <h2 class="section-title">两大板块</h2>
+      <h2 class="section-title">开始使用</h2>
       <div class="card-grid">
         <div class="service-card" onclick="navigate('task')">
           <div class="service-icon">📋</div>
           <h3>任务大厅</h3>
-          <p>代拿快递、代取外卖、帮打印、帮写报告、修电脑…发布你的需求，有人来接单搞定。</p>
-          <span class="service-tag">热门</span>
+          <p>代拿快递、代取外卖、二手交易、帮打印、修电脑…发布你的需求或浏览找活干。</p>
+          <span class="service-tag">全部</span>
         </div>
-        <div class="service-card" onclick="navigate('secondhand')">
+        <div class="service-card" onclick="navigate('task');setTimeout(()=>switchTaskTab('secondhand'),100)">
           <div class="service-icon">🔄</div>
           <h3>二手交易</h3>
           <p>毕业季淘好物，课本、电器、日用品。学长学姐实惠转让，学弟学妹放心入手。</p>
@@ -262,9 +261,15 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   <div class="container">
     <div class="page-header">
       <h2>📋 任务大厅</h2>
-      <p>发布你的需求，等有能力的人来接单。从拿外卖到修电脑，啥都能搞定。</p>
+      <p>发布你的需求，或者浏览找活干。从拿外卖到二手交易，啥都有。</p>
     </div>
-    <div class="filter-bar">
+    <!-- 板块 Tab -->
+    <div class="tab-bar" id="taskTabBar" style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0">
+      <button class="tab-btn active" data-tasktab="task" onclick="switchTaskTab('task')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:600;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;transition:all .2s">🔧 任务</button>
+      <button class="tab-btn" data-tasktab="secondhand" onclick="switchTaskTab('secondhand')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">🔄 二手交易</button>
+    </div>
+    <!-- 任务子分类 -->
+    <div class="filter-bar" id="taskFilters">
       <button class="filter-btn active" data-filter="all" onclick="filterOrders('task','all')">全部</button>
       <button class="filter-btn" data-filter="express" onclick="filterOrders('task','express')">📦 代拿快递</button>
       <button class="filter-btn" data-filter="food" onclick="filterOrders('task','food')">🍔 代取外卖</button>
@@ -273,26 +278,18 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <button class="filter-btn" data-filter="repair" onclick="filterOrders('task','repair')">🔧 维修</button>
       <button class="filter-btn" data-filter="other" onclick="filterOrders('task','other')">📌 其他</button>
     </div>
+    <!-- 二手子分类 -->
+    <div class="filter-bar" id="secondhandFilters" style="display:none">
+      <button class="filter-btn active" data-filter="all" onclick="filterOrders('secondhand','all')">全部</button>
+      <button class="filter-btn" data-filter="book" onclick="filterOrders('secondhand','book')">📚 教材书籍</button>
+      <button class="filter-btn" data-filter="electronic" onclick="filterOrders('secondhand','electronic')">💻 电子产品</button>
+      <button class="filter-btn" data-filter="daily" onclick="filterOrders('secondhand','daily')">🏠 生活用品</button>
+      <button class="filter-btn" data-filter="other" onclick="filterOrders('secondhand','other')">📌 其他</button>
+    </div>
     <div class="order-grid" id="taskOrders"></div>
   </div>
 </section>
 
-<section class="page" id="page-secondhand" style="display:none">
-  <div class="container">
-    <div class="page-header">
-      <h2>🔄 二手交易</h2>
-      <p>毕业季好物转让，物尽其用，实惠你我他。</p>
-    </div>
-    <div class="filter-bar">
-      <button class="filter-btn active" data-filter="all" onclick="filterOrders('secondhand','all')">全部</button>
-      <button class="filter-btn" data-filter="book" onclick="filterOrders('secondhand','book')">教材书籍</button>
-      <button class="filter-btn" data-filter="electronic" onclick="filterOrders('secondhand','electronic')">电子产品</button>
-      <button class="filter-btn" data-filter="daily" onclick="filterOrders('secondhand','daily')">生活用品</button>
-      <button class="filter-btn" data-filter="other" onclick="filterOrders('secondhand','other')">其他</button>
-    </div>
-    <div class="order-grid" id="secondhandOrders"></div>
-  </div>
-</section>
 
 <!-- Auth Modal -->
 <div class="modal-overlay" id="authModal">
@@ -440,7 +437,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 const REPO = 'XY5167/hust-helper-backend';
 const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
 
-const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', secondhand: 'all' } };
+const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', secondhand: 'all' }, taskTab: 'task' };
 
 // 初始化
 (function() {
@@ -495,7 +492,14 @@ function navigate(page) {
   if (nl) nl.classList.add('active');
   if (page === 'home') loadStats();
   else if (page === 'my') loadMyOrders();
-  else loadOrders(page, S.filter[page] || 'all');
+  else if (page === 'task') {
+    // 任务大厅：根据当前板块 tab 加载对应内容
+    if (S.taskTab === 'secondhand') {
+      loadOrders('secondhand', S.filter.secondhand || 'all');
+    } else {
+      loadOrders('task', S.filter.task || 'all');
+    }
+  }
 }
 
 // ============ STATS ============
@@ -519,14 +523,13 @@ async function loadStats() {
 
 // ============ ORDERS ============
 async function loadOrders(type, cat) {
-  const grid = document.getElementById(type + 'Orders');
+  // 任务大厅统一用 taskOrders 作为容器
+  const grid = document.getElementById('taskOrders');
   if (!grid) return;
   grid.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
 
   try {
     const issues = await ghIssues('order');
-    if (o && o.type === 'errand') o.type = 'task';
-    if (o && o.type === 'skill') o.type = 'task';
     let orders = issues.map(i => {
       try {
         const o = JSON.parse(i.body);
@@ -534,7 +537,14 @@ async function loadOrders(type, cat) {
         o._issue_number = i.number;
         return o;
       } catch(e) { return null; }
-    }).filter(o => o && o.type === type && o.status === 'open');
+    }).filter(o => o && o.status === 'open');
+
+    // 根据类型筛选：task 或 secondhand
+    if (type === 'secondhand') {
+      orders = orders.filter(o => o.type === 'secondhand');
+    } else {
+      orders = orders.filter(o => o.type === 'task' || o.type === 'errand' || o.type === 'skill');
+    }
 
     if (cat !== 'all') orders = orders.filter(o => o.category === cat);
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -552,7 +562,7 @@ async function loadOrders(type, cat) {
       const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
       return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
         + '<div class="order-card-header">'
-        + '<span class="order-card-type type-' + o.category + '">' + (ct[o.category] || tl[o.type]) + '</span>'
+        + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>'
         + '<span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span>'
         + '</div>'
         + '<div class="order-card-title">' + esc(o.title) + urgencyBadge + '</div>'
@@ -574,13 +584,35 @@ async function loadOrders(type, cat) {
 
 function filterOrders(type, cat) {
   S.filter[type] = cat;
-  const bar = document.querySelector('#page-' + type + ' .filter-bar');
-  if (bar) {
+  // 更新当前可见的 filter-bar 中的 active
+  const bars = document.querySelectorAll('#page-task .filter-bar');
+  bars.forEach(bar => {
     bar.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     const fb = bar.querySelector('[data-filter="' + cat + '"]');
     if (fb) fb.classList.add('active');
-  }
+  });
   loadOrders(type, cat);
+}
+
+function switchTaskTab(tab) {
+  S.taskTab = tab;
+  // 更新 tab 样式
+  document.querySelectorAll('#taskTabBar .tab-btn').forEach(b => {
+    b.style.color = 'var(--text-secondary)';
+    b.style.borderBottom = '2px solid transparent';
+    b.style.fontWeight = '500';
+  });
+  const activeTab = document.querySelector('#taskTabBar [data-tasktab="' + tab + '"]');
+  if (activeTab) {
+    activeTab.style.color = 'var(--primary)';
+    activeTab.style.borderBottom = '2px solid var(--primary)';
+    activeTab.style.fontWeight = '600';
+  }
+  // 切换 filter-bar 显示
+  document.getElementById('taskFilters').style.display = (tab === 'task') ? 'flex' : 'none';
+  document.getElementById('secondhandFilters').style.display = (tab === 'secondhand') ? 'flex' : 'none';
+  // 加载对应数据
+  loadOrders(tab, S.filter[tab] || 'all');
 }
 
 // ============ DETAIL ============
@@ -701,7 +733,12 @@ async function takeOrder(inum) {
     await ghUpdateIssue(inum, JSON.stringify(o));
     toast('接单成功！请提醒对方查看你的收款信息', 'success');
     closeDetailModal();
-    loadOrders(S.page, S.filter[S.page] || 'all');
+    if (S.page === 'task') {
+      if (S.taskTab === 'secondhand') loadOrders('secondhand', S.filter.secondhand || 'all');
+      else loadOrders('task', S.filter.task || 'all');
+    } else if (S.page !== 'home' && S.page !== 'my') {
+      loadOrders(S.page, S.filter[S.page] || 'all');
+    }
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -718,7 +755,12 @@ async function completeOrder(inum) {
     await ghUpdateIssue(inum, JSON.stringify(o));
     toast('订单完成！', 'success');
     closeDetailModal();
-    loadOrders(S.page, S.filter[S.page] || 'all');
+    if (S.page === 'task') {
+      if (S.taskTab === 'secondhand') loadOrders('secondhand', S.filter.secondhand || 'all');
+      else loadOrders('task', S.filter.task || 'all');
+    } else if (S.page !== 'home' && S.page !== 'my') {
+      loadOrders(S.page, S.filter[S.page] || 'all');
+    }
     loadStats();
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -735,7 +777,12 @@ async function cancelOrder(inum) {
     await ghUpdateIssue(inum, JSON.stringify(o));
     toast('订单已取消', 'info');
     closeDetailModal();
-    loadOrders(S.page, S.filter[S.page] || 'all');
+    if (S.page === 'task') {
+      if (S.taskTab === 'secondhand') loadOrders('secondhand', S.filter.secondhand || 'all');
+      else loadOrders('task', S.filter.task || 'all');
+    } else if (S.page !== 'home' && S.page !== 'my') {
+      loadOrders(S.page, S.filter[S.page] || 'all');
+    }
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -840,7 +887,12 @@ async function handleAuth(e) {
     } catch(ex) { err.textContent = '登录失败：' + ex.message; err.style.display = 'block'; return; }
   }
   loadStats();
-  if (S.page !== 'home') loadOrders(S.page, S.filter[S.page] || 'all');
+  if (S.page === 'task') {
+    if (S.taskTab === 'secondhand') loadOrders('secondhand', S.filter.secondhand || 'all');
+    else loadOrders('task', S.filter.task || 'all');
+  } else if (S.page !== 'home' && S.page !== 'my') {
+    loadOrders(S.page, S.filter[S.page] || 'all');
+  }
 }
 
 function logout() {
@@ -913,7 +965,12 @@ async function handlePublish(e) {
     await ghCreateIssue('[订单] ' + title, JSON.stringify(order), ['order', type, cat]);
     toast('发布成功！平台将抽成 ¥' + fee.toFixed(2), 'success');
     closePublishModal();
-    loadOrders(S.page, S.filter[S.page] || 'all');
+    if (S.page === 'task') {
+      if (S.taskTab === 'secondhand') loadOrders('secondhand', S.filter.secondhand || 'all');
+      else loadOrders('task', S.filter.task || 'all');
+    } else {
+      loadOrders(S.page, S.filter[S.page] || 'all');
+    }
     loadStats();
   } catch(ex) { err.textContent = '发布失败：' + ex.message; err.style.display = 'block'; }
 }
@@ -1123,7 +1180,10 @@ function compressImage(file, maxWidth = 400, quality = 0.6) {
 setInterval(function(){
   if(S.page==='home')loadStats();
   else if(S.page==='my')loadMyOrders();
-  else if(S.filter[S.page])loadOrders(S.page,S.filter[S.page]||'all');
+  else if(S.page==='task'){
+    if(S.taskTab==='secondhand')loadOrders('secondhand',S.filter.secondhand||'all');
+    else loadOrders('task',S.filter.task||'all');
+  }
 },15000);
 // ============ TOAST ============
 function toast(msg, type) {
