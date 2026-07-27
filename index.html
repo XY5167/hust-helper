@@ -392,45 +392,53 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
-// ============ LOCAL STORAGE DATABASE ============
-const DB = {
-  get(k) { try { return JSON.parse(localStorage.getItem('hust_'+k)) } catch(e) { return null } },
-  set(k,v) { localStorage.setItem('hust_'+k, JSON.stringify(v)) },
-  users() { return this.get('users') || [] },
-  orders() { return this.get('orders') || [] },
-  messages() { return this.get('messages') || [] },
-  saveUsers(arr) { this.set('users', arr) },
-  saveOrders(arr) { this.set('orders', arr) },
-  saveMessages(arr) { this.set('messages', arr) },
-  nextId(arr) { return arr.length > 0 ? Math.max(...arr.map(x=>x.id)) + 1 : 1 },
-};
+// ============ GITHUB ISSUES DATABASE ============
+// 数据存储在 GitHub Issues 中，所有人共享
 
-// Hash password
-function hash(pw) {
-  let h = 0;
-  for (let i = 0; i < pw.length; i++) {
-    const c = pw.charCodeAt(i);
-    h = ((h << 5) - h) + c;
-    h |= 0;
-  }
-  return 'hust_' + Math.abs(h).toString(16);
-}
+const REPO = 'XY5167/hust-helper-backend';
+const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
 
-// ============ STATE ============
-const S = {
-  user: null,
-  page: 'home',
-  authTab: 'login',
-  filter: { errand: 'all', secondhand: 'all', skill: 'all' }
-};
+const S = { user: null, page: 'home', authTab: 'login', filter: { errand: 'all', secondhand: 'all', skill: 'all' } };
 
-// Init
+// 初始化
 (function() {
   const saved = localStorage.getItem('hust_current_user');
   if (saved) try { S.user = JSON.parse(saved); } catch(e) {}
   updateUI();
   loadStats();
 })();
+
+// ============ GITHUB API ============
+async function ghIssues(label) {
+  const res = await fetch('https://api.github.com/repos/' + REPO + '/issues?labels=' + encodeURIComponent(label) + '&state=open&per_page=100', {
+    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+  });
+  if (!res.ok) throw new Error('API error ' + res.status);
+  return res.json();
+}
+
+async function ghCreateIssue(title, body, labels) {
+  const res = await fetch('https://api.github.com/repos/' + REPO + '/issues', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, body, labels })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Create failed ' + res.status);
+  }
+  return res.json();
+}
+
+async function ghUpdateIssue(number, body) {
+  const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + number, {
+    method: 'PATCH',
+    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body })
+  });
+  if (!res.ok) throw new Error('Update failed ' + res.status);
+  return res.json();
+}
 
 // ============ NAVIGATION ============
 function navigate(page) {
@@ -446,59 +454,71 @@ function navigate(page) {
 }
 
 // ============ STATS ============
-function loadStats() {
-  const orders = DB.orders();
-  const users = DB.users();
-  animateNum('statOrders', orders.length);
-  animateNum('statCompleted', orders.filter(o => o.status === 'completed').length);
-  animateNum('statUsers', users.length);
-}
-
-function animateNum(id, tgt) {
-  const el = document.getElementById(id);
-  const start = parseInt(el.textContent) || 0;
-  const dur = 500, ts = Date.now();
-  function tick() {
-    const p = Math.min((Date.now() - ts) / dur, 1);
-    el.textContent = Math.floor(start + (tgt - start) * (1 - Math.pow(1 - p, 3)));
-    if (p < 1) requestAnimationFrame(tick);
+async function loadStats() {
+  try {
+    const [users, orders] = await Promise.all([
+      ghIssues('user'),
+      ghIssues('order')
+    ]);
+    const orderList = orders.map(i => {
+      try { return JSON.parse(i.body); } catch(e) { return null; }
+    }).filter(Boolean);
+    document.getElementById('statOrders').textContent = orderList.length;
+    document.getElementById('statCompleted').textContent = orderList.filter(o => o.status === 'completed').length;
+    document.getElementById('statUsers').textContent = users.length;
+  } catch(e) {
+    console.error(e);
+    document.getElementById('statOrders').textContent = '?';
   }
-  requestAnimationFrame(tick);
 }
 
 // ============ ORDERS ============
-function loadOrders(type, cat) {
+async function loadOrders(type, cat) {
   const grid = document.getElementById(type + 'Orders');
   if (!grid) return;
-  let orders = DB.orders().filter(o => o.type === type && o.status === 'open');
-  if (cat !== 'all') orders = orders.filter(o => o.category === cat);
-  orders.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  grid.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
 
-  if (orders.length === 0) {
-    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>暂无订单，来发布第一个吧！</p></div>';
-    return;
+  try {
+    const issues = await ghIssues('order');
+    let orders = issues.map(i => {
+      try {
+        const o = JSON.parse(i.body);
+        o._issue_number = i.number;
+        return o;
+      } catch(e) { return null; }
+    }).filter(o => o && o.type === type && o.status === 'open');
+
+    if (cat !== 'all') orders = orders.filter(o => o.category === cat);
+    orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    if (orders.length === 0) {
+      grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>暂无订单，来发布第一个吧！</p></div>';
+      return;
+    }
+
+    grid.innerHTML = orders.map(o => {
+      const tl = {errand:'跑腿', secondhand:'二手', skill:'技能'};
+      const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
+      return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
+        + '<div class="order-card-header">'
+        + '<span class="order-card-type type-' + o.type + '">' + tl[o.type] + '</span>'
+        + '<span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span>'
+        + '</div>'
+        + '<div class="order-card-title">' + esc(o.title) + '</div>'
+        + (o.description ? '<div class="order-card-desc">' + esc(o.description) + '</div>' : '')
+        + '<div class="order-card-meta">'
+        + '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>'
+        + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
+        + '</div>'
+        + '<div class="order-card-footer">'
+        + '<span>发布者：' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</span>'
+        + '<span>' + timeAgo(o.created_at) + '</span>'
+        + '</div></div>';
+    }).join('');
+
+  } catch(e) {
+    grid.innerHTML = '<div class="empty-state"><p>加载失败：' + esc(e.message) + '</p></div>';
   }
-  grid.innerHTML = orders.map(o => {
-    const tl = {errand:'跑腿',secondhand:'二手',skill:'技能'};
-    const sl = {open:'待接单',taken:'已接单',completed:'已完成',cancelled:'已取消'};
-    const pub = DB.users().find(u => u.id === o.publisher_id);
-    return `<div class="order-card" data-oid="${o.id}" onclick="showDetail(${o.id})">
-      <div class="order-card-header">
-        <span class="order-card-type type-${o.type}">${tl[o.type]}</span>
-        <span class="order-card-status status-${o.status}">${sl[o.status]}</span>
-      </div>
-      <div class="order-card-title">${esc(o.title)}</div>
-      ${o.description ? '<div class="order-card-desc">' + esc(o.description) + '</div>' : ''}
-      <div class="order-card-meta">
-        <span class="order-card-price">¥${o.price.toFixed(2)}</span>
-        ${o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : ''}
-      </div>
-      <div class="order-card-footer">
-        <span>发布者：${esc(pub ? (pub.name || pub.student_id) : '未知')}</span>
-        <span>${timeAgo(o.created_at)}</span>
-      </div>
-    </div>`;
-  }).join('');
 }
 
 function filterOrders(type, cat) {
@@ -513,124 +533,107 @@ function filterOrders(type, cat) {
 }
 
 // ============ DETAIL ============
-function showDetail(oid) {
+async function showDetail(issueNum) {
   const modal = document.getElementById('detailModal');
   const ct = document.getElementById('detailContent');
   modal.classList.add('active');
-  const o = DB.orders().find(x => x.id === oid);
-  if (!o) { ct.innerHTML = '<p>订单不存在</p>'; return; }
+  ct.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
 
-  const tl = {errand:'跑腿代取',secondhand:'二手交易',skill:'技能服务'};
-  const sl = {open:'待接单',taken:'已接单',completed:'已完成',cancelled:'已取消'};
-  const pub = DB.users().find(u => u.id === o.publisher_id);
-  const tkr = DB.users().find(u => u.id === o.taker_id);
-  const msgs = DB.messages().filter(m => m.order_id === oid).sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    if (!res.ok) { ct.innerHTML = '<p>订单不存在</p>'; return; }
+    const issue = await res.json();
+    const o = JSON.parse(issue.body);
+    o._issue_number = issueNum;
 
-  let actions = '';
-  if (S.user && o.status === 'open' && o.publisher_id !== S.user.id) {
-    actions += '<button class="btn btn-primary" onclick="takeOrder(' + oid + ')">接单</button>';
-  }
-  if (S.user && o.status === 'taken' && o.taker_id === S.user.id) {
-    actions += '<button class="btn btn-success" onclick="completeOrder(' + oid + ')">确认完成</button>';
-  }
-  if (S.user && (o.publisher_id === S.user.id || o.taker_id === S.user.id) && (o.status === 'open' || o.status === 'taken')) {
-    actions += '<button class="btn btn-danger" onclick="cancelOrder(' + oid + ')">取消订单</button>';
-  }
+    const tl = {errand:'跑腿代取', secondhand:'二手交易', skill:'技能服务'};
+    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
 
-  let chat = '';
-  if (S.user && (o.publisher_id === S.user.id || o.taker_id === S.user.id) && o.status === 'taken') {
-    const msgsHTML = msgs.map(m => {
-      const s = DB.users().find(u => u.id === m.sender_id);
-      return '<div class="chat-msg"><strong>' + esc(s ? (s.name || s.student_id) : '?') + '：</strong>' + esc(m.content) + '</div>';
-    }).join('');
-    chat = '<div class="detail-section"><h4>💬 沟通</h4>' + (msgsHTML || '<p style="color:var(--text-muted);font-size:.83rem">暂无消息</p>') +
-      '<div class="chat-input-row"><input type="text" id="chatInput" placeholder="发送消息..."><button class="btn btn-primary btn-sm" onclick="sendMsg(' + oid + ')">发送</button></div></div>';
-  }
+    let actions = '';
+    if (S.user && o.status === 'open' && o.publisher_id !== (S.user._issue_number || S.user.student_id)) {
+      actions += '<button class="btn btn-primary" onclick="takeOrder(' + issueNum + ')">接单</button>';
+    }
+    if (S.user && o.status === 'taken' && o.taker_id === (S.user._issue_number || S.user.student_id)) {
+      actions += '<button class="btn btn-success" onclick="completeOrder(' + issueNum + ')">确认完成</button>';
+    }
+    if (S.user && (o.publisher_id === (S.user._issue_number || S.user.student_id) || o.taker_id === (S.user._issue_number || S.user.student_id))) {
+      if (o.status === 'open' || o.status === 'taken') {
+        actions += '<button class="btn btn-danger" onclick="cancelOrder(' + issueNum + ')">取消订单</button>';
+      }
+    }
 
-  ct.innerHTML = `
-    <div class="detail-header">
-      <span class="detail-type type-${o.type}">${tl[o.type]}</span>
-      <span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">${sl[o.status]}</span>
-    </div>
-    <h3 class="detail-title">${esc(o.title)}</h3>
-    <div class="detail-price">¥${o.price.toFixed(2)} <span style="font-size:.78rem;color:var(--text-muted);font-weight:400">（平台抽成 ¥${o.fee.toFixed(2)}）</span></div>
-    <div class="detail-meta">
-      <span>📌 ${esc(o.location || '未指定')}</span>
-      <span>👤 发布：${esc(pub ? (pub.name || pub.student_id) : '未知')}</span>
-      ${tkr ? '<span>🤝 接单：' + esc(tkr.name || tkr.student_id) + '</span>' : ''}
-      <span>🕐 ${timeAgo(o.created_at)}</span>
-    </div>
-    <div class="detail-desc">${esc(o.description || '无详细描述')}</div>
-    <div class="detail-actions">${actions}</div>
-    ${chat}
-  `;
+    ct.innerHTML = ''
+      + '<div class="detail-header"><span class="detail-type type-' + o.type + '">' + tl[o.type] + '</span>'
+      + '<span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">' + sl[o.status] + '</span></div>'
+      + '<h3 class="detail-title">' + esc(o.title) + '</h3>'
+      + '<div class="detail-price">¥' + o.price.toFixed(2) + ' <span style="font-size:.78rem;color:var(--text-muted);font-weight:400">（平台抽成 ¥' + o.fee.toFixed(2) + '）</span></div>'
+      + '<div class="detail-meta">'
+      + '<span>📌 ' + esc(o.location || '未指定') + '</span>'
+      + '<span>👤 发布：' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</span>'
+      + (o.taker_name ? '<span>🤝 接单：' + esc(o.taker_name) + '</span>' : '')
+      + '<span>🕐 ' + timeAgo(o.created_at) + '</span></div>'
+      + '<div class="detail-desc">' + esc(o.description || '无详细描述') + '</div>'
+      + '<div class="detail-actions">' + actions + '</div>';
+  } catch(e) { ct.innerHTML = '<p>加载失败</p>'; }
 }
 
 function closeDetailModal() { document.getElementById('detailModal').classList.remove('active'); }
 
-function takeOrder(oid) {
+async function takeOrder(inum) {
   if (!S.user) { showAuthModal(); return; }
-  const orders = DB.orders();
-  const o = orders.find(x => x.id === oid);
-  if (!o || o.status !== 'open') return;
-  if (o.publisher_id === S.user.id) { toast('不能接自己的订单', 'error'); return; }
-  o.status = 'taken';
-  o.taker_id = S.user.id;
-  DB.saveOrders(orders);
-  toast('接单成功！', 'success');
-  closeDetailModal();
-  loadOrders(S.page, S.filter[S.page] || 'all');
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const o = JSON.parse(issue.body);
+    if (o.status !== 'open') { toast('订单已被接取', 'error'); return; }
+    if (o.publisher_id === (S.user._issue_number || S.user.student_id)) { toast('不能接自己的订单', 'error'); return; }
+    o.status = 'taken';
+    o.taker_id = S.user._issue_number || S.user.student_id;
+    o.taker_name = S.user.name;
+    o.taker_student_id = S.user.student_id;
+    await ghUpdateIssue(inum, JSON.stringify(o));
+    toast('接单成功！', 'success');
+    closeDetailModal();
+    loadOrders(S.page, S.filter[S.page] || 'all');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
-function completeOrder(oid) {
+async function completeOrder(inum) {
   if (!confirm('确认订单已完成？')) return;
-  const orders = DB.orders();
-  const o = orders.find(x => x.id === oid);
-  if (!o || o.status !== 'taken') return;
-  o.status = 'completed';
-  const fee = o.fee;
-  const income = o.price - fee;
-
-  // Update balances
-  const users = DB.users();
-  const tkr = users.find(u => u.id === o.taker_id);
-  const pub = users.find(u => u.id === o.publisher_id);
-  if (tkr) tkr.balance = (tkr.balance || 0) + income;
-  if (pub) pub.balance = (pub.balance || 0) - o.price;
-
-  DB.saveOrders(orders);
-  DB.saveUsers(users);
-
-  // Update current user
-  const me = users.find(u => u.id === S.user.id);
-  if (me) { S.user = me; localStorage.setItem('hust_current_user', JSON.stringify(me)); updateUI(); }
-
-  toast('订单完成！收入 ¥' + income.toFixed(2) + '（平台抽成 ¥' + fee.toFixed(2) + '）', 'success');
-  closeDetailModal();
-  loadOrders(S.page, S.filter[S.page] || 'all');
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const o = JSON.parse(issue.body);
+    if (o.status !== 'taken') { toast('订单状态不正确', 'error'); return; }
+    o.status = 'completed';
+    await ghUpdateIssue(inum, JSON.stringify(o));
+    toast('订单完成！', 'success');
+    closeDetailModal();
+    loadOrders(S.page, S.filter[S.page] || 'all');
+    loadStats();
+  } catch(e) { toast(e.message, 'error'); }
 }
 
-function cancelOrder(oid) {
+async function cancelOrder(inum) {
   if (!confirm('确定取消此订单？')) return;
-  const orders = DB.orders();
-  const o = orders.find(x => x.id === oid);
-  if (!o) return;
-  o.status = 'cancelled';
-  DB.saveOrders(orders);
-  toast('订单已取消', 'info');
-  closeDetailModal();
-  loadOrders(S.page, S.filter[S.page] || 'all');
-}
-
-function sendMsg(oid) {
-  const input = document.getElementById('chatInput');
-  const content = input.value.trim();
-  if (!content || !S.user) return;
-  const msgs = DB.messages();
-  msgs.push({ id: DB.nextId(msgs), order_id: oid, sender_id: S.user.id, content, created_at: new Date().toISOString() });
-  DB.saveMessages(msgs);
-  input.value = '';
-  showDetail(oid);
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const o = JSON.parse(issue.body);
+    o.status = 'cancelled';
+    await ghUpdateIssue(inum, JSON.stringify(o));
+    toast('订单已取消', 'info');
+    closeDetailModal();
+    loadOrders(S.page, S.filter[S.page] || 'all');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ============ AUTH ============
@@ -660,7 +663,7 @@ function switchAuthTab(tab) {
   document.getElementById('authError').style.display = 'none';
 }
 
-function handleAuth(e) {
+async function handleAuth(e) {
   e.preventDefault();
   const sid = document.getElementById('authStudentId').value.trim().toUpperCase();
   const pw = document.getElementById('authPassword').value.trim();
@@ -669,29 +672,44 @@ function handleAuth(e) {
   const err = document.getElementById('authError');
 
   if (!sid || !pw) { err.textContent = '请填写学号和密码'; err.style.display = 'block'; return; }
-  if (!/^U\d{9,}$/.test(sid)) { err.textContent = '请输入有效的华科学号（如 U202312345）'; err.style.display = 'block'; return; }
-
-  const users = DB.users();
+  if (!/^U[0-9]{9,}$/.test(sid)) { err.textContent = '请输入有效的华科学号（如 U202312345）'; err.style.display = 'block'; return; }
 
   if (S.authTab === 'register') {
     if (!name) { err.textContent = '请输入真实姓名完成实名认证'; err.style.display = 'block'; return; }
-    if (users.find(u => u.student_id === sid)) { err.textContent = '该学号已注册'; err.style.display = 'block'; return; }
-    const newUser = { id: DB.nextId(users), student_id: sid, name, phone, password: hash(pw), balance: 0, created_at: new Date().toISOString() };
-    users.push(newUser);
-    DB.saveUsers(users);
-    S.user = newUser;
-    localStorage.setItem('hust_current_user', JSON.stringify(newUser));
-    updateUI();
-    closeAuthModal();
-    toast('注册成功，已实名认证', 'success');
+    try {
+      const issues = await ghIssues('user');
+      const dup = issues.find(i => {
+        try { const u = JSON.parse(i.body); return u.student_id === sid; } catch(e) { return false; }
+      });
+      if (dup) { err.textContent = '该学号已注册'; err.style.display = 'block'; return; }
+
+      const userData = { student_id: sid, name, phone, password: pw, balance: 0, created_at: new Date().toISOString() };
+      const newIssue = await ghCreateIssue(sid, JSON.stringify(userData), ['user']);
+      userData._issue_number = newIssue.number;
+      S.user = userData;
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      updateUI();
+      closeAuthModal();
+      toast('注册成功，已实名认证', 'success');
+    } catch(ex) { err.textContent = '注册失败：' + ex.message; err.style.display = 'block'; return; }
   } else {
-    const u = users.find(x => x.student_id === sid && x.password === hash(pw));
-    if (!u) { err.textContent = '学号或密码错误'; err.style.display = 'block'; return; }
-    S.user = u;
-    localStorage.setItem('hust_current_user', JSON.stringify(u));
-    updateUI();
-    closeAuthModal();
-    toast('登录成功', 'success');
+    try {
+      const issues = await ghIssues('user');
+      const found = issues.find(i => {
+        try {
+          const u = JSON.parse(i.body);
+          return u.student_id === sid && u.password === pw;
+        } catch(e) { return false; }
+      });
+      if (!found) { err.textContent = '学号或密码错误'; err.style.display = 'block'; return; }
+      const u = JSON.parse(found.body);
+      u._issue_number = found.number;
+      S.user = u;
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      updateUI();
+      closeAuthModal();
+      toast('登录成功', 'success');
+    } catch(ex) { err.textContent = '登录失败：' + ex.message; err.style.display = 'block'; return; }
   }
   loadStats();
   if (S.page !== 'home') loadOrders(S.page, S.filter[S.page] || 'all');
@@ -724,10 +742,10 @@ function updatePublishCategories() {
     secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'daily',l:'生活用品'},{v:'other',l:'其他'}],
     skill: [{v:'print',l:'帮忙打印'},{v:'report',l:'代写报告'},{v:'repair',l:'维修'},{v:'other',l:'其他技能'}]
   };
-  document.getElementById('publishCategory').innerHTML = cats[t].map(c => '<option value="'+c.v+'">'+c.l+'</option>').join('');
+  document.getElementById('publishCategory').innerHTML = cats[t].map(c => '<option value="' + c.v + '">' + c.l + '</option>').join('');
 }
 
-function handlePublish(e) {
+async function handlePublish(e) {
   e.preventDefault();
   const err = document.getElementById('publishError');
   const type = document.getElementById('publishType').value;
@@ -738,22 +756,25 @@ function handlePublish(e) {
   const loc = document.getElementById('publishLocation').value.trim();
 
   if (!title || !price) { err.textContent = '请填写标题和报酬'; err.style.display = 'block'; return; }
-  if (price <= 0) { err.textContent = '报酬必须大于0'; err.style.display = 'block'; return; }
 
   const fee = Math.round(price * 0.05 * 100) / 100;
-  const orders = DB.orders();
-  const o = {
-    id: DB.nextId(orders), type, category: cat, title, description: desc,
-    price, fee, location: loc, status: 'open',
-    publisher_id: S.user.id, taker_id: null,
+  const order = {
+    type, category: cat, title, description: desc, price, fee,
+    location: loc, status: 'open',
+    publisher_id: S.user._issue_number || S.user.student_id,
+    publisher_name: S.user.name,
+    publisher_student_id: S.user.student_id,
+    taker_id: null, taker_name: null,
     created_at: new Date().toISOString()
   };
-  orders.push(o);
-  DB.saveOrders(orders);
-  toast('发布成功！平台将抽成 ¥' + fee.toFixed(2), 'success');
-  closePublishModal();
-  loadOrders(S.page, S.filter[S.page] || 'all');
-  loadStats();
+
+  try {
+    await ghCreateIssue('[订单] ' + title, JSON.stringify(order), ['order', type, cat]);
+    toast('发布成功！平台将抽成 ¥' + fee.toFixed(2), 'success');
+    closePublishModal();
+    loadOrders(S.page, S.filter[S.page] || 'all');
+    loadStats();
+  } catch(ex) { err.textContent = '发布失败：' + ex.message; err.style.display = 'block'; }
 }
 
 // ============ UI ============
@@ -782,11 +803,11 @@ function toast(msg, type) {
 }
 
 // ============ HELPERS ============
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 function timeAgo(ds) {
   if (!ds) return '';
-  const d = new Date(ds);
+  const d = new Date(ds + (ds.includes('Z') ? '' : 'Z'));
   const diff = Math.floor((Date.now() - d) / 1000);
   if (diff < 60) return '刚刚';
   if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
@@ -795,7 +816,6 @@ function timeAgo(ds) {
   return ds.slice(0, 10);
 }
 
-// Modal outside click
 document.addEventListener('click', function(e) {
   if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('active');
 });
