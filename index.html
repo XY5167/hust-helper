@@ -416,7 +416,22 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   <div class="container">
     <div class="page-header">
       <h2>👤 我的</h2>
-      <p>查看你发布的订单和已接的订单。</p>
+      <p>管理个人信息、收款方式和订单。</p>
+    </div>
+    <div id="myProfile" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;display:none">
+      <h3 style="font-size:1.1rem;margin-bottom:16px">个人信息</h3>
+      <div class="form-group">
+        <label>微信收款码 / 支付宝收款信息</label>
+        <input type="text" id="myPaymentInfo" placeholder="如：微信收款码图片链接 或 支付宝账号">
+        <p class="form-hint">接单完成后，对方会通过这里支付给你。</p>
+      </div>
+      <div class="form-group">
+        <label>上传收款码图片（可选）</label>
+        <input type="file" id="myPaymentImage" accept="image/*">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveMyPayment()">保存收款信息</button>
+      <p class="form-error" id="myPaymentError" style="display:none"></p>
+      <div id="myPaymentPreview" style="margin-top:12px"></div>
     </div>
     <div id="myContent">
       <p style="color:var(--text-secondary)">请先登录...</p>
@@ -873,6 +888,88 @@ function updateUI() {
   } else {
     menu.style.display = 'none';
     btn.style.display = 'inline-flex';
+  }
+}
+
+
+async function loadMyOrders() {
+  const profile = document.getElementById('myProfile');
+  const ct = document.getElementById('myContent');
+  if (!ct) return;
+  if (!S.user) {
+    if (profile) profile.style.display = 'none';
+    ct.innerHTML = '<p style="color:var(--text-secondary)">请先登录...</p>';
+    return;
+  }
+  if (profile) profile.style.display = 'block';
+  ct.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
+
+  // 显示当前收款信息
+  const paymentInput = document.getElementById('myPaymentInfo');
+  const paymentPreview = document.getElementById('myPaymentPreview');
+  if (paymentInput && S.user.payment_info) paymentInput.value = S.user.payment_info;
+  if (paymentPreview && S.user.payment_image) {
+    paymentPreview.innerHTML = '<img src="' + S.user.payment_image + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
+  }
+
+  try {
+    const issues = await ghIssues('order');
+    const uid = S.user._issue_number || S.user.student_id;
+    let orders = issues.map(i => {
+      try { const o = JSON.parse(i.body); o._issue_number = i.number; return o; }
+      catch(e) { return null; }
+    }).filter(o => o && (o.publisher_id === uid || o.taker_id === uid));
+    orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
+    const tl = {errand:'跑腿', secondhand:'二手', skill:'技能'};
+
+    if (orders.length === 0) {
+      ct.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p></div>';
+      return;
+    }
+
+    ct.innerHTML = orders.map(o => {
+      const role = o.publisher_id === uid ? '<span style="color:var(--primary)">我发布的</span>' : '<span style="color:var(--success)">我接单的</span>';
+      return '<div class="order-card" style="margin-bottom:12px" onclick="showDetail(' + o._issue_number + ')">'
+        + '<div class="order-card-header"><span class="order-card-type type-' + o.type + '">' + tl[o.type] + '</span><span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span></div>'
+        + '<div class="order-card-title">' + esc(o.title) + ' <span style="font-size:.75rem;color:var(--text-muted)">' + role + '</span></div>'
+        + '<div class="order-card-meta"><span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>'
+        + '<div class="order-card-footer"><span>' + timeAgo(o.created_at) + '</span></div></div>';
+    }).join('');
+  } catch(e) {
+    ct.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
+  }
+}
+
+async function saveMyPayment() {
+  if (!S.user || !S.user._issue_number) { toast('请先登录', 'error'); return; }
+  const info = document.getElementById('myPaymentInfo').value.trim();
+  const imgFile = document.getElementById('myPaymentImage').files[0];
+  const errEl = document.getElementById('myPaymentError');
+
+  let imageData = S.user.payment_image || '';
+  if (imgFile && imgFile.size < 500 * 1024) {
+    imageData = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(imageData);
+      reader.readAsDataURL(imgFile);
+    });
+  }
+
+  S.user.payment_info = info;
+  S.user.payment_image = imageData;
+  localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+
+  try {
+    await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user));
+    toast('收款信息已保存', 'success');
+    const preview = document.getElementById('myPaymentPreview');
+    if (preview && imageData) preview.innerHTML = '<img src="' + imageData + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
+  } catch(e) {
+    errEl.textContent = '保存失败：' + e.message;
+    errEl.style.display = 'block';
   }
 }
 
