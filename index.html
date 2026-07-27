@@ -721,6 +721,7 @@ async function showDetail(issueNum) {
       + imageHTML
       + '<div class="detail-desc">' + esc(o.description || '无详细描述') + '</div>'
       + paymentHTML
+      + takerPayHTML
       + '<div class="detail-actions">' + actions + '</div>';
   } catch(e) { ct.innerHTML = '<p>加载失败</p>'; }
 }
