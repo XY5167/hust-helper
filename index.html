@@ -667,7 +667,7 @@ async function showDetail(issueNum) {
             const takerUser = allUsers.find(i => {
               try {
                 const u = JSON.parse(i.body);
-                return (u._issue_number && u._issue_number === o.taker_id) || u.student_id === o.taker_id;
+                return (u._issue_number && u._issue_number == o.taker_id) || u.student_id == o.taker_id;
               } catch(e) { return false; }
             });
             if (takerUser) {
