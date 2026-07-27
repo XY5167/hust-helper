@@ -324,6 +324,10 @@ input,select,textarea{font-family:inherit;font-size:1rem}
           <input type="text" id="authName" placeholder="请输入真实姓名">
         </div>
         <div class="form-group">
+          <label>华科邮箱</label>
+          <input type="email" id="authEmail" placeholder="xxx@hust.edu.cn">
+        </div>
+        <div class="form-group">
           <label>手机号</label>
           <input type="text" id="authPhone" placeholder="方便联系（选填）">
         </div>
@@ -374,7 +378,29 @@ input,select,textarea{font-family:inherit;font-size:1rem}
           <input type="text" id="publishLocation" placeholder="如：韵苑/紫菘/东校区">
         </div>
       </div>
-      <p class="form-hint">平台收取5%服务费。发布后可从余额中扣除。</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>紧急程度</label>
+          <select id="publishUrgency">
+            <option value="normal">一般</option>
+            <option value="urgent">加急</option>
+            <option value="asap">立刻需要</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>截止时间</label>
+          <input type="text" id="publishDeadline" placeholder="如：今晚8点前">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>支付方式（接单人完成后来支付）</label>
+        <input type="text" id="publishPayment" placeholder="如：微信 xxx / 支付宝 xxx / 面付">
+      </div>
+      <div class="form-group">
+        <label>图片（选填，二手交易建议上传）</label>
+        <input type="file" id="publishImage" accept="image/*">
+      </div>
+      <p class="form-hint">平台收取5%服务费。</p>
       <p class="form-error" id="publishError"></p>
       <button type="submit" class="btn btn-primary btn-block">发布</button>
     </form>
@@ -499,12 +525,14 @@ async function loadOrders(type, cat) {
     grid.innerHTML = orders.map(o => {
       const tl = {errand:'跑腿', secondhand:'二手', skill:'技能'};
       const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
+      const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
+      const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
       return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
         + '<div class="order-card-header">'
         + '<span class="order-card-type type-' + o.type + '">' + tl[o.type] + '</span>'
         + '<span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span>'
         + '</div>'
-        + '<div class="order-card-title">' + esc(o.title) + '</div>'
+        + '<div class="order-card-title">' + esc(o.title) + urgencyBadge + '</div>'
         + (o.description ? '<div class="order-card-desc">' + esc(o.description) + '</div>' : '')
         + '<div class="order-card-meta">'
         + '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>'
@@ -564,6 +592,12 @@ async function showDetail(issueNum) {
       }
     }
 
+    const urgencyLabels = {normal:'一般', urgent:'🔥 加急', asap:'⚡ 立刻需要'};
+    const urgencyHTML = o.urgency ? '<span>⏱️ 紧急程度：' + (urgencyLabels[o.urgency] || o.urgency) + '</span>' : '';
+    const deadlineHTML = o.deadline ? '<span>⏰ 截止：' + esc(o.deadline) + '</span>' : '';
+    const paymentHTML = o.payment ? '<div style="margin-top:12px;padding:12px;background:#fef3c7;border-radius:8px;font-size:.85rem"><strong>💳 支付方式：</strong>' + esc(o.payment) + '</div>' : '';
+    const imageHTML = o.image ? '<img src="' + o.image + '" style="max-width:100%;max-height:300px;border-radius:8px;margin:12px 0;display:block">' : '';
+
     ct.innerHTML = ''
       + '<div class="detail-header"><span class="detail-type type-' + o.type + '">' + tl[o.type] + '</span>'
       + '<span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">' + sl[o.status] + '</span></div>'
@@ -573,8 +607,12 @@ async function showDetail(issueNum) {
       + '<span>📌 ' + esc(o.location || '未指定') + '</span>'
       + '<span>👤 发布：' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</span>'
       + (o.taker_name ? '<span>🤝 接单：' + esc(o.taker_name) + '</span>' : '')
-      + '<span>🕐 ' + timeAgo(o.created_at) + '</span></div>'
+      + '<span>🕐 ' + timeAgo(o.created_at) + '</span>'
+      + urgencyHTML + deadlineHTML
+      + '</div>'
+      + imageHTML
       + '<div class="detail-desc">' + esc(o.description || '无详细描述') + '</div>'
+      + paymentHTML
       + '<div class="detail-actions">' + actions + '</div>';
   } catch(e) { ct.innerHTML = '<p>加载失败</p>'; }
 }
@@ -669,6 +707,7 @@ async function handleAuth(e) {
   const pw = document.getElementById('authPassword').value.trim();
   const name = document.getElementById('authName').value.trim();
   const phone = document.getElementById('authPhone').value.trim();
+  const email = document.getElementById('authEmail') ? document.getElementById('authEmail').value.trim() : '';
   const err = document.getElementById('authError');
 
   if (!sid || !pw) { err.textContent = '请填写学号和密码'; err.style.display = 'block'; return; }
@@ -683,7 +722,8 @@ async function handleAuth(e) {
       });
       if (dup) { err.textContent = '该学号已注册'; err.style.display = 'block'; return; }
 
-      const userData = { student_id: sid, name, phone, password: pw, balance: 0, created_at: new Date().toISOString() };
+      if (email && !email.endsWith('@hust.edu.cn')) { err.textContent = '请使用华科邮箱（@hust.edu.cn）'; err.style.display = 'block'; return; }
+      const userData = { student_id: sid, name, phone, email, password: pw, balance: 0, created_at: new Date().toISOString() };
       const newIssue = await ghCreateIssue(sid, JSON.stringify(userData), ['user']);
       userData._issue_number = newIssue.number;
       S.user = userData;
@@ -754,13 +794,31 @@ async function handlePublish(e) {
   const desc = document.getElementById('publishDesc').value.trim();
   const price = parseFloat(document.getElementById('publishPrice').value);
   const loc = document.getElementById('publishLocation').value.trim();
+  const urgency = document.getElementById('publishUrgency').value;
+  const deadline = document.getElementById('publishDeadline').value.trim();
+  const payment = document.getElementById('publishPayment').value.trim();
+  const imgFile = document.getElementById('publishImage').files[0];
 
   if (!title || !price) { err.textContent = '请填写标题和报酬'; err.style.display = 'block'; return; }
 
   const fee = Math.round(price * 0.05 * 100) / 100;
+
+  // 图片转 base64 存到 body 中（GitHub Issue 不支持文件上传）
+  let imageData = '';
+  if (imgFile && imgFile.size < 500 * 1024) {
+    imageData = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(imgFile);
+    });
+  }
+
   const order = {
     type, category: cat, title, description: desc, price, fee,
-    location: loc, status: 'open',
+    location: loc, urgency, deadline, payment,
+    image: imageData || '',
+    status: 'open',
     publisher_id: S.user._issue_number || S.user.student_id,
     publisher_name: S.user.name,
     publisher_student_id: S.user.student_id,
