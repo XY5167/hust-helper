@@ -508,6 +508,7 @@ function navigate(page) {
   const nl = document.querySelector('[data-page="' + page + '"]');
   if (nl) nl.classList.add('active');
   if (page === 'home') loadStats();
+  else if (page === 'my') loadMyOrders();
   else loadOrders(page, S.filter[page] || 'all');
 }
 
