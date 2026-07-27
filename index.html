@@ -6,6 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<meta name="version" content="1.1">
 <title>HUST 校园互助</title>
 <style>
 :root {
@@ -50,7 +51,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .user-menu{display:flex;align-items:center;gap:10px}
 .user-name{font-weight:600;font-size:.88rem}
 .user-verified{font-size:.7rem;background:var(--success);color:#fff;padding:2px 7px;border-radius:99px}
-.user-balance{font-size:.83rem;color:var(--primary);font-weight:500}
+.user-balance{display:none}
 
 /* Buttons */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border-radius:var(--radius-xs);font-size:.88rem;font-weight:500;border:none;transition:all .15s}
@@ -207,7 +208,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <div class="user-menu" id="userMenu" style="display:none">
         <span class="user-name" id="userNameDisplay"></span>
         <span class="user-verified" title="已实名">已实名</span>
-        <span class="user-balance" id="userBalance"></span>
         <button class="btn btn-outline btn-sm" onclick="showPublishModal()">+ 发布</button>
         <button class="btn btn-ghost btn-sm" onclick="logout()">退出</button>
       </div>
@@ -462,13 +462,15 @@ const S = { user: null, page: 'home', authTab: 'login', filter: { errand: 'all',
 (function() {
   const saved = localStorage.getItem('hust_current_user');
   if (saved) try { S.user = JSON.parse(saved); } catch(e) {}
+  if (S.user && !S.user._issue_number) ensureUserIssueNumber().then(updateUI).catch(()=>{});
   updateUI();
   loadStats();
 })();
 
 // ============ GITHUB API ============
-async function ghIssues(label) {
-  const res = await fetch('https://api.github.com/repos/' + REPO + '/issues?labels=' + encodeURIComponent(label) + '&state=open&per_page=100', {
+async function ghIssues(label, state) {
+  const s = state || 'open';
+  const res = await fetch('https://api.github.com/repos/' + REPO + '/issues?labels=' + encodeURIComponent(label) + '&state=' + s + '&per_page=100', {
     headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
   });
   if (!res.ok) throw new Error('API error ' + res.status);
@@ -762,11 +764,20 @@ async function handleAuth(e) {
   if (S.authTab === 'register') {
     if (!name) { err.textContent = '请输入真实姓名完成实名认证'; err.style.display = 'block'; return; }
     try {
-      const issues = await ghIssues('user');
+      // 查所有状态（open + closed），防止学号重复注册
+      const issues = await ghIssues('user', 'all');
       const dup = issues.find(i => {
         try { const u = JSON.parse(i.body); return u.student_id === sid; } catch(e) { return false; }
       });
-      if (dup) { err.textContent = '该学号已注册'; err.style.display = 'block'; return; }
+      if (dup) {
+        if (dup.state === 'open') {
+          err.textContent = '该学号已注册，请直接登录。如果忘记密码请联系管理员。';
+        } else {
+          err.textContent = '该学号已注册但账号被关闭，请联系管理员恢复。';
+        }
+        err.style.display = 'block';
+        return;
+      }
 
       if (email && !email.endsWith('@hust.edu.cn')) { err.textContent = '请使用华科邮箱（@hust.edu.cn）'; err.style.display = 'block'; return; }
       const userData = { student_id: sid, name, phone, email, password: pw, balance: 0, created_at: new Date().toISOString() };
@@ -789,7 +800,8 @@ async function handleAuth(e) {
     } catch(ex) { console.error(ex); err.textContent = '注册失败：' + ex.message; err.style.display = 'block'; return; }
   } else {
     try {
-      const issues = await ghIssues('user');
+      // 登录时也查所有状态，避免用户 issue 被关闭后无法登录
+      const issues = await ghIssues('user', 'all');
       const found = issues.find(i => {
         try {
           const u = JSON.parse(i.body);
@@ -797,8 +809,12 @@ async function handleAuth(e) {
         } catch(e) { return false; }
       });
       if (!found) { err.textContent = '学号或密码错误'; err.style.display = 'block'; return; }
+      if (found.state !== 'open') { err.textContent = '该账号已被停用，请联系管理员'; err.style.display = 'block'; return; }
       const u = JSON.parse(found.body);
       u._issue_number = found.number;
+      // 确保关键字段存在
+      u.payment_info = u.payment_info || '';
+      u.payment_image = u.payment_image || '';
       S.user = u;
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       updateUI();
@@ -894,13 +910,38 @@ function updateUI() {
     menu.style.display = 'flex';
     btn.style.display = 'none';
     document.getElementById('userNameDisplay').textContent = S.user.name || S.user.student_id;
-    document.getElementById('userBalance').textContent = '余额 ¥' + (S.user.balance || 0).toFixed(2);
   } else {
     menu.style.display = 'none';
     btn.style.display = 'inline-flex';
   }
 }
 
+
+async function ensureUserIssueNumber() {
+  // 确保 S.user 包含有效的 _issue_number
+  if (!S.user) return false;
+  if (S.user._issue_number) return true;
+  // 本地缓存缺少 _issue_number，尝试从 GitHub 匹配并修复
+  try {
+    const issues = await ghIssues('user', 'all');
+    const found = issues.find(i => {
+      try { const u = JSON.parse(i.body); return u.student_id === S.user.student_id; }
+      catch(e) { return false; }
+    });
+    if (found) {
+      S.user._issue_number = found.number;
+      // 同时把云端最新数据合并到本地（如 payment_info 等）
+      try {
+        const remote = JSON.parse(found.body);
+        S.user.payment_info = remote.payment_info || S.user.payment_info || '';
+        S.user.payment_image = remote.payment_image || S.user.payment_image || '';
+      } catch(e) {}
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      return true;
+    }
+  } catch(e) { console.error('ensureUserIssueNumber error:', e); }
+  return false;
+}
 
 async function loadMyOrders() {
   const profile = document.getElementById('myProfile');
@@ -909,6 +950,13 @@ async function loadMyOrders() {
   if (!S.user) {
     if (profile) profile.style.display = 'none';
     ct.innerHTML = '<p style="color:var(--text-secondary)">请先登录...</p>';
+    return;
+  }
+  // 尝试修复可能缺失的 _issue_number
+  const hasIssue = await ensureUserIssueNumber();
+  if (!hasIssue) {
+    if (profile) profile.style.display = 'none';
+    ct.innerHTML = '<p style="color:var(--danger)">用户信息不完整，请退出后重新登录。</p>';
     return;
   }
   if (profile) profile.style.display = 'block';
@@ -953,11 +1001,29 @@ async function loadMyOrders() {
 }
 
 async function saveMyPayment() {
-  if (!S.user || !S.user._issue_number) { toast('请先登录', 'error'); return; }
-  const info = document.getElementById('myPaymentInfo').value.trim();
-  const imgFile = document.getElementById('myPaymentImage').files[0];
   const errEl = document.getElementById('myPaymentError');
   errEl.style.display = 'none';
+
+  // 1. 从 localStorage 恢复用户
+  if (!S.user) {
+    const saved = localStorage.getItem('hust_current_user');
+    if (saved) {
+      try { S.user = JSON.parse(saved); } catch(e) { S.user = null; }
+    }
+  }
+  if (!S.user) { toast('请先登录', 'error'); return; }
+
+  // 2. 确保有 _issue_number
+  const hasIssue = await ensureUserIssueNumber();
+  if (!hasIssue) {
+    errEl.textContent = '用户信息不完整，请退出后重新登录。';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // 3. 读取表单
+  const info = document.getElementById('myPaymentInfo').value.trim();
+  const imgFile = document.getElementById('myPaymentImage').files[0];
 
   let imageData = S.user.payment_image || '';
   if (imgFile) {
@@ -974,17 +1040,41 @@ async function saveMyPayment() {
     }
   }
 
-  S.user.payment_info = info;
-  S.user.payment_image = imageData;
+  // 4. 先从云端拉取最新用户数据（防止覆盖别人的修改）
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + S.user._issue_number, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    if (res.ok) {
+      const issue = await res.json();
+      const remoteUser = JSON.parse(issue.body);
+      // 用云端最新数据覆盖本地，再写入新的收款信息
+      S.user = Object.assign({}, remoteUser, { _issue_number: S.user._issue_number });
+      S.user.payment_info = info;
+      S.user.payment_image = imageData;
+    } else {
+      // 拉不到就用本地数据
+      S.user.payment_info = info;
+      S.user.payment_image = imageData;
+    }
+  } catch(e) {
+    S.user.payment_info = info;
+    S.user.payment_image = imageData;
+  }
+
+  // 5. 先存本地
   localStorage.setItem('hust_current_user', JSON.stringify(S.user));
 
+  // 6. 推送到 GitHub
   try {
     await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user));
     toast('收款信息已保存', 'success');
     const preview = document.getElementById('myPaymentPreview');
-    if (preview && imageData) preview.innerHTML = '<img src="' + imageData + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
+    if (preview && imageData) {
+      preview.innerHTML = '<img src="' + imageData + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
+    }
   } catch(e) {
-    errEl.textContent = '保存失败：' + e.message + '。图片可能仍然太大，请尝试更小的图片。';
+    errEl.textContent = '保存到云端失败：' + e.message + '。请检查网络后重试。';
     errEl.style.display = 'block';
   }
 }
