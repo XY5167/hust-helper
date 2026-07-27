@@ -227,8 +227,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <h1 class="hero-title">校园生活，<span class="highlight">互相帮忙</span></h1>
       <p class="hero-subtitle">代拿快递、代取外卖、二手交易、帮打印…华科学子的校园互助平台</p>
       <div class="hero-stats" id="heroStats">
-        <div class="stat-item"><span class="stat-num" id="statOrders">0</span><span class="stat-label">订单总数</span></div>
-        <div class="stat-item"><span class="stat-num" id="statCompleted">0</span><span class="stat-label">已完成</span></div>
+        <div class="stat-item"><span class="stat-num" id="statOrders">0</span><span class="stat-label">未完成订单</span></div>
         <div class="stat-item"><span class="stat-num" id="statUsers">0</span><span class="stat-label">实名用户</span></div>
       </div>
       <div class="hero-actions">
@@ -519,8 +518,7 @@ async function loadStats() {
     const orderList = orders.map(i => {
       try { return JSON.parse(i.body); } catch(e) { return null; }
     }).filter(Boolean);
-    document.getElementById('statOrders').textContent = orderList.length;
-    document.getElementById('statCompleted').textContent = orderList.filter(o => o.status === 'completed').length;
+    document.getElementById('statOrders').textContent = orderList.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length;
     document.getElementById('statUsers').textContent = users.length;
   } catch(e) {
     console.error(e);
@@ -657,13 +655,17 @@ async function showDetail(issueNum) {
     const urgencyLabels = {normal:'一般', urgent:'🔥 加急', asap:'⚡ 立刻需要'};
     const urgencyHTML = o.urgency ? '<span>⏱️ 紧急程度：' + (urgencyLabels[o.urgency] || o.urgency) + '</span>' : '';
     const deadlineHTML = o.deadline ? '<span>⏰ 截止：' + esc(o.deadline) + '</span>' : '';
-    const paymentHTML = o.payment ? '<div style="margin-top:12px;padding:12px;background:#fef3c7;border-radius:8px;font-size:.85rem"><strong>💳 发单人的收款/付款信息：</strong>' + esc(o.payment) + '</div>' : '';
+    const paymentHTML = (o.payment && S.user && (o.publisher_id == (S.user._issue_number || S.user.student_id) || o.taker_id == (S.user._issue_number || S.user.student_id)))
+      ? '<div style="margin-top:12px;padding:12px;background:#fef3c7;border-radius:8px;font-size:.85rem"><strong>💳 发单人的付款方式（接单人用）</strong>' + esc(o.payment) + '</div>'
+      : '';
     const imageHTML = o.image ? '<img src="' + o.image + '" style="max-width:100%;max-height:300px;border-radius:8px;margin:12px 0;display:block">' : '';
     // 接单人的收款码（仅发单人可见）
     let takerPayHTML = '';
     if ((o.status === 'taken' || o.status === 'completed') && S.user) {
       const uid = S.user._issue_number || S.user.student_id;
-      const isPublisher = (o.publisher_id == uid) || (o.publisher_student_id == S.user.student_id);
+      const sid = S.user.student_id;
+      const isPublisher = (o.publisher_id == uid) || (o.publisher_id == sid) || (o.publisher_student_id == uid) || (o.publisher_student_id == sid);
+      console.log('DEBUG showDetail:', { uid, sid, publisher_id: o.publisher_id, publisher_student_id: o.publisher_student_id, isPublisher });
       if (isPublisher) {
         let payInfo = o.taker_payment_info || '';
         let payImage = o.taker_payment_image || '';
@@ -678,10 +680,12 @@ async function showDetail(issueNum) {
                 return (u._issue_number && u._issue_number == o.taker_id) || u.student_id == o.taker_id;
               } catch(e) { return false; }
             });
+            console.log('DEBUG takerUser found:', !!takerUser);
             if (takerUser) {
               const tu = JSON.parse(takerUser.body);
               payInfo = tu.payment_info || '';
               payImage = tu.payment_image || '';
+              console.log('DEBUG taker payment:', { payInfo, hasImage: !!payImage });
               // 回写到订单中，下次就不需要再查了
               if (payInfo || payImage) {
                 o.taker_payment_info = payInfo;
