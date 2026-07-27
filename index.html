@@ -423,7 +423,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <div class="form-group">
         <label>微信收款码 / 支付宝收款信息</label>
         <input type="text" id="myPaymentInfo" placeholder="如：微信收款码图片链接 或 支付宝账号">
-        <p class="form-hint">接单完成后，对方会通过这里支付给你。</p>
+        <p class="form-hint">⚠️ 重要：接单时自动发送给对方。请确保信息正确！</p>
       </div>
       <div class="form-group">
         <label>上传收款码图片（可选）</label>
@@ -627,8 +627,18 @@ async function showDetail(issueNum) {
     const urgencyLabels = {normal:'一般', urgent:'🔥 加急', asap:'⚡ 立刻需要'};
     const urgencyHTML = o.urgency ? '<span>⏱️ 紧急程度：' + (urgencyLabels[o.urgency] || o.urgency) + '</span>' : '';
     const deadlineHTML = o.deadline ? '<span>⏰ 截止：' + esc(o.deadline) + '</span>' : '';
-    const paymentHTML = o.payment ? '<div style="margin-top:12px;padding:12px;background:#fef3c7;border-radius:8px;font-size:.85rem"><strong>💳 支付方式：</strong>' + esc(o.payment) + '</div>' : '';
+    const paymentHTML = o.payment ? '<div style="margin-top:12px;padding:12px;background:#fef3c7;border-radius:8px;font-size:.85rem"><strong>💳 发单人的收款/付款信息：</strong>' + esc(o.payment) + '</div>' : '';
     const imageHTML = o.image ? '<img src="' + o.image + '" style="max-width:100%;max-height:300px;border-radius:8px;margin:12px 0;display:block">' : '';
+    // 接单人的收款码（仅发单人可见）
+    let takerPayHTML = '';
+    if ((o.status === 'taken' || o.status === 'completed') && S.user && o.taker_payment_info) {
+      const isPublisher = o.publisher_id === (S.user._issue_number || S.user.student_id);
+      if (isPublisher) {
+        takerPayHTML = '<div style="margin-top:12px;padding:16px;background:#dcfce7;border-radius:8px;border:2px solid #16a34a"><strong>✅ 接单人收款信息（请向对方付款）</strong><div style="margin-top:8px;font-size:.9rem">' + esc(o.taker_payment_info) + '</div>';
+        if (o.taker_payment_image) takerPayHTML += '<img src="' + o.taker_payment_image + '" style="max-width:200px;border-radius:8px;margin-top:8px;display:block">';
+        takerPayHTML += '</div>';
+      }
+    }
 
     ct.innerHTML = ''
       + '<div class="detail-header"><span class="detail-type type-' + o.type + '">' + tl[o.type] + '</span>'
@@ -665,8 +675,11 @@ async function takeOrder(inum) {
     o.taker_id = S.user._issue_number || S.user.student_id;
     o.taker_name = S.user.name;
     o.taker_student_id = S.user.student_id;
+    // 接单时自动把接单人的收款码写入订单
+    o.taker_payment_info = S.user.payment_info || '';
+    o.taker_payment_image = S.user.payment_image || '';
     await ghUpdateIssue(inum, JSON.stringify(o));
-    toast('接单成功！', 'success');
+    toast('接单成功！请提醒对方查看你的收款信息', 'success');
     closeDetailModal();
     loadOrders(S.page, S.filter[S.page] || 'all');
   } catch(e) { toast(e.message, 'error'); }
