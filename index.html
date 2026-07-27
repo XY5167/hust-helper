@@ -111,6 +111,12 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .type-errand{background:#fef3c7;color:#92400e}
 .type-secondhand{background:#dbeafe;color:#1e40af}
 .type-skill{background:#dcfce7;color:#166534}
+.type-food{background:#fef3c7;color:#92400e}
+.type-express{background:#dbeafe;color:#1e40af}
+.type-print{background:#dcfce7;color:#166534}
+.type-report{background:#f3e8ff;color:#7c3aed}
+.type-repair{background:#fce7f3;color:#be185d}
+.type-other{background:#f1f5f9;color:#475569}
 .order-card-status{font-size:.72rem;padding:3px 9px;border-radius:99px}
 .status-open{background:#dcfce7;color:#166534}
 .status-taken{background:#fef3c7;color:#92400e}
@@ -198,9 +204,8 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     <a href="#" class="logo" onclick="navigate('home')">HUST互助</a>
     <nav class="nav-links" id="navLinks">
       <a href="#" class="nav-link active" data-page="home" onclick="navigate('home')">首页</a>
-      <a href="#" class="nav-link" data-page="errand" onclick="navigate('errand')">跑腿代取</a>
+      <a href="#" class="nav-link" data-page="task" onclick="navigate('task')">任务大厅</a>
       <a href="#" class="nav-link" data-page="secondhand" onclick="navigate('secondhand')">二手交易</a>
-      <a href="#" class="nav-link" data-page="skill" onclick="navigate('skill')">技能服务</a>
       <a href="#" class="nav-link" data-page="my" onclick="navigate('my')">我的</a>
     </nav>
     <div class="header-actions" id="headerActions">
@@ -219,27 +224,27 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   <div class="hero">
     <div class="container">
       <h1 class="hero-title">校园生活，<span class="highlight">互相帮忙</span></h1>
-      <p class="hero-subtitle">跑腿代取 · 二手交易 · 技能服务 — 华科学子的互助平台</p>
+      <p class="hero-subtitle">任务大厅 · 二手交易 — 华科学子的互助平台</p>
       <div class="hero-stats" id="heroStats">
         <div class="stat-item"><span class="stat-num" id="statOrders">0</span><span class="stat-label">订单总数</span></div>
         <div class="stat-item"><span class="stat-num" id="statCompleted">0</span><span class="stat-label">已完成</span></div>
         <div class="stat-item"><span class="stat-num" id="statUsers">0</span><span class="stat-label">实名用户</span></div>
       </div>
       <div class="hero-actions">
-        <button class="btn btn-primary btn-lg" onclick="navigate('errand')">找人代取</button>
-        <button class="btn btn-outline btn-lg" onclick="navigate('errand')">我要接单</button>
+        <button class="btn btn-primary btn-lg" onclick="navigate('task')">发布任务</button>
+        <button class="btn btn-outline btn-lg" onclick="navigate('task')">我要接单</button>
       </div>
     </div>
   </div>
 
   <div class="container">
     <div class="section">
-      <h2 class="section-title">三大服务</h2>
+      <h2 class="section-title">两大板块</h2>
       <div class="card-grid">
-        <div class="service-card" onclick="navigate('errand')">
-          <div class="service-icon">📦</div>
-          <h3>跑腿代取</h3>
-          <p>代拿快递、外卖，省时省力。发布需求或接单赚钱，每单平台仅抽成5%。</p>
+        <div class="service-card" onclick="navigate('task')">
+          <div class="service-icon">📋</div>
+          <h3>任务大厅</h3>
+          <p>代拿快递、代取外卖、帮打印、帮写报告、修电脑…发布你的需求，有人来接单搞定。</p>
           <span class="service-tag">热门</span>
         </div>
         <div class="service-card" onclick="navigate('secondhand')">
@@ -248,30 +253,27 @@ input,select,textarea{font-family:inherit;font-size:1rem}
           <p>毕业季淘好物，课本、电器、日用品。学长学姐实惠转让，学弟学妹放心入手。</p>
           <span class="service-tag">毕业季</span>
         </div>
-        <div class="service-card" onclick="navigate('skill')">
-          <div class="service-icon">🛠️</div>
-          <h3>技能服务</h3>
-          <p>帮打印、帮写报告、修电脑...发布你的需求，有能力的人来帮你搞定。</p>
-          <span class="service-tag">灵活</span>
-        </div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="page" id="page-errand" style="display:none">
+<section class="page" id="page-task" style="display:none">
   <div class="container">
     <div class="page-header">
-      <h2>📦 跑腿代取</h2>
-      <p>不想下楼？找人代拿快递、外卖。想赚零花钱？来接单！</p>
+      <h2>📋 任务大厅</h2>
+      <p>发布你的需求，等有能力的人来接单。从拿外卖到修电脑，啥都能搞定。</p>
     </div>
     <div class="filter-bar">
-      <button class="filter-btn active" data-filter="all" onclick="filterOrders('errand','all')">全部</button>
-      <button class="filter-btn" data-filter="express" onclick="filterOrders('errand','express')">代拿快递</button>
-      <button class="filter-btn" data-filter="food" onclick="filterOrders('errand','food')">代取外卖</button>
-      <button class="filter-btn" data-filter="other" onclick="filterOrders('errand','other')">其他跑腿</button>
+      <button class="filter-btn active" data-filter="all" onclick="filterOrders('task','all')">全部</button>
+      <button class="filter-btn" data-filter="express" onclick="filterOrders('task','express')">📦 代拿快递</button>
+      <button class="filter-btn" data-filter="food" onclick="filterOrders('task','food')">🍔 代取外卖</button>
+      <button class="filter-btn" data-filter="print" onclick="filterOrders('task','print')">🖨️ 帮忙打印</button>
+      <button class="filter-btn" data-filter="report" onclick="filterOrders('task','report')">📝 代写报告</button>
+      <button class="filter-btn" data-filter="repair" onclick="filterOrders('task','repair')">🔧 维修</button>
+      <button class="filter-btn" data-filter="other" onclick="filterOrders('task','other')">📌 其他</button>
     </div>
-    <div class="order-grid" id="errandOrders"></div>
+    <div class="order-grid" id="taskOrders"></div>
   </div>
 </section>
 
@@ -289,23 +291,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <button class="filter-btn" data-filter="other" onclick="filterOrders('secondhand','other')">其他</button>
     </div>
     <div class="order-grid" id="secondhandOrders"></div>
-  </div>
-</section>
-
-<section class="page" id="page-skill" style="display:none">
-  <div class="container">
-    <div class="page-header">
-      <h2>🛠️ 技能服务</h2>
-      <p>发布需求，找到对的人帮你搞定。帮打印、帮写报告、修电脑...</p>
-    </div>
-    <div class="filter-bar">
-      <button class="filter-btn active" data-filter="all" onclick="filterOrders('skill','all')">全部</button>
-      <button class="filter-btn" data-filter="print" onclick="filterOrders('skill','print')">帮忙打印</button>
-      <button class="filter-btn" data-filter="report" onclick="filterOrders('skill','report')">代写报告</button>
-      <button class="filter-btn" data-filter="repair" onclick="filterOrders('skill','repair')">维修</button>
-      <button class="filter-btn" data-filter="other" onclick="filterOrders('skill','other')">其他</button>
-    </div>
-    <div class="order-grid" id="skillOrders"></div>
   </div>
 </section>
 
@@ -355,9 +340,8 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <div class="form-group">
         <label>类型</label>
         <select id="publishType" required onchange="updatePublishCategories()">
-          <option value="errand">跑腿代取</option>
+          <option value="task">任务大厅</option>
           <option value="secondhand">二手交易</option>
-          <option value="skill">技能服务</option>
         </select>
       </div>
       <div class="form-group">
@@ -456,7 +440,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 const REPO = 'XY5167/hust-helper-backend';
 const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
 
-const S = { user: null, page: 'home', authTab: 'login', filter: { errand: 'all', secondhand: 'all', skill: 'all' } };
+const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', secondhand: 'all' } };
 
 // 初始化
 (function() {
@@ -541,9 +525,12 @@ async function loadOrders(type, cat) {
 
   try {
     const issues = await ghIssues('order');
+    if (o && o.type === 'errand') o.type = 'task';
+    if (o && o.type === 'skill') o.type = 'task';
     let orders = issues.map(i => {
       try {
         const o = JSON.parse(i.body);
+        if (o.type === 'errand' || o.type === 'skill') o.type = 'task';
         o._issue_number = i.number;
         return o;
       } catch(e) { return null; }
@@ -558,13 +545,14 @@ async function loadOrders(type, cat) {
     }
 
     grid.innerHTML = orders.map(o => {
-      const tl = {errand:'跑腿', secondhand:'二手', skill:'技能'};
+      const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'任务'};
+      const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品'};
       const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
       const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
       const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
       return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
         + '<div class="order-card-header">'
-        + '<span class="order-card-type type-' + o.type + '">' + tl[o.type] + '</span>'
+        + '<span class="order-card-type type-' + o.category + '">' + (ct[o.category] || tl[o.type]) + '</span>'
         + '<span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span>'
         + '</div>'
         + '<div class="order-card-title">' + esc(o.title) + urgencyBadge + '</div>'
@@ -611,7 +599,7 @@ async function showDetail(issueNum) {
     const o = JSON.parse(issue.body);
     o._issue_number = issueNum;
 
-    const tl = {errand:'跑腿代取', secondhand:'二手交易', skill:'技能服务'};
+    const tl = {errand:'跑腿代取', secondhand:'二手交易', skill:'技能服务', task:'任务'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
 
     let actions = '';
@@ -658,7 +646,7 @@ async function showDetail(issueNum) {
               if (payInfo || payImage) {
                 o.taker_payment_info = payInfo;
                 o.taker_payment_image = payImage;
-                try { await ghUpdateIssue(inum, JSON.stringify(o)); } catch(e) {}
+                try { await ghUpdateIssue(issueNum, JSON.stringify(o)); } catch(e) {}
               }
             }
           } catch(e) { console.error('拉取接单人收款信息失败:', e); }
@@ -673,7 +661,7 @@ async function showDetail(issueNum) {
     }
 
     ct.innerHTML = ''
-      + '<div class="detail-header"><span class="detail-type type-' + o.type + '">' + tl[o.type] + '</span>'
+      + '<div class="detail-header"><span class="detail-type type-' + (o.category || 'other') + '">' + tl[o.type] + '</span>'
       + '<span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">' + sl[o.status] + '</span></div>'
       + '<h3 class="detail-title">' + esc(o.title) + '</h3>'
       + '<div class="detail-price">¥' + o.price.toFixed(2) + ' <span style="font-size:.78rem;color:var(--text-muted);font-weight:400">（平台抽成 ¥' + o.fee.toFixed(2) + '）</span></div>'
@@ -878,9 +866,8 @@ function closePublishModal() {
 function updatePublishCategories() {
   const t = document.getElementById('publishType').value;
   const cats = {
-    errand: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'other',l:'其他跑腿'}],
-    secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'daily',l:'生活用品'},{v:'other',l:'其他'}],
-    skill: [{v:'print',l:'帮忙打印'},{v:'report',l:'代写报告'},{v:'repair',l:'维修'},{v:'other',l:'其他技能'}]
+    task: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'print',l:'帮忙打印'},{v:'report',l:'代写报告'},{v:'repair',l:'维修'},{v:'other',l:'其他任务'}],
+    secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'daily',l:'生活用品'},{v:'other',l:'其他'}]
   };
   document.getElementById('publishCategory').innerHTML = cats[t].map(c => '<option value="' + c.v + '">' + c.l + '</option>').join('');
 }
@@ -1009,7 +996,7 @@ async function loadMyOrders() {
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
-    const tl = {errand:'跑腿', secondhand:'二手', skill:'技能'};
+    const tl = {task:'任务', secondhand:'二手', errand:'任务', skill:'任务'};
 
     if (orders.length === 0) {
       ct.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p></div>';
@@ -1019,7 +1006,7 @@ async function loadMyOrders() {
     ct.innerHTML = orders.map(o => {
       const role = o.publisher_id === uid ? '<span style="color:var(--primary)">我发布的</span>' : '<span style="color:var(--success)">我接单的</span>';
       return '<div class="order-card" style="margin-bottom:12px" onclick="showDetail(' + o._issue_number + ')">'
-        + '<div class="order-card-header"><span class="order-card-type type-' + o.type + '">' + tl[o.type] + '</span><span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span></div>'
+        + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (tl[o.type] || '任务') + '</span><span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span></div>'
         + '<div class="order-card-title">' + esc(o.title) + ' <span style="font-size:.75rem;color:var(--text-muted)">' + role + '</span></div>'
         + '<div class="order-card-meta"><span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>'
         + '<div class="order-card-footer"><span>' + timeAgo(o.created_at) + '</span></div></div>';
