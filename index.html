@@ -662,7 +662,8 @@ async function showDetail(issueNum) {
     // 接单人的收款码（仅发单人可见）
     let takerPayHTML = '';
     if ((o.status === 'taken' || o.status === 'completed') && S.user) {
-      const isPublisher = o.publisher_id === (S.user._issue_number || S.user.student_id);
+      const uid = S.user._issue_number || S.user.student_id;
+      const isPublisher = (o.publisher_id == uid) || (o.publisher_student_id == S.user.student_id);
       if (isPublisher) {
         let payInfo = o.taker_payment_info || '';
         let payImage = o.taker_payment_image || '';
@@ -695,6 +696,8 @@ async function showDetail(issueNum) {
           takerPayHTML = '<div style="margin-top:12px;padding:16px;background:#dcfce7;border-radius:8px;border:2px solid #16a34a"><strong>✅ 接单人收款信息（请向对方付款）</strong><div style="margin-top:8px;font-size:.9rem">' + esc(payInfo) + '</div>';
           if (payImage) takerPayHTML += '<img src="' + payImage + '" style="max-width:200px;border-radius:8px;margin-top:8px;display:block">';
           takerPayHTML += '</div>';
+        } else {
+          takerPayHTML = '<div style="margin-top:12px;padding:12px;background:#fee2e2;border-radius:8px;border:1.5px solid #dc2626"><strong>⚠️ 接单人未设置收款信息</strong><div style="margin-top:4px;font-size:.85rem">请联系对方：' + esc(o.taker_name || '未知') + '（' + esc(o.taker_student_id || '') + '）</div></div>';
         }
       }
     }
@@ -729,7 +732,7 @@ async function takeOrder(inum) {
     const issue = await res.json();
     const o = JSON.parse(issue.body);
     if (o.status !== 'open') { toast('订单已被接取', 'error'); return; }
-    if (o.publisher_id === (S.user._issue_number || S.user.student_id)) { toast('不能接自己的订单', 'error'); return; }
+    if (o.publisher_id == (S.user._issue_number || S.user.student_id)) { toast('不能接自己的订单', 'error'); return; }
     o.status = 'taken';
     o.taker_id = S.user._issue_number || S.user.student_id;
     o.taker_name = S.user.name;
