@@ -860,13 +860,9 @@ async function handlePublish(e) {
 
   // 图片转 base64 存到 body 中（GitHub Issue 不支持文件上传）
   let imageData = '';
-  if (imgFile && imgFile.size < 500 * 1024) {
-    imageData = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => resolve('');
-      reader.readAsDataURL(imgFile);
-    });
+  if (imgFile) {
+    if (imgFile.size > 2 * 1024 * 1024) { err.textContent = '图片太大，请选择 2MB 以内的图片'; err.style.display = 'block'; return; }
+    imageData = await compressImage(imgFile, 800, 0.6);
   }
 
   const order = {
@@ -961,15 +957,21 @@ async function saveMyPayment() {
   const info = document.getElementById('myPaymentInfo').value.trim();
   const imgFile = document.getElementById('myPaymentImage').files[0];
   const errEl = document.getElementById('myPaymentError');
+  errEl.style.display = 'none';
 
   let imageData = S.user.payment_image || '';
-  if (imgFile && imgFile.size < 500 * 1024) {
-    imageData = await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => resolve(imageData);
-      reader.readAsDataURL(imgFile);
-    });
+  if (imgFile) {
+    if (imgFile.size > 2 * 1024 * 1024) {
+      errEl.textContent = '图片太大，请选择 2MB 以内的图片';
+      errEl.style.display = 'block';
+      return;
+    }
+    imageData = await compressImage(imgFile);
+    if (!imageData) {
+      errEl.textContent = '图片处理失败';
+      errEl.style.display = 'block';
+      return;
+    }
   }
 
   S.user.payment_info = info;
@@ -982,9 +984,32 @@ async function saveMyPayment() {
     const preview = document.getElementById('myPaymentPreview');
     if (preview && imageData) preview.innerHTML = '<img src="' + imageData + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
   } catch(e) {
-    errEl.textContent = '保存失败：' + e.message;
+    errEl.textContent = '保存失败：' + e.message + '。图片可能仍然太大，请尝试更小的图片。';
     errEl.style.display = 'block';
   }
+}
+
+function compressImage(file, maxWidth = 400, quality = 0.6) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => resolve('');
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
 }
 
 
