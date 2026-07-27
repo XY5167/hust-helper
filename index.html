@@ -44,9 +44,11 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px;gap:20px}
 .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:1.15rem}
 .nav-links{display:flex;gap:2px}
-.nav-link{padding:8px 14px;border-radius:var(--radius-xs);font-size:.88rem;font-weight:500;color:var(--text-secondary);transition:all .15s;border:none;background:none}
+.nav-link{padding:8px 14px;border-radius:var(--radius-xs);font-size:.88rem;font-weight:500;color:var(--text-secondary);transition:all .15s;border:none;background:none;position:relative}
 .nav-link:hover{background:var(--bg-hover);color:var(--text)}
 .nav-link.active{background:var(--primary-light);color:var(--primary)}
+.nav-badge{position:absolute;top:-4px;right:-6px;min-width:18px;height:18px;border-radius:99px;background:var(--danger);color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;line-height:1;box-shadow:0 0 0 2px #fff;animation:badgePop .3s ease}
+@keyframes badgePop{0%{transform:scale(0)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
 .header-actions{display:flex;align-items:center;gap:8px}
 .user-menu{display:flex;align-items:center;gap:10px}
 .user-name{font-weight:600;font-size:.88rem}
@@ -1196,13 +1198,14 @@ setInterval(function(){
   }
 },15000);
 // ============ TOAST ============
-function toast(msg, type) {
+function toast(msg, type, duration) {
   const c = document.getElementById('toastContainer');
   const el = document.createElement('div');
   el.className = 'toast toast-' + (type || 'info');
   el.textContent = msg;
   c.appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 2500);
+  const d = duration || 2500;
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, d);
 }
 
 // ============ HELPERS ============
@@ -1226,6 +1229,25 @@ document.addEventListener('click', function(e) {
 // ============ 通知系统 ============
 // 记录已知订单状态，用于检测变化
 let _knownOrders = {};
+let _unreadNotifications = 0; // 未读通知计数
+
+// 更新导航栏红点
+function updateNavBadge() {
+  const navLink = document.querySelector('[data-page="task"]');
+  if (!navLink) return;
+  let badge = navLink.querySelector('.nav-badge');
+  if (_unreadNotifications > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'nav-badge';
+      navLink.appendChild(badge);
+    }
+    badge.textContent = _unreadNotifications > 99 ? '99+' : String(_unreadNotifications);
+    badge.style.display = 'flex';
+  } else {
+    if (badge) badge.style.display = 'none';
+  }
+}
 
 // 请求浏览器通知权限
 function requestNotifyPermission() {
@@ -1237,13 +1259,25 @@ function requestNotifyPermission() {
 
 // 发送浏览器通知
 function sendNotify(title, body) {
-  // 页面内 toast
-  toast(title + '：' + body, 'info');
+  _unreadNotifications++;
+  updateNavBadge();
+  // 页面内 toast — 延长到 6 秒
+  toast(title + '：' + body, 'info', 6000);
   // 浏览器原生通知
   if ('Notification' in window && Notification.permission === 'granted') {
-    try { new Notification(title, { body, icon: '📋' }); } catch(e) {}
+    try { new Notification(title, { body, icon: '📋', tag: 'hust-notify' }); } catch(e) {}
   }
 }
+
+// 点击任务大厅时清除红点
+const _origNavigate = navigate;
+navigate = function(page) {
+  if (page === 'task') {
+    _unreadNotifications = 0;
+    updateNavBadge();
+  }
+  _origNavigate(page);
+};
 
 // 轮询检查订单状态变化（仅登录用户）
 async function checkOrderNotifications() {
