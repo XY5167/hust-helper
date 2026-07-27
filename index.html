@@ -1212,6 +1212,93 @@ function timeAgo(ds) {
 document.addEventListener('click', function(e) {
   if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('active');
 });
+
+// ============ 通知系统 ============
+// 记录已知订单状态，用于检测变化
+let _knownOrders = {};
+
+// 请求浏览器通知权限
+function requestNotifyPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+// 发送浏览器通知
+function sendNotify(title, body) {
+  // 页面内 toast
+  toast(title + '：' + body, 'info');
+  // 浏览器原生通知
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try { new Notification(title, { body, icon: '📋' }); } catch(e) {}
+  }
+}
+
+// 轮询检查订单状态变化（仅登录用户）
+async function checkOrderNotifications() {
+  if (!S.user) return;
+  const uid = S.user._issue_number || S.user.student_id;
+  if (!uid) return;
+
+  try {
+    const issues = await ghIssues('order');
+    const myOrders = issues.map(i => {
+      try { const o = JSON.parse(i.body); o._num = i.number; return o; }
+      catch(e) { return null; }
+    }).filter(o => o && (o.publisher_id == uid || o.taker_id == uid));
+
+    for (const o of myOrders) {
+      const key = String(o._num);
+      const prev = _knownOrders[key];
+
+      if (prev !== undefined && prev.status !== o.status) {
+        // 状态变化了！
+        const isPublisher = o.publisher_id == uid;
+        if (isPublisher) {
+          if (o.status === 'taken' && prev.status === 'open') {
+            sendNotify('📢 有人接单了', (o.taker_name || '同学') + ' 接取了你的订单「' + (o.title || '无标题') + '」');
+          }
+          if (o.status === 'completed' && prev.status === 'taken') {
+            sendNotify('✅ 订单已完成', '你的订单「' + (o.title || '无标题') + '」已被标记为完成');
+          }
+        }
+        if (!isPublisher && o.taker_id == uid) {
+          if (o.status === 'completed' && prev.status === 'taken') {
+            sendNotify('✅ 订单已完成', '你接的订单「' + (o.title || '无标题') + '」已确认完成');
+          }
+        }
+      }
+
+      // 更新已知状态
+      _knownOrders[key] = { status: o.status };
+    }
+  } catch(e) { /* 静默失败 */ }
+}
+
+// 初始化通知：登录后开始轮询
+const _origHandleAuth = handleAuth;
+handleAuth = async function(e) {
+  await _origHandleAuth(e);
+  if (S.user) {
+    requestNotifyPermission();
+    _knownOrders = {};
+    checkOrderNotifications();
+  }
+};
+
+// 初始化通知：已登录用户
+(function() {
+  if (S.user) {
+    requestNotifyPermission();
+    checkOrderNotifications();
+  }
+})();
+
+// 每 10 秒检查一次通知
+setInterval(function() {
+  if (S.user) checkOrderNotifications();
+}, 10000);
 </script>
 
 </body>
