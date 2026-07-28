@@ -726,7 +726,8 @@ function renderOrders(orders) {
   if (!grid) return;
 
   if (orders.length === 0) {
-    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>暂无匹配订单</p></div>';
+    const emptyText = _cachedType === 'qa' ? '暂无问答' : '暂无匹配订单';
+    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>' + emptyText + '</p></div>';
     return;
   }
 
