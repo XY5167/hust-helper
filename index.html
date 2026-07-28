@@ -220,6 +220,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <span class="user-name" id="userNameDisplay"></span>
         <span class="user-verified" title="已实名">已实名</span>
         <button class="btn btn-outline btn-sm" onclick="showPublishModal()">+ 发布</button>
+        <button class="btn btn-outline btn-sm" id="btnAdmin" style="display:none;background:var(--accent);color:#fff;border-color:var(--accent)" onclick="showAdminPanel()">审核</button>
         <button class="btn btn-ghost btn-sm" onclick="logout()">退出</button>
       </div>
     </div>
@@ -492,9 +493,20 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   </div>
 </div>
 
+<!-- Admin Panel Modal -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeAdminModal()">&times;</button>
+    <h3 style="margin-bottom:16px">🛡️ 管理员审核</h3>
+    <div id="adminContent"><p>加载中...</p></div>
+  </div>
+</div>
+
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
+// ============ 管理员配置 ============
+const ADMIN_STUDENT_ID = 'U202312345'; // 管理员学号，改成你自己的
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
 
@@ -1097,8 +1109,96 @@ function closeUserProfileModal() {
   document.getElementById('userProfileModal').classList.remove('active');
 }
 
+// ============ 管理员审核 ============
+async function showAdminPanel() {
+  if (!S.user || S.user.student_id !== ADMIN_STUDENT_ID) {
+    toast('仅管理员可访问', 'error');
+    return;
+  }
+  document.getElementById('adminModal').classList.add('active');
+  await loadAdminPanel();
+}
+
+function closeAdminModal() {
+  document.getElementById('adminModal').classList.remove('active');
+}
+
+async function loadAdminPanel() {
+  const ct = document.getElementById('adminContent');
+  ct.innerHTML = '<p>加载中...</p>';
+  try {
+    const issues = await ghIssues('user', 'all');
+    const users = issues.map(i => {
+      try { const u = JSON.parse(i.body); u._issue_number = i.number; u._state = i.state; return u; }
+      catch(e) { return null; }
+    }).filter(u => u);
+
+    // 分类
+    const pending = users.filter(u => u.status === 'pending');
+    const approved = users.filter(u => u.status !== 'pending' && u.status !== 'rejected' && u._state === 'open');
+    const rejected = users.filter(u => u.status === 'rejected');
+
+    let html = '';
+    // 待审核
+    html += '<h4 style="margin-bottom:10px">⏳ 待审核 (' + pending.length + ')</h4>';
+    if (pending.length === 0) {
+      html += '<p style="color:var(--text-secondary);margin-bottom:16px">暂无待审核用户</p>';
+    } else {
+      html += '<div style="max-height:300px;overflow-y:auto;margin-bottom:16px">';
+      for (const u of pending) {
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
+          + '<div><strong>' + esc(u.name) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span>'
+          + (u.email ? '<br><span style="font-size:.8rem;color:var(--text-secondary)">📧 ' + esc(u.email) + '</span>' : '')
+          + (u.phone ? ' <span style="font-size:.8rem;color:var(--text-secondary)">📱 ' + esc(u.phone) + '</span>' : '')
+          + '<br><span style="font-size:.75rem;color:var(--text-muted)">' + timeAgo(u.created_at) + ' 注册</span></div>'
+          + '<div style="display:flex;gap:6px;flex-shrink:0">'
+          + '<button class="btn btn-sm btn-success" onclick="approveUser(' + u._issue_number + ')">通过</button>'
+          + '<button class="btn btn-sm btn-danger" onclick="rejectUser(' + u._issue_number + ')">拒绝</button>'
+          + '</div></div>';
+      }
+      html += '</div>';
+    }
+    // 已审核用户数
+    html += '<h4 style="margin-bottom:10px">✅ 已通过用户 (' + approved.length + ')</h4>';
+    html += '<h4 style="margin-bottom:10px">❌ 已拒绝用户 (' + rejected.length + ')</h4>';
+
+    ct.innerHTML = html;
+  } catch(e) {
+    ct.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
+  }
+}
+
+async function approveUser(inum) {
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const u = JSON.parse(issue.body);
+    u.status = 'approved';
+    await ghUpdateIssue(inum, JSON.stringify(u));
+    toast('已通过审核', 'success');
+    await loadAdminPanel();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+async function rejectUser(inum) {
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const u = JSON.parse(issue.body);
+    u.status = 'rejected';
+    await ghUpdateIssue(inum, JSON.stringify(u));
+    toast('已拒绝该用户', 'info');
+    await loadAdminPanel();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
 async function takeOrder(inum) {
   if (!S.user) { showAuthModal(); return; }
+  if (!checkApproved()) return;
   try {
     const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
@@ -1298,7 +1398,7 @@ async function handleAuth(e) {
         return;
       }
 
-      const userData = { student_id: sid, name, phone, email, password: pw, balance: 0, email_verified: true, created_at: new Date().toISOString() };
+      const userData = { student_id: sid, name, phone, email, password: pw, balance: 0, email_verified: true, status: 'pending', created_at: new Date().toISOString() };
       if (userData.email && userData.email.length > 60) { userData.email = userData.email.substring(0, 60); }
       let newIssue;
       try {
@@ -1314,7 +1414,9 @@ async function handleAuth(e) {
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       updateUI();
       closeAuthModal();
-      toast('注册成功，已实名认证', 'success');
+      toast('注册成功！请等待管理员审核通过后即可使用。', 'success');
+      // 注册后不自动登录，提示用户等待审核
+      S.user = null;
     } catch(ex) { console.error(ex); err.textContent = '注册失败：' + ex.message; err.style.display = 'block'; return; }
   } else {
     try {
@@ -1328,8 +1430,19 @@ async function handleAuth(e) {
       });
       if (!found) { err.textContent = '学号或密码错误'; err.style.display = 'block'; return; }
       if (found.state !== 'open') { err.textContent = '该账号已被停用，请联系管理员'; err.style.display = 'block'; return; }
-      // 检查投诉次数
       const u = JSON.parse(found.body);
+      // 检查审核状态
+      if (u.status === 'pending') {
+        err.textContent = '您的账号正在审核中，请耐心等待管理员审核通过。';
+        err.style.display = 'block';
+        return;
+      }
+      if (u.status === 'rejected') {
+        err.textContent = '您的账号审核未通过，请联系管理员了解原因。';
+        err.style.display = 'block';
+        return;
+      }
+      // 检查投诉次数
       const reportCount = await getUserReportCount(u._issue_number || u.student_id);
       if (reportCount >= 5) {
         err.textContent = '该账号已被多次投诉（' + reportCount + '次），已自动封停。如需申诉请联系管理员。';
@@ -1366,8 +1479,21 @@ function logout() {
 // ============ PUBLISH ============
 function showPublishModal() {
   if (!S.user) { showAuthModal(); return; }
+  if (!checkApproved()) return;
   document.getElementById('publishModal').classList.add('active');
   updatePublishCategories();
+}
+
+function checkApproved() {
+  if (S.user && S.user.status === 'pending') {
+    toast('您的账号正在审核中，审核通过后才能发布或接单。', 'info');
+    return false;
+  }
+  if (S.user && S.user.status === 'rejected') {
+    toast('您的账号审核未通过，请联系管理员。', 'error');
+    return false;
+  }
+  return true;
 }
 
 function closePublishModal() {
@@ -1449,9 +1575,18 @@ function updateUI() {
     menu.style.display = 'flex';
     btn.style.display = 'none';
     document.getElementById('userNameDisplay').textContent = S.user.name || S.user.student_id;
+    // 管理员显示审核入口
+    const adminBtn = document.getElementById('btnAdmin');
+    if (S.user.student_id === ADMIN_STUDENT_ID) {
+      if (adminBtn) adminBtn.style.display = 'inline-flex';
+    } else {
+      if (adminBtn) adminBtn.style.display = 'none';
+    }
   } else {
     menu.style.display = 'none';
     btn.style.display = 'inline-flex';
+    const adminBtn = document.getElementById('btnAdmin');
+    if (adminBtn) adminBtn.style.display = 'none';
   }
 }
 
