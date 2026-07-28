@@ -420,7 +420,12 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
       <button class="btn btn-outline btn-sm" onclick="showReportsView()" style="display:none" id="btnReports">📋 反馈中心</button>
     </div>
-    <div id="myContent">
+    <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0" id="myOrderTabs">
+      <button class="tab-btn active" data-mytab="all" onclick="switchMyTab('all')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:600;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px">全部</button>
+      <button class="tab-btn" data-mytab="published" onclick="switchMyTab('published')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px">我发布的</button>
+      <button class="tab-btn" data-mytab="taken" onclick="switchMyTab('taken')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px">我接单的</button>
+    </div>
+    <div id="myOrdersList">
       <p style="color:var(--text-secondary)">请先登录...</p>
     </div>
   </div>
@@ -1246,22 +1251,42 @@ async function ensureUserIssueNumber() {
 
 async function loadMyOrders(myTab) {
   const profile = document.getElementById('myProfile');
+  const tabsEl = document.getElementById('myOrderTabs');
+  const listEl = document.getElementById('myOrdersList');
+  const btnReports = document.getElementById('btnReports');
+
   if (!S.user) {
     if (profile) profile.style.display = 'none';
-    document.getElementById('myOrdersList').innerHTML = '<p style="color:var(--text-secondary)">请先登录...</p>';
+    if (tabsEl) tabsEl.style.display = 'none';
+    if (btnReports) btnReports.style.display = 'none';
+    if (listEl) listEl.innerHTML = '<p style="color:var(--text-secondary)">请先登录...</p>';
     return;
   }
+
   const hasIssue = await ensureUserIssueNumber();
   if (!hasIssue) {
     if (profile) profile.style.display = 'none';
-    document.getElementById('myOrdersList').innerHTML = '<p style="color:var(--danger)">用户信息不完整，请退出后重新登录。</p>';
+    if (tabsEl) tabsEl.style.display = 'none';
+    if (btnReports) btnReports.style.display = 'none';
+    if (listEl) listEl.innerHTML = '<p style="color:var(--danger)">用户信息不完整，请退出后重新登录。</p>';
     return;
   }
+
   if (profile) profile.style.display = 'block';
-  document.getElementById('btnReports').style.display = 'inline-flex';
+  if (tabsEl) tabsEl.style.display = 'flex';
+  if (btnReports) btnReports.style.display = 'inline-flex';
 
   const tab = myTab || S.myTab || 'all';
   S.myTab = tab;
+
+  // 显示当前收款信息
+  const paymentInput = document.getElementById('myPaymentInfo');
+  const paymentPreview = document.getElementById('myPaymentPreview');
+  if (paymentInput && S.user.payment_info) paymentInput.value = S.user.payment_info;
+  if (paymentPreview && S.user.payment_image) {
+    paymentPreview.innerHTML = '<img src="' + S.user.payment_image + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
+  }
+
   // 更新 tab 样式
   document.querySelectorAll('#myOrderTabs .tab-btn').forEach(b => {
     b.style.color = 'var(--text-secondary)';
@@ -1275,15 +1300,7 @@ async function loadMyOrders(myTab) {
     activeTab.style.fontWeight = '600';
   }
 
-  // 显示当前收款信息
-  const paymentInput = document.getElementById('myPaymentInfo');
-  const paymentPreview = document.getElementById('myPaymentPreview');
-  if (paymentInput && S.user.payment_info) paymentInput.value = S.user.payment_info;
-  if (paymentPreview && S.user.payment_image) {
-    paymentPreview.innerHTML = '<img src="' + S.user.payment_image + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
-  }
-
-  const listEl = document.getElementById('myOrdersList');
+  if (!listEl) return;
   listEl.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
 
   try {
