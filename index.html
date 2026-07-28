@@ -1210,7 +1210,7 @@ function switchAuthTab(tab) {
 }
 
 // ============ 邮箱验证码 ============
-const MAIL_API = 'http://localhost:3456'; // 邮件服务地址
+const MAIL_API = ''; // 邮件服务同源部署
 
 async function sendVerifyCode() {
   const email = document.getElementById('authEmail').value.trim();
