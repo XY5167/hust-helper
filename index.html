@@ -974,7 +974,6 @@ async function loadComments(issueNum) {
       + '<input type="text" id="commentInput" placeholder="输入消息..." style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem" onkeydown="if(event.key===\'Enter\')sendComment(' + issueNum + ')">'
       + '<button class="btn btn-primary btn-sm" onclick="sendComment(' + issueNum + ')" style="white-space:nowrap">发送</button>'
       + '</div>';
-    }
   } catch(e) { el.innerHTML = ''; }
 }
 
@@ -2013,36 +2012,88 @@ function compressImage(file, maxWidth = 400, quality = 0.6) {
 }
 
 
-// ============ 自动清理旧订单 ============
-// 已完成/已取消的订单超过7天自动删除（GitHub Issue close）
+// ============ 数据清理 ============
+// 清理过期订单和评论（管理员在审核面板中手动触发）
+async function cleanOldData(days) {
+  const maxAge = days * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  let orderCleaned = 0, commentCleaned = 0;
+
+  try {
+    // 1. 清理订单（已完成/已取消超过指定天数）
+    const issues = await ghIssues('order', 'all');
+    for (const issue of issues) {
+      try {
+        const o = JSON.parse(issue.body);
+        if (o.status !== 'completed' && o.status !== 'cancelled') continue;
+        const created = new Date(o.created_at).getTime();
+        if (now - created > maxAge) {
+          // 先删评论
+          try {
+            const comments = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issue.number + '/comments?per_page=100', {
+              headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+            }).then(r => r.json());
+            for (const c of comments) {
+              await fetch('https://api.github.com/repos/' + REPO + '/issues/comments/' + c.id, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+              });
+              commentCleaned++;
+            }
+          } catch(e) {}
+          await ghCloseIssue(issue.number);
+          orderCleaned++;
+        }
+      } catch(e) {}
+    }
+
+    // 2. 清理未审核的僵尸用户（注册超过指定天数仍 pending）
+    const users = await ghIssues('user', 'all');
+    let userCleaned = 0;
+    for (const user of users) {
+      try {
+        const u = JSON.parse(user.body);
+        if (u.status !== 'pending') continue;
+        const created = new Date(u.created_at).getTime();
+        if (now - created > maxAge) {
+          await ghCloseIssue(user.number);
+          userCleaned++;
+        }
+      } catch(e) {}
+    }
+
+    toast('🧹 清理完成：' + orderCleaned + '条订单、' + commentCleaned + '条评论、' + userCleaned + '个僵尸用户', 'success');
+    return { orderCleaned, commentCleaned, userCleaned };
+  } catch(e) {
+    toast('清理失败：' + e.message, 'error');
+    return { orderCleaned: 0, commentCleaned: 0, userCleaned: 0 };
+  }
+}
+
+// 自动清理：页面加载后只运行一次
 let _cleanupRan = false;
-async function cleanOldOrders() {
+async function autoCleanOldOrders() {
   if (_cleanupRan) return;
   _cleanupRan = true;
   try {
     const issues = await ghIssues('order', 'all');
     const now = Date.now();
-    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7天
+    const maxAge = 7 * 24 * 60 * 60 * 1000;
     let cleaned = 0;
     for (const issue of issues) {
       try {
         const o = JSON.parse(issue.body);
-        // 只清理已完成或已取消的订单
         if (o.status !== 'completed' && o.status !== 'cancelled') continue;
-        const created = new Date(o.created_at).getTime();
-        if (now - created > maxAge) {
-          // 关闭 GitHub Issue（不删除，只是 close）
+        if (now - new Date(o.created_at).getTime() > maxAge) {
           await ghCloseIssue(issue.number);
           cleaned++;
         }
-      } catch(e) { /* 跳过解析失败的 */ }
+      } catch(e) {}
     }
     if (cleaned > 0) console.log('🧹 自动清理了 ' + cleaned + ' 条过期订单');
-  } catch(e) { /* 静默失败 */ }
+  } catch(e) {}
 }
-
-// 页面加载后延迟执行清理
-setTimeout(cleanOldOrders, 5000);
+setTimeout(autoCleanOldOrders, 5000);
 
 // 自动刷新：每15秒刷新一次当前页面数据
 setInterval(function(){
