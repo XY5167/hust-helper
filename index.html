@@ -1584,15 +1584,20 @@ async function handlePublish(e) {
 
   const fee = Math.round(price * 0.05 * 100) / 100;
 
-  // 图片转 base64 存到 body 中（GitHub Issue 不支持文件上传）
+  // 图片转 base64 存到 body 中（GitHub Issue body 上限约 65536 字符）
   let imageData = '';
   if (imgFile) {
-    if (imgFile.size > 2 * 1024 * 1024) { err.textContent = '图片太大，请选择 2MB 以内的图片'; err.style.display = 'block'; return; }
-    imageData = await compressImage(imgFile, 500, 0.5);
-    if (imageData && imageData.length > 30000) {
-      err.textContent = '图片压缩后仍过大，请尝试更小的图片或截图后再上传';
-      err.style.display = 'block';
-      return;
+    if (imgFile.size > 5 * 1024 * 1024) { err.textContent = '图片太大，请选择 5MB 以内的图片'; err.style.display = 'block'; return; }
+    // 先尝试较高质量压缩
+    imageData = await compressImage(imgFile, 800, 0.7);
+    if (imageData && imageData.length > 55000) {
+      // 仍太大，再降质量
+      imageData = await compressImage(imgFile, 600, 0.5);
+      if (imageData && imageData.length > 55000) {
+        err.textContent = '图片压缩后仍过大，请尝试更小的图片或截图后再上传';
+        err.style.display = 'block';
+        return;
+      }
     }
   }
 
