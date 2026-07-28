@@ -243,21 +243,10 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   </div>
 
   <div class="container">
-    <div class="section">
-      <h2 class="section-title">开始使用</h2>
-      <div class="card-grid">
-        <div class="service-card" onclick="navigate('task')">
-          <div class="service-icon">📋</div>
-          <h3>任务大厅</h3>
-          <p>代拿快递、代取外卖、二手交易、帮打印、修电脑…发布你的需求或浏览找活干。</p>
-          <span class="service-tag">全部</span>
-        </div>
-        <div class="service-card" onclick="navigate('task');setTimeout(()=>switchTaskTab('secondhand'),100)">
-          <div class="service-icon">🔄</div>
-          <h3>二手交易</h3>
-          <p>毕业季淘好物，课本、电器、日用品。学长学姐实惠转让，学弟学妹放心入手。</p>
-          <span class="service-tag">毕业季</span>
-        </div>
+    <div class="section" style="padding-top:24px">
+      <div class="hero-actions" style="margin:0">
+        <button class="btn btn-primary btn-lg" onclick="navigate('task')">浏览任务大厅</button>
+        <button class="btn btn-outline btn-lg" onclick="navigate('task');setTimeout(()=>switchTaskTab('secondhand'),100)">逛逛二手交易</button>
       </div>
     </div>
   </div>
@@ -1092,7 +1081,7 @@ async function showUserProfile(studentId) {
       + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + stars + '</div><div style="font-size:.75rem;color:var(--text-secondary)">' + scoreCount + '条评价</div></div>'
       + (reportCount > 0 ? '<div style="text-align:center;padding:12px 18px;background:#fef2f2;border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#dc2626">' + reportCount + '</div><div style="font-size:.75rem;color:#dc2626">被投诉</div></div>' : '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#16a34a">0</div><div style="font-size:.75rem;color:var(--text-secondary)">被投诉</div></div>')
       + '</div>'
-      + (recentOrders.length > 0 ? '<h4 style="font-size:.95rem;margin-bottom:10px">最近订单</h4>' + recentOrders.slice(0, 10).map(o => {
+      + (recentOrders.length > 0 ? '<h4 style="font-size:.95rem;margin-bottom:10px">最近订单</h4>' + recentOrders.slice(0, 2).map(o => {
         const sl = {completed:'已完成', taken:'已接单', open:'待接单', cancelled:'已取消'};
         return '<div style="background:var(--bg);border-radius:6px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="closeUserProfileModal();showDetail(' + o.num + ')">'
           + '<span style="font-size:.85rem">' + esc(o.title) + ' <span style="color:var(--text-muted);font-size:.75rem">(' + o.role + ')</span></span>'
