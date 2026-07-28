@@ -1500,6 +1500,13 @@ async function loadMyOrders(myTab) {
 
     listEl.innerHTML = orders.map(o => {
       const role = o.publisher_id == uid ? '<span style="color:var(--primary);font-size:.75rem">我发布的</span>' : '<span style="color:var(--success);font-size:.75rem">我接单的</span>';
+      // 对方信息（点击可查看主页）
+      let counterpartLink = '';
+      if (o.publisher_id == uid && o.taker_name) {
+        counterpartLink = '<span style="margin-left:auto;font-size:.78rem">🤝 <a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_name) + '</a></span>';
+      } else if (o.taker_id == uid) {
+        counterpartLink = '<span style="margin-left:auto;font-size:.78rem">👤 <a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || '未知') + '</a></span>';
+      }
       let rateBtn = '';
       if (o.status === 'completed') {
         const isPublisher = o.publisher_id == uid;
@@ -1512,7 +1519,7 @@ async function loadMyOrders(myTab) {
         + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span><span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span></div>'
         + '<div class="order-card-title">' + esc(o.title) + ' ' + role + '</div>'
         + '<div class="order-card-meta"><span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>'
-        + '<div class="order-card-footer"><span>' + timeAgo(o.created_at) + '</span>' + rateBtn + '</div></div>';
+        + '<div class="order-card-footer"><span>' + timeAgo(o.created_at) + '</span>' + counterpartLink + rateBtn + '</div></div>';
     }).join('');
   } catch(e) {
     listEl.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
