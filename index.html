@@ -863,6 +863,7 @@ async function showDetail(issueNum) {
           actions += '<button class="btn btn-warning" onclick="showReportModal(' + issueNum + ')">投诉</button>';
         }
       }
+    }
 
     const urgencyLabels = {normal:'一般', urgent:'🔥 加急', asap:'⚡ 立刻需要'};
     const urgencyHTML = o.urgency ? '<span>⏱️ 紧急程度：' + (urgencyLabels[o.urgency] || o.urgency) + '</span>' : '';
