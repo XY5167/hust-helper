@@ -485,6 +485,14 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   </div>
 </div>
 
+<!-- User Profile Modal -->
+<div class="modal-overlay" id="userProfileModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeUserProfileModal()">&times;</button>
+    <div id="userProfileContent"><p>加载中...</p></div>
+  </div>
+</div>
+
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
@@ -655,7 +663,7 @@ function renderOrders(orders) {
       + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
       + '</div>'
       + '<div class="order-card-footer">'
-      + '<span>发布者：' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</span>'
+      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a></span>'
       + '<span>' + timeAgo(o.created_at) + '</span>'
       + '</div></div>';
   }).join('');
@@ -825,8 +833,8 @@ async function showDetail(issueNum) {
       + '<div class="detail-price">¥' + o.price.toFixed(2) + ' <span style="font-size:.78rem;color:var(--text-muted);font-weight:400">（平台抽成 ¥' + o.fee.toFixed(2) + '）</span></div>'
       + '<div class="detail-meta">'
       + '<span>📌 ' + esc(o.location || '未指定') + '</span>'
-      + '<span>👤 发布：' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</span>'
-      + (o.taker_name ? '<span>🤝 接单：' + esc(o.taker_name) + '</span>' : '')
+      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a></span>'
+      + (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_name) + '</a></span>' : '')
       + '<span>🕐 ' + timeAgo(o.created_at) + '</span>'
       + urgencyHTML + deadlineHTML
       + '</div>'
@@ -994,6 +1002,91 @@ async function rateOrder(inum) {
     toast('评价成功！感谢你的反馈 ⭐', 'success');
     if (S.page === 'my') loadMyOrders(S.myTab);
   } catch(e) { toast('评价失败：' + e.message, 'error'); }
+}
+
+// ============ USER PROFILE ============
+async function showUserProfile(studentId) {
+  if (!studentId) return;
+  const modal = document.getElementById('userProfileModal');
+  const ct = document.getElementById('userProfileContent');
+  modal.classList.add('active');
+  ct.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
+
+  try {
+    // 查找用户信息
+    const users = await ghIssues('user', 'all');
+    const userIssue = users.find(i => {
+      try { const u = JSON.parse(i.body); return u.student_id === studentId; }
+      catch(e) { return false; }
+    });
+    if (!userIssue) { ct.innerHTML = '<p>用户不存在</p>'; return; }
+    const user = JSON.parse(userIssue.body);
+
+    // 查找该用户的所有已完成订单，统计评价
+    const orders = await ghIssues('order');
+    const userOrders = orders.map(i => {
+      try { const o = JSON.parse(i.body); o._num = i.number; return o; }
+      catch(e) { return null; }
+    }).filter(o => o && o.status === 'completed' && (o.publisher_id == (user._issue_number || user.student_id) || o.taker_id == (user._issue_number || user.student_id)));
+
+    // 统计评分
+    let totalScore = 0, scoreCount = 0, completedCount = 0;
+    const recentOrders = [];
+    for (const o of userOrders) {
+      completedCount++;
+      const isPublisher = o.publisher_id == (user._issue_number || user.student_id);
+      const score = isPublisher ? o.taker_rated : o.publisher_rated;
+      if (score) { totalScore += score; scoreCount++; }
+      recentOrders.push({
+        title: o.title,
+        role: isPublisher ? '发布' : '接单',
+        price: o.price,
+        status: o.status,
+        time: o.created_at,
+        num: o._num,
+        score: isPublisher ? o.taker_rated : o.publisher_rated
+      });
+    }
+    recentOrders.sort((a, b) => new Date(b.time) - new Date(a.time));
+    const avgScore = scoreCount > 0 ? (totalScore / scoreCount).toFixed(1) : '暂无';
+    const stars = scoreCount > 0 ? '⭐'.repeat(Math.round(totalScore / scoreCount)) : '—';
+
+    // 查看投诉记录
+    let reportCount = 0;
+    try {
+      const reports = await ghIssues('report', 'all');
+      reportCount = reports.filter(r => {
+        try { const rp = JSON.parse(r.body); return rp.target_id == (user._issue_number || user.student_id) && rp.status === 'open'; }
+        catch(e) { return false; }
+      }).length;
+    } catch(e) {}
+
+    ct.innerHTML = ''
+      + '<div style="text-align:center;margin-bottom:20px">'
+      + '<div style="width:64px;height:64px;border-radius:50%;background:var(--primary-light);color:var(--primary);font-size:1.5rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-bottom:8px">' + (user.name || '?').charAt(0).toUpperCase() + '</div>'
+      + '<h3 style="margin:0">' + esc(user.name || '未知') + '</h3>'
+      + '<p style="color:var(--text-secondary);font-size:.85rem;margin:4px 0">' + esc(user.student_id) + '</p>'
+      + '</div>'
+      + '<div style="display:flex;gap:12px;justify-content:center;margin-bottom:20px;flex-wrap:wrap">'
+      + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + avgScore + '</div><div style="font-size:.75rem;color:var(--text-secondary)">平均评分</div></div>'
+      + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + stars + '</div><div style="font-size:.75rem;color:var(--text-secondary)">' + scoreCount + '条评价</div></div>'
+      + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + completedCount + '</div><div style="font-size:.75rem;color:var(--text-secondary)">完成订单</div></div>'
+      + (reportCount > 0 ? '<div style="text-align:center;padding:12px 18px;background:#fef2f2;border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#dc2626">' + reportCount + '</div><div style="font-size:.75rem;color:#dc2626">被投诉</div></div>' : '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#16a34a">0</div><div style="font-size:.75rem;color:var(--text-secondary)">被投诉</div></div>')
+      + '</div>'
+      + (recentOrders.length > 0 ? '<h4 style="font-size:.95rem;margin-bottom:10px">最近订单</h4>' + recentOrders.slice(0, 10).map(o => {
+        const sl = {completed:'已完成', taken:'已接单', open:'待接单', cancelled:'已取消'};
+        return '<div style="background:var(--bg);border-radius:6px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="closeUserProfileModal();showDetail(' + o.num + ')">'
+          + '<span style="font-size:.85rem">' + esc(o.title) + ' <span style="color:var(--text-muted);font-size:.75rem">(' + o.role + ')</span></span>'
+          + '<span style="font-size:.85rem;color:var(--text-muted)">¥' + o.price.toFixed(2) + ' ' + (o.score ? '⭐' + o.score : '') + '</span>'
+          + '</div>';
+      }).join('') : '<p style="color:var(--text-secondary);text-align:center">暂无订单记录</p>');
+  } catch(e) {
+    ct.innerHTML = '<p style="color:var(--danger)">加载失败</p>';
+  }
+}
+
+function closeUserProfileModal() {
+  document.getElementById('userProfileModal').classList.remove('active');
 }
 
 async function takeOrder(inum) {
