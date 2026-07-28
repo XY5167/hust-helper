@@ -551,6 +551,16 @@ async function ghUpdateIssue(number, body) {
   return res.json();
 }
 
+async function ghCloseIssue(number) {
+  const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + number, {
+    method: 'PATCH',
+    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ state: 'closed' })
+  });
+  if (!res.ok) throw new Error('Close failed ' + res.status);
+  return res.json();
+}
+
 // ============ NAVIGATION ============
 function navigate(page) {
   S.page = page;
@@ -1070,7 +1080,6 @@ async function showUserProfile(studentId) {
       + '<div style="display:flex;gap:12px;justify-content:center;margin-bottom:20px;flex-wrap:wrap">'
       + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + avgScore + '</div><div style="font-size:.75rem;color:var(--text-secondary)">平均评分</div></div>'
       + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + stars + '</div><div style="font-size:.75rem;color:var(--text-secondary)">' + scoreCount + '条评价</div></div>'
-      + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + completedCount + '</div><div style="font-size:.75rem;color:var(--text-secondary)">完成订单</div></div>'
       + (reportCount > 0 ? '<div style="text-align:center;padding:12px 18px;background:#fef2f2;border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#dc2626">' + reportCount + '</div><div style="font-size:.75rem;color:#dc2626">被投诉</div></div>' : '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#16a34a">0</div><div style="font-size:.75rem;color:var(--text-secondary)">被投诉</div></div>')
       + '</div>'
       + (recentOrders.length > 0 ? '<h4 style="font-size:.95rem;margin-bottom:10px">最近订单</h4>' + recentOrders.slice(0, 10).map(o => {
@@ -1632,6 +1641,37 @@ function compressImage(file, maxWidth = 400, quality = 0.6) {
   });
 }
 
+
+// ============ 自动清理旧订单 ============
+// 已完成/已取消的订单超过7天自动删除（GitHub Issue close）
+let _cleanupRan = false;
+async function cleanOldOrders() {
+  if (_cleanupRan) return;
+  _cleanupRan = true;
+  try {
+    const issues = await ghIssues('order', 'all');
+    const now = Date.now();
+    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7天
+    let cleaned = 0;
+    for (const issue of issues) {
+      try {
+        const o = JSON.parse(issue.body);
+        // 只清理已完成或已取消的订单
+        if (o.status !== 'completed' && o.status !== 'cancelled') continue;
+        const created = new Date(o.created_at).getTime();
+        if (now - created > maxAge) {
+          // 关闭 GitHub Issue（不删除，只是 close）
+          await ghCloseIssue(issue.number);
+          cleaned++;
+        }
+      } catch(e) { /* 跳过解析失败的 */ }
+    }
+    if (cleaned > 0) console.log('🧹 自动清理了 ' + cleaned + ' 条过期订单');
+  } catch(e) { /* 静默失败 */ }
+}
+
+// 页面加载后延迟执行清理
+setTimeout(cleanOldOrders, 5000);
 
 // 自动刷新：每15秒刷新一次当前页面数据
 setInterval(function(){
