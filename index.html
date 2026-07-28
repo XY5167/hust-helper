@@ -289,6 +289,16 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <button class="filter-btn" data-filter="daily" onclick="filterOrders('secondhand','daily')">🏠 生活用品</button>
       <button class="filter-btn" data-filter="other" onclick="filterOrders('secondhand','other')">📌 其他</button>
     </div>
+    <!-- 搜索和排序 -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap" id="taskSearchBar">
+      <input type="text" id="taskSearchInput" placeholder="🔍 搜索订单标题或描述..." style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card)" oninput="applySearchAndSort()">
+      <select id="taskSortSelect" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card);cursor:pointer" onchange="applySearchAndSort()">
+        <option value="newest">🕐 最新发布</option>
+        <option value="oldest">🕐 最早发布</option>
+        <option value="price_high">💰 价格从高到低</option>
+        <option value="price_low">💰 价格从低到高</option>
+      </select>
+    </div>
     <div class="order-grid" id="taskOrders"></div>
   </div>
 </section>
@@ -573,11 +583,19 @@ async function loadStats() {
 }
 
 // ============ ORDERS ============
+let _cachedOrders = null;
+let _cachedType = null;
+
 async function loadOrders(type, cat) {
-  // 任务大厅统一用 taskOrders 作为容器
   const grid = document.getElementById('taskOrders');
   if (!grid) return;
   grid.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
+
+  // 清空搜索
+  const searchInput = document.getElementById('taskSearchInput');
+  const sortSelect = document.getElementById('taskSortSelect');
+  if (searchInput) searchInput.value = '';
+  if (sortSelect) sortSelect.value = 'newest';
 
   try {
     const issues = await ghIssues('order');
@@ -590,7 +608,7 @@ async function loadOrders(type, cat) {
       } catch(e) { return null; }
     }).filter(o => o && o.status === 'open');
 
-    // 根据类型筛选：task 或 secondhand
+    // 根据类型筛选
     if (type === 'secondhand') {
       orders = orders.filter(o => o.type === 'secondhand');
     } else {
@@ -600,37 +618,81 @@ async function loadOrders(type, cat) {
     if (cat !== 'all') orders = orders.filter(o => o.category === cat);
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    if (orders.length === 0) {
-      grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>暂无订单，来发布第一个吧！</p></div>';
-      return;
-    }
+    // 缓存搜索结果
+    _cachedOrders = orders;
+    _cachedType = type;
 
-    grid.innerHTML = orders.map(o => {
-      const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'任务'};
-      const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品'};
-      const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
-      const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
-      const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
-      return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
-        + '<div class="order-card-header">'
-        + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>'
-        + '<span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span>'
-        + '</div>'
-        + '<div class="order-card-title">' + esc(o.title) + urgencyBadge + '</div>'
-        + (o.description ? '<div class="order-card-desc">' + esc(o.description) + '</div>' : '')
-        + '<div class="order-card-meta">'
-        + '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>'
-        + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
-        + '</div>'
-        + '<div class="order-card-footer">'
-        + '<span>发布者：' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</span>'
-        + '<span>' + timeAgo(o.created_at) + '</span>'
-        + '</div></div>';
-    }).join('');
-
+    renderOrders(orders);
   } catch(e) {
     grid.innerHTML = '<div class="empty-state"><p>加载失败：' + esc(e.message) + '</p></div>';
   }
+}
+
+function renderOrders(orders) {
+  const grid = document.getElementById('taskOrders');
+  if (!grid) return;
+
+  if (orders.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>暂无匹配订单</p></div>';
+    return;
+  }
+
+  grid.innerHTML = orders.map(o => {
+    const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'任务'};
+    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品'};
+    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
+    const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
+    const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
+    return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
+      + '<div class="order-card-header">'
+      + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>'
+      + '<span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span>'
+      + '</div>'
+      + '<div class="order-card-title">' + esc(o.title) + urgencyBadge + '</div>'
+      + (o.description ? '<div class="order-card-desc">' + esc(o.description) + '</div>' : '')
+      + '<div class="order-card-meta">'
+      + '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>'
+      + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
+      + '</div>'
+      + '<div class="order-card-footer">'
+      + '<span>发布者：' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</span>'
+      + '<span>' + timeAgo(o.created_at) + '</span>'
+      + '</div></div>';
+  }).join('');
+}
+
+function applySearchAndSort() {
+  if (!_cachedOrders) return;
+  let orders = [..._cachedOrders];
+
+  // 搜索过滤
+  const keyword = (document.getElementById('taskSearchInput')?.value || '').trim().toLowerCase();
+  if (keyword) {
+    orders = orders.filter(o => {
+      return (o.title || '').toLowerCase().includes(keyword)
+        || (o.description || '').toLowerCase().includes(keyword)
+        || (o.location || '').toLowerCase().includes(keyword)
+        || (o.publisher_name || '').toLowerCase().includes(keyword);
+    });
+  }
+
+  // 排序
+  const sortBy = document.getElementById('taskSortSelect')?.value || 'newest';
+  switch (sortBy) {
+    case 'oldest':
+      orders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      break;
+    case 'price_high':
+      orders.sort((a, b) => (b.price || 0) - (a.price || 0));
+      break;
+    case 'price_low':
+      orders.sort((a, b) => (a.price || 0) - (b.price || 0));
+      break;
+    default: // newest
+      orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+
+  renderOrders(orders);
 }
 
 function filterOrders(type, cat) {
