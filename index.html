@@ -493,6 +493,8 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   <div class="modal modal-lg">
     <button class="modal-close" onclick="closeDetailModal()">&times;</button>
     <div id="detailContent"></div>
+    <!-- 评论区 -->
+    <div id="detailComments" style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px"></div>
   </div>
 </div>
 
@@ -923,10 +925,91 @@ async function showDetail(issueNum) {
       + paymentHTML
       + takerPayHTML
       + '<div class="detail-actions">' + actions + '</div>';
+    // 加载评论区
+    await loadComments(issueNum);
+    // 启动自动刷新
+    startCommentPolling(issueNum);
   } catch(e) { ct.innerHTML = '<p>加载失败</p>'; }
 }
 
-function closeDetailModal() { document.getElementById('detailModal').classList.remove('active'); }
+function closeDetailModal() {
+  document.getElementById('detailModal').classList.remove('active');
+  stopCommentPolling();
+}
+
+// ============ 评论聊天 ============
+let _commentTimer = null;
+let _commentIssueNum = null;
+
+async function loadComments(issueNum) {
+  const el = document.getElementById('detailComments');
+  if (!el) return;
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum + '/comments?per_page=50', {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    if (!res.ok) { el.innerHTML = ''; return; }
+    const comments = await res.json();
+
+    if (comments.length === 0) {
+      el.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:12px">暂无留言，在此与对方协商吧 💬</p>';
+    } else {
+      el.innerHTML = comments.map(c => {
+        try {
+          const u = JSON.parse(c.body);
+          const name = u.name || '用户';
+          const text = u.text || '';
+          const time = new Date(c.created_at).toLocaleString('zh-CN');
+          const isMe = S.user && (u.student_id === S.user.student_id);
+          return '<div style="padding:8px 12px;margin-bottom:8px;background:' + (isMe ? '#eff6ff' : 'var(--bg)') + ';border-radius:8px">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+            + '<strong style="font-size:.82rem;color:' + (isMe ? 'var(--primary)' : 'var(--text)') + '">' + esc(name) + (isMe ? ' (我)' : '') + '</strong>'
+            + '<span style="font-size:.7rem;color:var(--text-muted)">' + time + '</span></div>'
+            + '<div style="font-size:.88rem">' + esc(text) + '</div></div>';
+        } catch(e) { return ''; }
+      }).join('');
+    }
+    // 追加输入框
+    el.innerHTML += '<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
+      + '<input type="text" id="commentInput" placeholder="输入消息..." style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem" onkeydown="if(event.key===\'Enter\')sendComment(' + issueNum + ')">'
+      + '<button class="btn btn-primary btn-sm" onclick="sendComment(' + issueNum + ')" style="white-space:nowrap">发送</button>'
+      + '</div>';
+    }
+  } catch(e) { el.innerHTML = ''; }
+}
+
+async function sendComment(issueNum) {
+  if (!S.user) { showAuthModal(); return; }
+  const input = document.getElementById('commentInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.disabled = true;
+  try {
+    const body = JSON.stringify({ name: S.user.name, student_id: S.user.student_id, text });
+    await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum + '/comments', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body })
+    });
+    input.value = '';
+    await loadComments(issueNum);
+  } catch(e) { toast('发送失败：' + e.message, 'error'); }
+  input.disabled = false;
+}
+
+function startCommentPolling(issueNum) {
+  stopCommentPolling();
+  _commentIssueNum = issueNum;
+  _commentTimer = setInterval(() => {
+    if (_commentIssueNum) loadComments(_commentIssueNum);
+  }, 8000);
+}
+
+function stopCommentPolling() {
+  if (_commentTimer) { clearInterval(_commentTimer); _commentTimer = null; }
+  _commentIssueNum = null;
+}
 
 // ============ REPORT SYSTEM ============
 let _reportIssueNum = null;
