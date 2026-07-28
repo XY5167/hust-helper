@@ -68,6 +68,8 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .btn-block{width:100%}
 .btn-success{background:var(--success);color:#fff}
 .btn-danger{background:var(--danger);color:#fff}
+.btn-warning{background:#f59e0b;color:#fff}
+.btn-warning:hover{opacity:.85}
 
 /* Hero */
 .hero{padding:70px 0 50px;text-align:center;background:linear-gradient(180deg,#eff6ff 0%,var(--bg) 100%)}
@@ -415,6 +417,9 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <p class="form-error" id="myPaymentError" style="display:none"></p>
       <div id="myPaymentPreview" style="margin-top:12px"></div>
     </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+      <button class="btn btn-outline btn-sm" onclick="showReportsView()" style="display:none" id="btnReports">📋 反馈中心</button>
+    </div>
     <div id="myContent">
       <p style="color:var(--text-secondary)">请先登录...</p>
     </div>
@@ -426,6 +431,42 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   <div class="modal modal-lg">
     <button class="modal-close" onclick="closeDetailModal()">&times;</button>
     <div id="detailContent"></div>
+  </div>
+</div>
+
+<!-- Report Modal -->
+<div class="modal-overlay" id="reportModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeReportModal()">&times;</button>
+    <h3 style="margin-bottom:16px">📢 投诉反馈</h3>
+    <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:16px">投诉对象：<strong id="reportTarget"></strong>｜订单：<strong id="reportOrderTitle"></strong></p>
+    <div class="form-group">
+      <label>投诉原因</label>
+      <select id="reportReason">
+        <option value="付款金额不对">付款金额不对</option>
+        <option value="付款后失联">付款后失联</option>
+        <option value="未完成约定任务">未完成约定任务</option>
+        <option value="态度恶劣">态度恶劣</option>
+        <option value="虚假信息">虚假信息</option>
+        <option value="其他">其他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>详细说明</label>
+      <textarea id="reportDesc" rows="3" placeholder="请详细描述问题..."></textarea>
+    </div>
+    <p class="form-error" id="reportError" style="display:none"></p>
+    <button class="btn btn-danger btn-block" onclick="submitReport()">提交投诉</button>
+    <p style="font-size:.75rem;color:var(--text-muted);margin-top:8px">投诉达 5 次将自动封停账号。请如实反馈。</p>
+  </div>
+</div>
+
+<!-- Reports View Modal -->
+<div class="modal-overlay" id="reportsViewModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeReportsViewModal()">&times;</button>
+    <h3 style="margin-bottom:16px">📋 反馈中心</h3>
+    <div id="reportsViewContent"><p>加载中...</p></div>
   </div>
 </div>
 
@@ -650,6 +691,10 @@ async function showDetail(issueNum) {
       if (o.status === 'open' || o.status === 'taken') {
         actions += '<button class="btn btn-danger" onclick="cancelOrder(' + issueNum + ')">取消订单</button>';
       }
+      // 投诉按钮：已完成订单或已接单订单都可以投诉
+      if (o.status === 'taken' || o.status === 'completed') {
+        actions += '<button class="btn btn-warning" onclick="showReportModal(' + issueNum + ')">投诉</button>';
+      }
     }
 
     const urgencyLabels = {normal:'一般', urgent:'🔥 加急', asap:'⚡ 立刻需要'};
@@ -727,6 +772,129 @@ async function showDetail(issueNum) {
 }
 
 function closeDetailModal() { document.getElementById('detailModal').classList.remove('active'); }
+
+// ============ REPORT SYSTEM ============
+let _reportIssueNum = null;
+
+function showReportModal(issueNum) {
+  if (!S.user) { showAuthModal(); return; }
+  _reportIssueNum = issueNum;
+  // 先获取订单信息
+  fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum, {
+    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+  }).then(r => r.json()).then(issue => {
+    const o = JSON.parse(issue.body);
+    const isPublisher = (o.publisher_id == (S.user._issue_number || S.user.student_id));
+    const target = isPublisher ? (o.taker_name || o.taker_student_id) : (o.publisher_name || o.publisher_student_id);
+    document.getElementById('reportTarget').textContent = target;
+    document.getElementById('reportOrderTitle').textContent = o.title || '无标题';
+    document.getElementById('reportError').style.display = 'none';
+    document.getElementById('reportModal').classList.add('active');
+  }).catch(() => toast('获取订单信息失败', 'error'));
+}
+
+function closeReportModal() {
+  document.getElementById('reportModal').classList.remove('active');
+  _reportIssueNum = null;
+}
+
+async function submitReport() {
+  const reason = document.getElementById('reportReason').value;
+  const desc = document.getElementById('reportDesc').value.trim();
+  const errEl = document.getElementById('reportError');
+  if (!desc) { errEl.textContent = '请填写详细说明'; errEl.style.display = 'block'; return; }
+
+  // 获取订单信息以确定投诉对象
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + _reportIssueNum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const o = JSON.parse(issue.body);
+    const isPublisher = (o.publisher_id == (S.user._issue_number || S.user.student_id));
+    const targetId = isPublisher ? (o.taker_id || o.taker_student_id) : (o.publisher_id || o.publisher_student_id);
+    const targetName = isPublisher ? (o.taker_name || o.taker_student_id) : (o.publisher_name || o.publisher_student_id);
+
+    const report = {
+      order_issue_number: _reportIssueNum,
+      order_title: o.title,
+      reporter_id: S.user._issue_number || S.user.student_id,
+      reporter_name: S.user.name,
+      target_id: targetId,
+      target_name: targetName,
+      reason,
+      description: desc,
+      created_at: new Date().toISOString(),
+      status: 'open'
+    };
+
+    await ghCreateIssue('[投诉] ' + targetName + ' - ' + reason, JSON.stringify(report), ['report']);
+    toast('投诉已提交，我们会尽快处理', 'success');
+    closeReportModal();
+    document.getElementById('reportDesc').value = '';
+  } catch(e) {
+    errEl.textContent = '提交失败：' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+// 查询某用户的投诉次数
+async function getUserReportCount(targetId) {
+  try {
+    const reports = await ghIssues('report', 'all');
+    let count = 0;
+    for (const r of reports) {
+      try {
+        const rp = JSON.parse(r.body);
+        if ((rp.target_id == targetId) && rp.status === 'open') count++;
+      } catch(e) {}
+    }
+    return count;
+  } catch(e) { return 0; }
+}
+
+// 反馈中心
+async function showReportsView() {
+  document.getElementById('reportsViewModal').classList.add('active');
+  const ct = document.getElementById('reportsViewContent');
+  ct.innerHTML = '<p>加载中...</p>';
+  try {
+    const uid = S.user._issue_number || S.user.student_id;
+    const reports = await ghIssues('report', 'all');
+    // 我发起的投诉 + 我被投诉的
+    const myReports = reports.map(r => {
+      try { const rp = JSON.parse(r.body); rp._num = r.number; rp._state = r.state; return rp; }
+      catch(e) { return null; }
+    }).filter(r => r && (r.reporter_id == uid || r.target_id == uid));
+    myReports.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    if (myReports.length === 0) {
+      ct.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div><p>暂无投诉记录</p></div>';
+      return;
+    }
+
+    ct.innerHTML = myReports.map(r => {
+      const isMe = r.reporter_id == uid;
+      const badge = isMe ? '<span style="color:#f59e0b;font-size:.75rem">我发起的</span>' : '<span style="color:#dc2626;font-size:.75rem">投诉我的</span>';
+      const statusBadge = r.status === 'open' ? '<span style="color:#f59e0b">处理中</span>' : '<span style="color:#16a34a">已解决</span>';
+      return '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+        + '<span style="font-weight:600">' + esc(r.target_name) + ' - ' + esc(r.reason) + '</span>'
+        + '<span>' + badge + ' ' + statusBadge + '</span>'
+        + '</div>'
+        + '<div style="font-size:.85rem;color:var(--text-secondary)">订单：' + esc(r.order_title || '') + '</div>'
+        + '<div style="font-size:.85rem;color:var(--text-muted);margin-top:4px">' + esc(r.description || '') + '</div>'
+        + '<div style="font-size:.75rem;color:var(--text-muted);margin-top:6px">' + timeAgo(r.created_at) + '</div>'
+        + '</div>';
+    }).join('');
+  } catch(e) {
+    ct.innerHTML = '<p style="color:var(--danger)">加载失败</p>';
+  }
+}
+
+function closeReportsViewModal() {
+  document.getElementById('reportsViewModal').classList.remove('active');
+}
 
 async function takeOrder(inum) {
   if (!S.user) { showAuthModal(); return; }
@@ -889,7 +1057,14 @@ async function handleAuth(e) {
       });
       if (!found) { err.textContent = '学号或密码错误'; err.style.display = 'block'; return; }
       if (found.state !== 'open') { err.textContent = '该账号已被停用，请联系管理员'; err.style.display = 'block'; return; }
+      // 检查投诉次数
       const u = JSON.parse(found.body);
+      const reportCount = await getUserReportCount(u._issue_number || u.student_id);
+      if (reportCount >= 5) {
+        err.textContent = '该账号已被多次投诉（' + reportCount + '次），已自动封停。如需申诉请联系管理员。';
+        err.style.display = 'block';
+        return;
+      }
       u._issue_number = found.number;
       // 确保关键字段存在
       u.payment_info = u.payment_info || '';
@@ -1053,6 +1228,7 @@ async function loadMyOrders() {
     return;
   }
   if (profile) profile.style.display = 'block';
+  document.getElementById('btnReports').style.display = 'inline-flex';
   ct.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
 
   // 显示当前收款信息
