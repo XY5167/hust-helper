@@ -285,7 +285,35 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     </div>
     <!-- 搜索和排序 -->
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap" id="taskSearchBar">
-      <input type="text" id="taskSearchInput" placeholder="🔍 搜索订单标题或描述..." style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card)" oninput="applySearchAndSort()">
+      <input type="text" id="taskSearchInput" placeholder="🔍 搜索标题/描述/地点..." style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card)" oninput="applySearchAndSort()">
+      <select id="taskDormFilter" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card);cursor:pointer" onchange="applySearchAndSort()">
+        <option value="">📍 全部区域</option>
+        <optgroup label="紫菘">
+          <option value="紫菘1栋">紫菘1栋</option><option value="紫菘2栋">紫菘2栋</option><option value="紫菘3栋">紫菘3栋</option>
+          <option value="紫菘4栋">紫菘4栋</option><option value="紫菘5栋">紫菘5栋</option><option value="紫菘6栋">紫菘6栋</option>
+          <option value="紫菘7栋">紫菘7栋</option><option value="紫菘8栋">紫菘8栋</option><option value="紫菘9栋">紫菘9栋</option>
+          <option value="紫菘10栋">紫菘10栋</option><option value="紫菘11栋">紫菘11栋</option><option value="紫菘12栋">紫菘12栋</option>
+          <option value="紫菘13栋">紫菘13栋</option>
+        </optgroup>
+        <optgroup label="韵苑">
+          <option value="韵苑1栋">韵苑1栋</option><option value="韵苑2栋">韵苑2栋</option><option value="韵苑3栋">韵苑3栋</option>
+          <option value="韵苑4栋">韵苑4栋</option><option value="韵苑5栋">韵苑5栋</option><option value="韵苑6栋">韵苑6栋</option>
+          <option value="韵苑7栋">韵苑7栋</option><option value="韵苑8栋">韵苑8栋</option><option value="韵苑9栋">韵苑9栋</option>
+          <option value="韵苑10栋">韵苑10栋</option><option value="韵苑11栋">韵苑11栋</option><option value="韵苑12栋">韵苑12栋</option>
+          <option value="韵苑13栋">韵苑13栋</option><option value="韵苑14栋">韵苑14栋</option>
+          <option value="韵苑15栋">韵苑15栋</option><option value="韵苑16栋">韵苑16栋</option><option value="韵苑17栋">韵苑17栋</option><option value="韵苑18栋">韵苑18栋</option>
+          <option value="韵苑19栋">韵苑19栋</option><option value="韵苑20栋">韵苑20栋</option>
+          <option value="韵苑21栋">韵苑21栋</option><option value="韵苑22栋">韵苑22栋</option>
+          <option value="韵苑23栋">韵苑23栋</option><option value="韵苑24栋">韵苑24栋</option>
+          <option value="韵苑25栋">韵苑25栋</option><option value="韵苑26栋">韵苑26栋</option>
+          <option value="韵苑27栋">韵苑27栋</option><option value="韵苑28栋">韵苑28栋</option>
+        </optgroup>
+        <optgroup label="沁苑">
+          <option value="沁苑1栋">沁苑1栋</option><option value="沁苑2栋">沁苑2栋</option><option value="沁苑3栋">沁苑3栋</option>
+          <option value="沁苑4栋">沁苑4栋</option><option value="沁苑5栋">沁苑5栋</option><option value="沁苑6栋">沁苑6栋</option>
+          <option value="沁苑7栋">沁苑7栋</option><option value="沁苑8栋">沁苑8栋</option>
+        </optgroup>
+      </select>
       <select id="taskSortSelect" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card);cursor:pointer" onchange="applySearchAndSort()">
         <option value="newest">🕐 最新发布</option>
         <option value="oldest">🕐 最早发布</option>
@@ -330,6 +358,43 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <div class="form-group">
           <label>手机号</label>
           <input type="text" id="authPhone" placeholder="方便联系（选填）">
+        </div>
+        <div class="form-group">
+          <label>宿舍位置</label>
+          <select id="authDorm">
+            <option value="">请选择宿舍区域（选填）</option>
+            <optgroup label="紫菘">
+              <option value="紫菘1栋">紫菘1栋</option><option value="紫菘2栋">紫菘2栋</option><option value="紫菘3栋">紫菘3栋</option>
+              <option value="紫菘4栋">紫菘4栋</option><option value="紫菘5栋">紫菘5栋</option><option value="紫菘6栋">紫菘6栋</option>
+              <option value="紫菘7栋">紫菘7栋</option><option value="紫菘8栋">紫菘8栋</option><option value="紫菘9栋">紫菘9栋</option>
+              <option value="紫菘10栋">紫菘10栋</option><option value="紫菘11栋">紫菘11栋</option><option value="紫菘12栋">紫菘12栋</option>
+              <option value="紫菘13栋">紫菘13栋</option>
+            </optgroup>
+            <optgroup label="韵苑">
+              <option value="韵苑1栋">韵苑1栋</option><option value="韵苑2栋">韵苑2栋</option><option value="韵苑3栋">韵苑3栋</option>
+              <option value="韵苑4栋">韵苑4栋</option><option value="韵苑5栋">韵苑5栋</option><option value="韵苑6栋">韵苑6栋</option>
+              <option value="韵苑7栋">韵苑7栋</option><option value="韵苑8栋">韵苑8栋</option><option value="韵苑9栋">韵苑9栋</option>
+              <option value="韵苑10栋">韵苑10栋</option><option value="韵苑11栋">韵苑11栋</option><option value="韵苑12栋">韵苑12栋</option>
+              <option value="韵苑13栋">韵苑13栋</option><option value="韵苑14栋">韵苑14栋</option>
+              <option value="韵苑15栋">韵苑15栋</option><option value="韵苑16栋">韵苑16栋</option>
+              <option value="韵苑17栋">韵苑17栋</option><option value="韵苑18栋">韵苑18栋</option>
+              <option value="韵苑19栋">韵苑19栋</option><option value="韵苑20栋">韵苑20栋</option>
+              <option value="韵苑21栋">韵苑21栋</option><option value="韵苑22栋">韵苑22栋</option>
+              <option value="韵苑23栋">韵苑23栋</option><option value="韵苑24栋">韵苑24栋</option>
+              <option value="韵苑25栋">韵苑25栋</option><option value="韵苑26栋">韵苑26栋</option>
+              <option value="韵苑27栋">韵苑27栋</option><option value="韵苑28栋">韵苑28栋</option>
+            </optgroup>
+            <optgroup label="沁苑">
+              <option value="沁苑1栋">沁苑1栋</option><option value="沁苑2栋">沁苑2栋</option><option value="沁苑3栋">沁苑3栋</option>
+              <option value="沁苑4栋">沁苑4栋</option><option value="沁苑5栋">沁苑5栋</option><option value="沁苑6栋">沁苑6栋</option>
+              <option value="沁苑7栋">沁苑7栋</option><option value="沁苑8栋">沁苑8栋</option>
+            </optgroup>
+            <optgroup label="其他">
+              <option value="东校区">东校区</option><option value="西校区">西校区</option>
+              <option value="留学生公寓">留学生公寓</option><option value="博士生公寓">博士生公寓</option>
+              <option value="其他">其他</option>
+            </optgroup>
+          </select>
         </div>
       </div>
       <div class="form-group">
@@ -697,13 +762,21 @@ function applySearchAndSort() {
 
   // 搜索过滤
   const keyword = (document.getElementById('taskSearchInput')?.value || '').trim().toLowerCase();
+  const dormFilter = (document.getElementById('taskDormFilter')?.value || '').trim();
+
   if (keyword) {
     orders = orders.filter(o => {
       return (o.title || '').toLowerCase().includes(keyword)
         || (o.description || '').toLowerCase().includes(keyword)
         || (o.location || '').toLowerCase().includes(keyword)
-        || (o.publisher_name || '').toLowerCase().includes(keyword);
+        || (o.publisher_name || '').toLowerCase().includes(keyword)
+        || (o.publisher_dorm || '').toLowerCase().includes(keyword);
     });
+  }
+
+  // 宿舍区域筛选
+  if (dormFilter) {
+    orders = orders.filter(o => (o.publisher_dorm || '') === dormFilter);
   }
 
   // 排序
@@ -1355,6 +1428,7 @@ async function handleAuth(e) {
   const pw = document.getElementById('authPassword').value.trim();
   const name = document.getElementById('authName').value.trim();
   const phone = document.getElementById('authPhone').value.trim();
+  const dorm = document.getElementById('authDorm') ? document.getElementById('authDorm').value.trim() : '';
   const email = document.getElementById('authEmail') ? document.getElementById('authEmail').value.trim() : '';
   const err = document.getElementById('authError');
 
@@ -1399,7 +1473,7 @@ async function handleAuth(e) {
         return;
       }
 
-      const userData = { student_id: sid, name, phone, email, password: pw, balance: 0, email_verified: true, status: 'pending', created_at: new Date().toISOString() };
+      const userData = { student_id: sid, name, phone, dorm, email, password: pw, balance: 0, email_verified: true, status: 'pending', created_at: new Date().toISOString() };
       if (userData.email && userData.email.length > 60) { userData.email = userData.email.substring(0, 60); }
       let newIssue;
       try {
@@ -1550,6 +1624,7 @@ async function handlePublish(e) {
     publisher_id: S.user._issue_number || S.user.student_id,
     publisher_name: S.user.name,
     publisher_student_id: S.user.student_id,
+    publisher_dorm: S.user.dorm || '',
     taker_id: null, taker_name: null,
     created_at: new Date().toISOString()
   };
