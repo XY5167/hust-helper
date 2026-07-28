@@ -262,8 +262,9 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     </div>
     <!-- 板块 Tab -->
     <div class="tab-bar" id="taskTabBar" style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0">
-      <button class="tab-btn active" data-tasktab="task" onclick="switchTaskTab('task')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:600;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;transition:all .2s">🔧 任务</button>
+      <button class="tab-btn active" data-tasktab="task" onclick="switchTaskTab('task')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:600;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;transition:all .2s">🏃 跑腿代办</button>
       <button class="tab-btn" data-tasktab="secondhand" onclick="switchTaskTab('secondhand')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">🔄 二手交易</button>
+      <button class="tab-btn" data-tasktab="qa" onclick="switchTaskTab('qa')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">💬 有问必答</button>
     </div>
     <!-- 任务子分类 -->
     <div class="filter-bar" id="taskFilters">
@@ -282,6 +283,15 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <button class="filter-btn" data-filter="electronic" onclick="filterOrders('secondhand','electronic')">💻 电子产品</button>
       <button class="filter-btn" data-filter="daily" onclick="filterOrders('secondhand','daily')">🏠 生活用品</button>
       <button class="filter-btn" data-filter="other" onclick="filterOrders('secondhand','other')">📌 其他</button>
+    </div>
+    <!-- 问答子分类 -->
+    <div class="filter-bar" id="qaFilters" style="display:none">
+      <button class="filter-btn active" data-filter="all" onclick="filterOrders('qa','all')">全部</button>
+      <button class="filter-btn" data-filter="course" onclick="filterOrders('qa','course')">📖 选课学习</button>
+      <button class="filter-btn" data-filter="exam" onclick="filterOrders('qa','exam')">📝 考研保研</button>
+      <button class="filter-btn" data-filter="life" onclick="filterOrders('qa','life')">🍜 校园生活</button>
+      <button class="filter-btn" data-filter="job" onclick="filterOrders('qa','job')">💼 实习就业</button>
+      <button class="filter-btn" data-filter="other" onclick="filterOrders('qa','other')">📌 其他</button>
     </div>
     <!-- 搜索和排序 -->
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap" id="taskSearchBar">
@@ -396,8 +406,9 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <div class="form-group">
         <label>类型</label>
         <select id="publishType" required onchange="updatePublishCategories()">
-          <option value="task">任务大厅</option>
+          <option value="task">跑腿代办</option>
           <option value="secondhand">二手交易</option>
+          <option value="qa">有问必答</option>
         </select>
       </div>
       <div class="form-group">
@@ -445,7 +456,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <input type="file" id="publishImage" accept="image/*" multiple>
         <div id="publishImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
       </div>
-      <p class="form-hint">平台收取5%服务费。</p>
+      <p class="form-hint" id="publishFeeHint">免费发布，无平台抽成。</p>
       <p class="form-error" id="publishError"></p>
       <button type="submit" class="btn btn-primary btn-block">发布</button>
     </form>
@@ -562,7 +573,7 @@ const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
 const REPO = 'XY5167/hust-helper-backend';
 const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
 
-const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', secondhand: 'all' }, taskTab: 'task', myTab: 'all' };
+const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', secondhand: 'all', qa: 'all' }, taskTab: 'task', myTab: 'all' };
 
 // 初始化
 (function() {
@@ -633,9 +644,10 @@ function navigate(page) {
   if (page === 'home') loadStats();
   else if (page === 'my') loadMyOrders();
   else if (page === 'task') {
-    // 任务大厅：根据当前板块 tab 加载对应内容
     if (S.taskTab === 'secondhand') {
       loadOrders('secondhand', S.filter.secondhand || 'all');
+    } else if (S.taskTab === 'qa') {
+      loadOrders('qa', S.filter.qa || 'all');
     } else {
       loadOrders('task', S.filter.task || 'all');
     }
@@ -676,7 +688,8 @@ async function loadOrders(type, cat) {
   if (sortSelect) sortSelect.value = 'newest';
 
   try {
-    const issues = await ghIssues('order');
+    const label = type === 'qa' ? 'qa' : 'order';
+    const issues = await ghIssues(label);
     let orders = issues.map(i => {
       try {
         const o = JSON.parse(i.body);
@@ -689,6 +702,8 @@ async function loadOrders(type, cat) {
     // 根据类型筛选
     if (type === 'secondhand') {
       orders = orders.filter(o => o.type === 'secondhand');
+    } else if (type === 'qa') {
+      orders = orders.filter(o => o.type === 'qa');
     } else {
       orders = orders.filter(o => o.type === 'task' || o.type === 'errand' || o.type === 'skill');
     }
@@ -716,8 +731,8 @@ function renderOrders(orders) {
   }
 
   grid.innerHTML = orders.map(o => {
-    const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'任务'};
-    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品'};
+    const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答'};
+    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
     const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
     const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
@@ -795,7 +810,6 @@ function filterOrders(type, cat) {
 
 function switchTaskTab(tab) {
   S.taskTab = tab;
-  // 更新 tab 样式
   document.querySelectorAll('#taskTabBar .tab-btn').forEach(b => {
     b.style.color = 'var(--text-secondary)';
     b.style.borderBottom = '2px solid transparent';
@@ -807,10 +821,9 @@ function switchTaskTab(tab) {
     activeTab.style.borderBottom = '2px solid var(--primary)';
     activeTab.style.fontWeight = '600';
   }
-  // 切换 filter-bar 显示
   document.getElementById('taskFilters').style.display = (tab === 'task') ? 'flex' : 'none';
   document.getElementById('secondhandFilters').style.display = (tab === 'secondhand') ? 'flex' : 'none';
-  // 加载对应数据
+  document.getElementById('qaFilters').style.display = (tab === 'qa') ? 'flex' : 'none';
   loadOrders(tab, S.filter[tab] || 'all');
 }
 
@@ -830,25 +843,26 @@ async function showDetail(issueNum) {
     const o = JSON.parse(issue.body);
     o._issue_number = issueNum;
 
-    const tl = {errand:'跑腿代取', secondhand:'二手交易', skill:'技能服务', task:'任务'};
+    const tl = {errand:'跑腿代办', secondhand:'二手交易', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
+    const isQA = o.type === 'qa';
 
     let actions = '';
-    if (S.user && o.status === 'open' && o.publisher_id !== (S.user._issue_number || S.user.student_id)) {
-      actions += '<button class="btn btn-primary" onclick="takeOrder(' + issueNum + ')">接单</button>';
-    }
-    if (S.user && o.status === 'taken' && o.taker_id === (S.user._issue_number || S.user.student_id)) {
-      actions += '<button class="btn btn-success" onclick="completeOrder(' + issueNum + ')">确认完成</button>';
-    }
-    if (S.user && (o.publisher_id === (S.user._issue_number || S.user.student_id) || o.taker_id === (S.user._issue_number || S.user.student_id))) {
-      if (o.status === 'open' || o.status === 'taken') {
-        actions += '<button class="btn btn-danger" onclick="cancelOrder(' + issueNum + ')">取消订单</button>';
+    if (!isQA) {
+      if (S.user && o.status === 'open' && o.publisher_id !== (S.user._issue_number || S.user.student_id)) {
+        actions += '<button class="btn btn-primary" onclick="takeOrder(' + issueNum + ')">接单</button>';
       }
-      // 投诉按钮：已完成订单或已接单订单都可以投诉
-      if (o.status === 'taken' || o.status === 'completed') {
-        actions += '<button class="btn btn-warning" onclick="showReportModal(' + issueNum + ')">投诉</button>';
+      if (S.user && o.status === 'taken' && o.taker_id === (S.user._issue_number || S.user.student_id)) {
+        actions += '<button class="btn btn-success" onclick="completeOrder(' + issueNum + ')">确认完成</button>';
       }
-    }
+      if (S.user && (o.publisher_id === (S.user._issue_number || S.user.student_id) || o.taker_id === (S.user._issue_number || S.user.student_id))) {
+        if (o.status === 'open' || o.status === 'taken') {
+          actions += '<button class="btn btn-danger" onclick="cancelOrder(' + issueNum + ')">取消订单</button>';
+        }
+        if (o.status === 'taken' || o.status === 'completed') {
+          actions += '<button class="btn btn-warning" onclick="showReportModal(' + issueNum + ')">投诉</button>';
+        }
+      }
 
     const urgencyLabels = {normal:'一般', urgent:'🔥 加急', asap:'⚡ 立刻需要'};
     const urgencyHTML = o.urgency ? '<span>⏱️ 紧急程度：' + (urgencyLabels[o.urgency] || o.urgency) + '</span>' : '';
@@ -912,18 +926,17 @@ async function showDetail(issueNum) {
       + '<div class="detail-header"><span class="detail-type type-' + (o.category || 'other') + '">' + tl[o.type] + '</span>'
       + '<span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">' + sl[o.status] + '</span></div>'
       + '<h3 class="detail-title">' + esc(o.title) + '</h3>'
-      + '<div class="detail-price">¥' + o.price.toFixed(2) + ' <span style="font-size:.78rem;color:var(--text-muted);font-weight:400">（平台抽成 ¥' + o.fee.toFixed(2) + '）</span></div>'
+      + (isQA ? '' : '<div class="detail-price">¥' + o.price.toFixed(2) + '</div>')
       + '<div class="detail-meta">'
-      + '<span>📌 ' + esc(o.location || '未指定') + '</span>'
+      + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
       + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a></span>'
-      + (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_name) + '</a></span>' : '')
+      + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_name) + '</a></span>' : ''))
       + '<span>🕐 ' + timeAgo(o.created_at) + '</span>'
-      + urgencyHTML + deadlineHTML
+      + (isQA ? '' : urgencyHTML + deadlineHTML)
       + '</div>'
       + imageHTML
       + '<div class="detail-desc">' + esc(o.description || '无详细描述') + '</div>'
-      + paymentHTML
-      + takerPayHTML
+      + (isQA ? '' : paymentHTML + takerPayHTML)
       + '<div class="detail-actions">' + actions + '</div>';
     // 加载评论区
     await loadComments(issueNum);
@@ -1648,9 +1661,32 @@ function updatePublishCategories() {
   const t = document.getElementById('publishType').value;
   const cats = {
     task: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'print',l:'帮忙打印'},{v:'report',l:'代写报告'},{v:'repair',l:'维修'},{v:'other',l:'其他任务'}],
-    secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'daily',l:'生活用品'},{v:'other',l:'其他'}]
+    secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'daily',l:'生活用品'},{v:'other',l:'其他'}],
+    qa: [{v:'course',l:'选课学习'},{v:'exam',l:'考研保研'},{v:'life',l:'校园生活'},{v:'job',l:'实习就业'},{v:'other',l:'其他问题'}]
   };
   document.getElementById('publishCategory').innerHTML = cats[t].map(c => '<option value="' + c.v + '">' + c.l + '</option>').join('');
+  // 问答类型隐藏价格和支付等字段
+  const priceGroup = document.getElementById('publishPrice').parentElement;
+  const payGroup = document.getElementById('publishPayment').parentElement;
+  const locGroup = document.getElementById('publishLocation').parentElement;
+  const urgencyGroup = document.getElementById('publishUrgency').parentElement;
+  const deadlineGroup = document.getElementById('publishDeadline').parentElement;
+  const feeHint = document.getElementById('publishFeeHint');
+  if (t === 'qa') {
+    priceGroup.style.display = 'none';
+    payGroup.style.display = 'none';
+    locGroup.style.display = 'none';
+    urgencyGroup.style.display = 'none';
+    deadlineGroup.style.display = 'none';
+    if (feeHint) feeHint.style.display = 'none';
+  } else {
+    priceGroup.style.display = 'block';
+    payGroup.style.display = 'block';
+    locGroup.style.display = 'block';
+    urgencyGroup.style.display = 'block';
+    deadlineGroup.style.display = 'block';
+    if (feeHint) feeHint.style.display = 'block';
+  }
 }
 
 async function handlePublish(e) {
@@ -1660,16 +1696,15 @@ async function handlePublish(e) {
   const cat = document.getElementById('publishCategory').value;
   const title = document.getElementById('publishTitle').value.trim();
   const desc = document.getElementById('publishDesc').value.trim();
-  const price = parseFloat(document.getElementById('publishPrice').value);
+  const price = type === 'qa' ? 0 : parseFloat(document.getElementById('publishPrice').value);
   const loc = document.getElementById('publishLocation').value.trim();
   const urgency = document.getElementById('publishUrgency').value;
   const deadline = document.getElementById('publishDeadline').value.trim();
   const payment = document.getElementById('publishPayment').value.trim();
   const imgFiles = document.getElementById('publishImage').files;
 
-  if (!title || !price) { err.textContent = '请填写标题和报酬'; err.style.display = 'block'; return; }
-
-  const fee = Math.round(price * 0.05 * 100) / 100;
+  if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
+  if (type !== 'qa' && !price) { err.textContent = '请填写报酬金额'; err.style.display = 'block'; return; }
 
   // 图片上传到图床（ImgBB，免费，单张32MB）
   let images = [];
@@ -1692,7 +1727,7 @@ async function handlePublish(e) {
   }
 
   const order = {
-    type, category: cat, title, description: desc, price, fee,
+    type, category: cat, title, description: desc, price: price || 0, fee: 0,
     location: loc, urgency, deadline, payment,
     images: images,
     status: 'open',
@@ -1705,11 +1740,14 @@ async function handlePublish(e) {
   };
 
   try {
-    await ghCreateIssue('[订单] ' + title, JSON.stringify(order), ['order', type, cat]);
-    toast('发布成功！平台将抽成 ¥' + fee.toFixed(2), 'success');
+    const label = type === 'qa' ? 'qa' : 'order';
+    const prefix = type === 'qa' ? '[问答] ' : '[订单] ';
+    await ghCreateIssue(prefix + title, JSON.stringify(order), [label, type, cat]);
+    toast('发布成功！', 'success');
     closePublishModal();
     if (S.page === 'task') {
       if (S.taskTab === 'secondhand') loadOrders('secondhand', S.filter.secondhand || 'all');
+      else if (S.taskTab === 'qa') loadOrders('qa', S.filter.qa || 'all');
       else loadOrders('task', S.filter.task || 'all');
     } else {
       loadOrders(S.page, S.filter[S.page] || 'all');
@@ -1854,8 +1892,8 @@ async function loadMyOrders(myTab) {
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
-    const tl = {task:'任务', secondhand:'二手', errand:'任务', skill:'任务'};
-    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品'};
+    const tl = {task:'跑腿代办', secondhand:'二手', errand:'跑腿代办', skill:'跑腿代办', qa:'问答'};
+    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业'};
 
     if (orders.length === 0) {
       listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p></div>';
@@ -2101,6 +2139,7 @@ setInterval(function(){
   else if(S.page==='my')loadMyOrders();
   else if(S.page==='task'){
     if(S.taskTab==='secondhand')loadOrders('secondhand',S.filter.secondhand||'all');
+    else if(S.taskTab==='qa')loadOrders('qa',S.filter.qa||'all');
     else loadOrders('task',S.filter.task||'all');
   }
 },15000);
