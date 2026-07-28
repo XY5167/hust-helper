@@ -479,7 +479,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 const REPO = 'XY5167/hust-helper-backend';
 const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
 
-const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', secondhand: 'all' }, taskTab: 'task' };
+const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', secondhand: 'all' }, taskTab: 'task', myTab: 'all' };
 
 // 初始化
 (function() {
@@ -896,6 +896,39 @@ function closeReportsViewModal() {
   document.getElementById('reportsViewModal').classList.remove('active');
 }
 
+// ============ RATING SYSTEM ============
+async function rateOrder(inum) {
+  if (!S.user) { showAuthModal(); return; }
+  const rating = prompt('请给对方打分（1-5星）：\n⭐  = 不满意\n⭐⭐⭐ = 一般\n⭐⭐⭐⭐⭐ = 非常满意', '5');
+  if (!rating) return;
+  const score = parseInt(rating);
+  if (isNaN(score) || score < 1 || score > 5) { toast('请输入 1-5 之间的数字', 'error'); return; }
+
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const o = JSON.parse(issue.body);
+    if (o.status !== 'completed') { toast('只能评价已完成的订单', 'error'); return; }
+
+    const uid = S.user._issue_number || S.user.student_id;
+    const isPublisher = o.publisher_id == uid;
+
+    if (isPublisher) {
+      if (o.publisher_rated) { toast('你已经评价过了', 'error'); return; }
+      o.publisher_rated = score;
+    } else {
+      if (o.taker_rated) { toast('你已经评价过了', 'error'); return; }
+      o.taker_rated = score;
+    }
+
+    await ghUpdateIssue(inum, JSON.stringify(o));
+    toast('评价成功！感谢你的反馈 ⭐', 'success');
+    if (S.page === 'my') loadMyOrders(S.myTab);
+  } catch(e) { toast('评价失败：' + e.message, 'error'); }
+}
+
 async function takeOrder(inum) {
   if (!S.user) { showAuthModal(); return; }
   try {
@@ -1211,25 +1244,36 @@ async function ensureUserIssueNumber() {
   return false;
 }
 
-async function loadMyOrders() {
+async function loadMyOrders(myTab) {
   const profile = document.getElementById('myProfile');
-  const ct = document.getElementById('myContent');
-  if (!ct) return;
   if (!S.user) {
     if (profile) profile.style.display = 'none';
-    ct.innerHTML = '<p style="color:var(--text-secondary)">请先登录...</p>';
+    document.getElementById('myOrdersList').innerHTML = '<p style="color:var(--text-secondary)">请先登录...</p>';
     return;
   }
-  // 尝试修复可能缺失的 _issue_number
   const hasIssue = await ensureUserIssueNumber();
   if (!hasIssue) {
     if (profile) profile.style.display = 'none';
-    ct.innerHTML = '<p style="color:var(--danger)">用户信息不完整，请退出后重新登录。</p>';
+    document.getElementById('myOrdersList').innerHTML = '<p style="color:var(--danger)">用户信息不完整，请退出后重新登录。</p>';
     return;
   }
   if (profile) profile.style.display = 'block';
   document.getElementById('btnReports').style.display = 'inline-flex';
-  ct.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
+
+  const tab = myTab || S.myTab || 'all';
+  S.myTab = tab;
+  // 更新 tab 样式
+  document.querySelectorAll('#myOrderTabs .tab-btn').forEach(b => {
+    b.style.color = 'var(--text-secondary)';
+    b.style.borderBottom = '2px solid transparent';
+    b.style.fontWeight = '500';
+  });
+  const activeTab = document.querySelector('#myOrderTabs [data-mytab="' + tab + '"]');
+  if (activeTab) {
+    activeTab.style.color = 'var(--primary)';
+    activeTab.style.borderBottom = '2px solid var(--primary)';
+    activeTab.style.fontWeight = '600';
+  }
 
   // 显示当前收款信息
   const paymentInput = document.getElementById('myPaymentInfo');
@@ -1239,34 +1283,72 @@ async function loadMyOrders() {
     paymentPreview.innerHTML = '<img src="' + S.user.payment_image + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
   }
 
+  const listEl = document.getElementById('myOrdersList');
+  listEl.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
+
   try {
     const issues = await ghIssues('order');
     const uid = S.user._issue_number || S.user.student_id;
     let orders = issues.map(i => {
       try { const o = JSON.parse(i.body); o._issue_number = i.number; return o; }
       catch(e) { return null; }
-    }).filter(o => o && (o.publisher_id === uid || o.taker_id === uid));
+    }).filter(o => o);
+
+    // 按 tab 筛选
+    if (tab === 'published') orders = orders.filter(o => o.publisher_id == uid);
+    else if (tab === 'taken') orders = orders.filter(o => o.taker_id == uid);
+    else orders = orders.filter(o => o.publisher_id == uid || o.taker_id == uid);
+
+    // 自动取消超时订单
+    const now = Date.now();
+    const timeout24h = 24 * 60 * 60 * 1000;
+    const timeout48h = 48 * 60 * 60 * 1000;
+    for (const o of orders) {
+      const created = new Date(o.created_at).getTime();
+      if (o.status === 'open' && (now - created > timeout24h)) {
+        o.status = 'cancelled';
+        try { await ghUpdateIssue(o._issue_number, JSON.stringify(o)); } catch(e) {}
+      }
+      if (o.status === 'taken' && (now - created > timeout48h)) {
+        o.status = 'cancelled';
+        try { await ghUpdateIssue(o._issue_number, JSON.stringify(o)); } catch(e) {}
+      }
+    }
+
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
     const tl = {task:'任务', secondhand:'二手', errand:'任务', skill:'任务'};
+    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品'};
 
     if (orders.length === 0) {
-      ct.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p></div>';
+      listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p></div>';
       return;
     }
 
-    ct.innerHTML = orders.map(o => {
-      const role = o.publisher_id === uid ? '<span style="color:var(--primary)">我发布的</span>' : '<span style="color:var(--success)">我接单的</span>';
+    listEl.innerHTML = orders.map(o => {
+      const role = o.publisher_id == uid ? '<span style="color:var(--primary);font-size:.75rem">我发布的</span>' : '<span style="color:var(--success);font-size:.75rem">我接单的</span>';
+      let rateBtn = '';
+      if (o.status === 'completed') {
+        const isPublisher = o.publisher_id == uid;
+        const hasRated = isPublisher ? o.publisher_rated : o.taker_rated;
+        if (!hasRated) {
+          rateBtn = '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();rateOrder(' + o._issue_number + ')" style="margin-top:4px">⭐ 评价</button>';
+        }
+      }
       return '<div class="order-card" style="margin-bottom:12px" onclick="showDetail(' + o._issue_number + ')">'
-        + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (tl[o.type] || '任务') + '</span><span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span></div>'
-        + '<div class="order-card-title">' + esc(o.title) + ' <span style="font-size:.75rem;color:var(--text-muted)">' + role + '</span></div>'
+        + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span><span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span></div>'
+        + '<div class="order-card-title">' + esc(o.title) + ' ' + role + '</div>'
         + '<div class="order-card-meta"><span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>'
-        + '<div class="order-card-footer"><span>' + timeAgo(o.created_at) + '</span></div></div>';
+        + '<div class="order-card-footer"><span>' + timeAgo(o.created_at) + '</span>' + rateBtn + '</div></div>';
     }).join('');
   } catch(e) {
-    ct.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
+    listEl.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
   }
+}
+
+function switchMyTab(tab) {
+  loadMyOrders(tab);
 }
 
 async function saveMyPayment() {
