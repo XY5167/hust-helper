@@ -1852,8 +1852,9 @@ async function cleanClosedUsers() {
 async function takeOrder(inum) {
   if (!S.user) { showAuthModal(); return; }
   if (!checkApproved()) return;
-  // 跑腿认证检查：只有认证跑腿才能接单（跑腿代办和二手交易）
-  if (!S.user.runner_verified) {
+  // 跑腿认证检查：管理员和已认证跑腿才能接单
+  const isAdmin = S.user.student_id === ADMIN_STUDENT_ID;
+  if (!S.user.runner_verified && !isAdmin) {
     toast('⚠️ 接单需要先通过跑腿认证。请到「我的」页面申请跑腿认证，上传学生证照片。', 'info');
     return;
   }
