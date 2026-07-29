@@ -162,9 +162,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .form-hint{font-size:.78rem;color:var(--text-muted);margin-bottom:10px}
 .form-error{font-size:.83rem;color:var(--danger);margin-bottom:10px;display:none}
 .verify-badge{display:inline-block;font-size:.68rem;font-weight:600;background:var(--success);color:#fff;padding:1px 7px;border-radius:99px;margin-left:5px;vertical-align:middle}
-.verify-row{display:flex;gap:8px;align-items:center}
-.verify-row input{flex:1}
-#sendCodeBtn:disabled{opacity:.5;cursor:not-allowed}
 
 /* Detail */
 .detail-header{margin-bottom:16px}
@@ -349,17 +346,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <div class="form-group">
           <label>真实姓名 <span class="verify-badge">实名认证</span></label>
           <input type="text" id="authName" placeholder="请输入真实姓名">
-        </div>
-        <div class="form-group">
-          <label>邮箱 <span class="verify-badge">需验证</span></label>
-          <div class="verify-row">
-            <input type="email" id="authEmail" placeholder="your@hust.edu.cn" style="flex:1">
-            <button type="button" class="btn btn-sm btn-outline" id="sendCodeBtn" onclick="sendVerifyCode()" style="white-space:nowrap">发送验证码</button>
-          </div>
-        </div>
-        <div class="form-group" id="codeGroup" style="display:none">
-          <label>验证码</label>
-          <input type="text" id="authCode" placeholder="输入6位验证码" maxlength="6" inputmode="numeric" style="letter-spacing:4px;font-size:1.1rem;font-weight:600;text-align:center">
         </div>
         <div class="form-group">
           <label>手机号</label>
@@ -1646,7 +1632,6 @@ function switchAuthTab(tab) {
   if (tab === 'login') {
     tabs[0].classList.add('active');
     document.getElementById('registerExtra').style.display = 'none';
-    document.getElementById('codeGroup').style.display = 'none';
     document.getElementById('authSubmit').textContent = '登录';
   } else {
     tabs[1].classList.add('active');
@@ -1656,56 +1641,6 @@ function switchAuthTab(tab) {
   document.getElementById('authError').style.display = 'none';
 }
 
-// ============ 邮箱验证码 ============
-const MAIL_API = ''; // 邮件服务同源部署
-
-async function sendVerifyCode() {
-  const email = document.getElementById('authEmail').value.trim();
-  const err = document.getElementById('authError');
-  const btn = document.getElementById('sendCodeBtn');
-
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    err.textContent = '请先输入有效的邮箱地址';
-    err.style.display = 'block';
-    return;
-  }
-
-  btn.disabled = true;
-  err.style.display = 'none';
-
-  try {
-    const res = await fetch(MAIL_API + '/api/send-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '发送失败');
-
-    // 显示验证码输入框
-    document.getElementById('codeGroup').style.display = 'block';
-    document.getElementById('authCode').focus();
-    toast('验证码已发送，请查收邮件', 'success');
-
-    // 60秒倒计时
-    let sec = 60;
-    btn.textContent = sec + 's 后重发';
-    const timer = setInterval(() => {
-      sec--;
-      btn.textContent = sec + 's 后重发';
-      if (sec <= 0) {
-        clearInterval(timer);
-        btn.textContent = '发送验证码';
-        btn.disabled = false;
-      }
-    }, 1000);
-  } catch(e) {
-    err.textContent = e.message;
-    err.style.display = 'block';
-    btn.disabled = false;
-  }
-}
-
 async function handleAuth(e) {
   e.preventDefault();
   const sid = document.getElementById('authStudentId').value.trim().toUpperCase();
@@ -1713,7 +1648,6 @@ async function handleAuth(e) {
   const name = document.getElementById('authName').value.trim();
   const phone = document.getElementById('authPhone').value.trim();
   const dorm = document.getElementById('authDorm') ? document.getElementById('authDorm').value.trim() : '';
-  const email = document.getElementById('authEmail') ? document.getElementById('authEmail').value.trim() : '';
   const err = document.getElementById('authError');
 
   if (!sid || !pw) { err.textContent = '请填写学号和密码'; err.style.display = 'block'; return; }
@@ -1721,25 +1655,6 @@ async function handleAuth(e) {
 
   if (S.authTab === 'register') {
     if (!name) { err.textContent = '请输入真实姓名完成实名认证'; err.style.display = 'block'; return; }
-    if (!email) { err.textContent = '请输入邮箱地址'; err.style.display = 'block'; return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = '请输入有效的邮箱地址'; err.style.display = 'block'; return; }
-
-    // 校验邮箱验证码
-    const code = document.getElementById('authCode').value.trim();
-    if (!code) { err.textContent = '请输入邮箱验证码'; err.style.display = 'block'; return; }
-    try {
-      const verifyRes = await fetch(MAIL_API + '/api/verify-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code })
-      });
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok) throw new Error(verifyData.error || '验证失败');
-    } catch(ex) {
-      err.textContent = '验证码校验失败：' + ex.message;
-      err.style.display = 'block';
-      return;
-    }
 
     try {
       // 查所有状态（open + closed），防止学号重复注册
@@ -1757,8 +1672,7 @@ async function handleAuth(e) {
         return;
       }
 
-      const userData = { student_id: sid, name, phone, dorm, email, password: pw, balance: 0, email_verified: true, status: 'pending', created_at: new Date().toISOString() };
-      if (userData.email && userData.email.length > 60) { userData.email = userData.email.substring(0, 60); }
+      const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: 'pending', created_at: new Date().toISOString() };
       let newIssue;
       try {
         newIssue = await ghCreateIssue(sid, JSON.stringify(userData), ['user']);
