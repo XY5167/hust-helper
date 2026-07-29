@@ -942,6 +942,11 @@ async function showDetail(issueNum) {
     if (!isQA) {
       if (S.user && o.status === 'open' && o.publisher_id !== (S.user._issue_number || S.user.student_id)) {
         actions += '<button class="btn btn-primary" onclick="takeOrder(' + issueNum + ')">接单</button>';
+        // 接单前询问：非发布者的任何人都可以向发布者发起私聊确认
+        const pubSid = o.publisher_student_id || '';
+        const pubName = o.publisher_name || '未知';
+        const pubIssueNum = o.publisher_id || '';
+        actions += '<button class="btn btn-outline" onclick="createChatOrder(\'' + esc(pubSid) + '\',\'' + esc(pubName) + '\',\'' + esc(pubIssueNum) + '\',\'' + esc(o.title) + '\')">💬 询问发布者</button>';
       }
       if (S.user && o.status === 'taken' && o.taker_id === (S.user._issue_number || S.user.student_id)) {
         actions += '<button class="btn btn-success" onclick="completeOrder(' + issueNum + ')">确认完成</button>';
@@ -1461,20 +1466,16 @@ function closeUserProfileModal() {
   document.getElementById('userProfileModal').classList.remove('active');
 }
 
-// ============ 管理员发起私信 ============
-async function adminStartChat(targetSid, targetName, targetIssueNum) {
-  if (!S.user || S.user.student_id !== ADMIN_STUDENT_ID) {
-    toast('仅管理员可用', 'error');
-    return;
-  }
+// ============ 通用：创建私信对话 ============
+async function createChatOrder(targetSid, targetName, targetIssueNum, sourceOrderTitle) {
+  if (!S.user) { showAuthModal(); return; }
 
   try {
-    // 创建一个私密对话订单（type=chat，管理员发布，目标用户作为接单人）
     const chatOrder = {
       type: 'chat',
       category: 'other',
-      title: '管理员对话 ' + targetName,
-      description: '管理员向 ' + targetName + '（' + targetSid + '）发起的私信对话',
+      title: (sourceOrderTitle ? '询问：' + sourceOrderTitle : '对话 ' + targetName),
+      description: S.user.name + ' 向 ' + targetName + '（' + targetSid + '）发起的私信对话' + (sourceOrderTitle ? '，关于订单「' + sourceOrderTitle + '」' : ''),
       price: 0,
       fee: 0,
       location: '',
@@ -1499,6 +1500,15 @@ async function adminStartChat(targetSid, targetName, targetIssueNum) {
   } catch(e) {
     toast('创建对话失败：' + e.message, 'error');
   }
+}
+
+// ============ 管理员发起私信 ============
+async function adminStartChat(targetSid, targetName, targetIssueNum) {
+  if (!S.user || S.user.student_id !== ADMIN_STUDENT_ID) {
+    toast('仅管理员可用', 'error');
+    return;
+  }
+  await createChatOrder(targetSid, targetName, targetIssueNum, null);
 }
 
 // ============ 管理员审核 ============
@@ -2519,7 +2529,7 @@ async function loadMyOrders(myTab) {
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
-    const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答'};
+    const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答', chat:'💬 私信'};
     const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
 
     if (orders.length === 0) {
@@ -2528,7 +2538,8 @@ async function loadMyOrders(myTab) {
     }
 
     listEl.innerHTML = orders.map(o => {
-      const role = o.publisher_id == uid ? '<span style="color:var(--primary);font-size:.75rem">我发布的</span>' : '<span style="color:var(--success);font-size:.75rem">我接单的</span>';
+      const role = o.publisher_id == uid ? '<span style="color:var(--primary);font-size:.75rem">我发起的</span>' : '<span style="color:var(--success);font-size:.75rem">我参与的</span>';
+      const isChat = o.type === 'chat';
       // 对方信息（点击可查看主页）
       let counterpartLink = '';
       if (o.publisher_id == uid && o.taker_name) {
@@ -2537,17 +2548,20 @@ async function loadMyOrders(myTab) {
         counterpartLink = '<span style="margin-left:auto;font-size:.78rem">👤 <a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || '未知') + '</a></span>';
       }
       let rateBtn = '';
-      if (o.status === 'completed') {
+      if (o.status === 'completed' && !isChat) {
         const isPublisher = o.publisher_id == uid;
         const hasRated = isPublisher ? o.publisher_rated : o.taker_rated;
         if (!hasRated) {
           rateBtn = '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();rateOrder(' + o._issue_number + ')" style="margin-top:4px">⭐ 评价</button>';
         }
       }
-      return '<div class="order-card" style="margin-bottom:12px" onclick="showDetail(' + o._issue_number + ')">'
+      const metaHTML = isChat
+        ? '<div class="order-card-meta"><span style="color:var(--text-muted);font-size:.8rem">💬 私信对话</span></div>'
+        : '<div class="order-card-meta"><span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>';
+      return '<div class="order-card" style="margin-bottom:12px' + (isChat ? ';border-left:3px solid #8b5cf6' : '') + '" onclick="showDetail(' + o._issue_number + ')">'
         + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span><span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span></div>'
         + '<div class="order-card-title">' + esc(o.title) + ' ' + role + '</div>'
-        + '<div class="order-card-meta"><span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>'
+        + metaHTML
         + '<div class="order-card-footer"><span>' + timeAgo(o.created_at) + '</span>' + counterpartLink + rateBtn + '</div></div>';
     }).join('');
   } catch(e) {
