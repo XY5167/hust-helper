@@ -1701,8 +1701,8 @@ async function handleAuth(e) {
         } catch(e) { return false; }
       });
       if (!found) { err.textContent = '学号或密码错误'; err.style.display = 'block'; return; }
+      // 确保 issue 处于 open 状态（清理数据时可能被误关）
       if (found.state !== 'open') {
-        // 账号被关闭（可能是清理数据时误关），只要密码正确就自动重新激活
         const reopenRes = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + found.number, {
           method: 'PATCH',
           headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
@@ -1716,6 +1716,16 @@ async function handleAuth(e) {
         toast('账号已自动恢复可用状态', 'success');
       }
       const u = JSON.parse(found.body);
+      // 安全网：清理数据后从未审核的老账号自动激活
+      // 同时去掉过大的 base64 图片避免 GitHub API 截断问题
+      if (!u.status || u.status === 'None') {
+        u.status = 'approved';
+        // 去掉 base64 图片（如果有的话），GitHub Issues API 在大 body 上有写入限制
+        if (u.payment_image && u.payment_image.startsWith('data:')) {
+          u.payment_image = '';
+        }
+        try { await ghUpdateIssue(found.number, JSON.stringify(u)); } catch(e) {}
+      }
       // 检查审核状态
       if (u.status === 'pending') {
         err.textContent = '您的账号正在审核中，请耐心等待管理员审核通过。';
