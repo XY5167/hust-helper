@@ -1013,29 +1013,100 @@ async function loadComments(issueNum) {
     if (!res.ok) { el.innerHTML = ''; return; }
     const comments = await res.json();
 
-    if (comments.length === 0) {
-      el.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:12px">暂无留言，在此与对方协商吧 💬</p>';
+    // 获取订单信息用于私密过滤
+    let order = null;
+    try {
+      const issueRes = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum, {
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+      });
+      if (issueRes.ok) {
+        const issue = await issueRes.json();
+        order = JSON.parse(issue.body);
+        order._issue_number = issueNum;
+      }
+    } catch(e) {}
+
+    const isAdmin = S.user && S.user.student_id === ADMIN_STUDENT_ID;
+    const myId = S.user ? (S.user._issue_number || S.user.student_id) : null;
+    const mySid = S.user ? S.user.student_id : null;
+    const pubId = order ? order.publisher_id : null;
+    const takerId = order ? order.taker_id : null;
+    const pubSid = order ? order.publisher_student_id : null;
+    const takerSid = order ? order.taker_student_id : null;
+
+    // 判断我是否是该订单的参与者
+    const isParticipant = isAdmin
+      || (myId && (myId == pubId || myId == takerId))
+      || (mySid && (mySid == pubSid || mySid == takerSid));
+
+    // 私密过滤：只显示发布者、接单人、管理员发的评论
+    const visibleComments = comments.filter(c => {
+      if (isAdmin) return true;
+      try {
+        const u = JSON.parse(c.body);
+        const cId = u.student_id || '';
+        return cId === pubSid || cId === takerSid || cId === ADMIN_STUDENT_ID || cId === pubId || cId === takerId;
+      } catch(e) { return false; }
+    });
+
+    // 判断我是否能发消息
+    let canSend = false;
+    let sendHint = '';
+    if (!S.user) {
+      sendHint = '请登录后发送消息';
+    } else if (!isParticipant) {
+      sendHint = '仅订单参与者可以发送消息';
+    } else if (!order || order.status === 'open') {
+      // 未接单：发布者可以发1条，其他人不能发（除了管理员）
+      const myComments = visibleComments.filter(c => {
+        try { return JSON.parse(c.body).student_id === mySid; } catch(e) { return false; }
+      });
+      if (isAdmin) {
+        canSend = true;
+      } else if (myId == pubId && myComments.length < 1) {
+        canSend = true;
+        sendHint = '接单前仅可发 1 条消息';
+      } else if (myComments.length >= 1 && myId == pubId) {
+        sendHint = '接单前仅可发 1 条消息，等待接单后可继续聊天';
+      } else if (myId != pubId) {
+        sendHint = '订单尚未被接取，暂时无法发消息';
+      }
+    } else if (order.status === 'completed' || order.status === 'cancelled') {
+      sendHint = '订单已结束，对话已关闭';
     } else {
-      el.innerHTML = comments.map(c => {
+      // 已接单，参与者可以聊天
+      canSend = isAdmin || isParticipant;
+    }
+
+    if (visibleComments.length === 0) {
+      el.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:12px">暂无消息</p>';
+    } else {
+      el.innerHTML = visibleComments.map(c => {
         try {
           const u = JSON.parse(c.body);
           const name = u.name || '用户';
           const text = u.text || '';
           const time = new Date(c.created_at).toLocaleString('zh-CN');
           const isMe = S.user && (u.student_id === S.user.student_id);
-          return '<div style="padding:8px 12px;margin-bottom:8px;background:' + (isMe ? '#eff6ff' : 'var(--bg)') + ';border-radius:8px">'
+          const isAdminMsg = u.student_id === ADMIN_STUDENT_ID;
+          return '<div style="padding:8px 12px;margin-bottom:8px;background:' + (isMe ? '#eff6ff' : isAdminMsg ? '#fef3c7' : 'var(--bg)') + ';border-radius:8px">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
-            + '<strong style="font-size:.82rem;color:' + (isMe ? 'var(--primary)' : 'var(--text)') + '">' + esc(name) + (isMe ? ' (我)' : '') + '</strong>'
+            + '<strong style="font-size:.82rem;color:' + (isMe ? 'var(--primary)' : isAdminMsg ? '#92400e' : 'var(--text)') + '">' + esc(name) + (isMe ? ' (我)' : '') + (isAdminMsg ? ' [管理员]' : '') + '</strong>'
             + '<span style="font-size:.7rem;color:var(--text-muted)">' + time + '</span></div>'
             + '<div style="font-size:.88rem">' + esc(text) + '</div></div>';
         } catch(e) { return ''; }
       }).join('');
     }
+
     // 追加输入框
-    el.innerHTML += '<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
-      + '<input type="text" id="commentInput" placeholder="输入消息..." style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem" onkeydown="if(event.key===\'Enter\')sendComment(' + issueNum + ')">'
-      + '<button class="btn btn-primary btn-sm" onclick="sendComment(' + issueNum + ')" style="white-space:nowrap">发送</button>'
-      + '</div>';
+    if (canSend) {
+      el.innerHTML += '<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
+        + '<input type="text" id="commentInput" placeholder="输入消息..." style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem" onkeydown="if(event.key===\'Enter\')sendComment(' + issueNum + ')">'
+        + '<button class="btn btn-primary btn-sm" onclick="sendComment(' + issueNum + ')" style="white-space:nowrap">发送</button>'
+        + '</div>';
+    } else if (sendHint) {
+      el.innerHTML += '<p style="color:var(--text-muted);font-size:.78rem;text-align:center;padding:10px;margin-top:10px;border-top:1px solid var(--border)">' + sendHint + '</p>';
+    }
   } catch(e) { el.innerHTML = ''; }
 }
 
@@ -1774,6 +1845,8 @@ async function completeOrder(inum) {
     if (o.status !== 'taken') { toast('订单状态不正确', 'error'); return; }
     o.status = 'completed';
     await ghUpdateIssue(inum, JSON.stringify(o));
+    // 自动清除对话评论
+    await deleteAllComments(inum);
     toast('订单完成！', 'success');
     closeDetailModal();
     if (S.page === 'task') refreshCurrentTab();
@@ -1794,6 +1867,8 @@ async function cancelOrder(inum) {
     const o = JSON.parse(issue.body);
     o.status = 'cancelled';
     await ghUpdateIssue(inum, JSON.stringify(o));
+    // 自动清除对话评论
+    await deleteAllComments(inum);
     toast('订单已取消', 'info');
     closeDetailModal();
     if (S.page === 'task') refreshCurrentTab();
@@ -1801,6 +1876,23 @@ async function cancelOrder(inum) {
       loadOrders(S.page, S.filter[S.page] || 'all');
     }
   } catch(e) { toast(e.message, 'error'); }
+}
+
+// 删除订单所有评论
+async function deleteAllComments(inum) {
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum + '/comments?per_page=100', {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    if (!res.ok) return;
+    const comments = await res.json();
+    for (const c of comments) {
+      await fetch('https://api.github.com/repos/' + REPO + '/issues/comments/' + c.id, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+      });
+    }
+  } catch(e) { /* 静默 */ }
 }
 
 // ============ AUTH ============
