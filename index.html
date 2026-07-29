@@ -891,9 +891,51 @@ async function showDetail(issueNum) {
     const o = JSON.parse(issue.body);
     o._issue_number = issueNum;
 
-    const tl = {errand:'跑腿代办', secondhand:'二手交易', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答', borrow:'有偿借物'};
+    const tl = {errand:'跑腿代办', secondhand:'二手交易', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答', borrow:'有偿借物', chat:'私信对话'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
     const isQA = o.type === 'qa';
+    const isChat = o.type === 'chat';
+
+    // ============ 私信对话特殊渲染 ============
+    if (isChat) {
+      const myId = S.user ? (S.user._issue_number || S.user.student_id) : null;
+      const mySid = S.user ? S.user.student_id : null;
+      const pubId = o.publisher_id;
+      const pubSid = o.publisher_student_id;
+      const isAdmin = S.user && S.user.student_id === ADMIN_STUDENT_ID;
+      const isPub = (myId == pubId) || (mySid == pubSid);
+      const isTaker = (myId == o.taker_id) || (mySid == o.taker_student_id);
+      const isParticipant = isAdmin || isPub || isTaker;
+
+      if (!S.user) {
+        ct.innerHTML = '<div class="empty-state"><p>请先登录</p></div>';
+      } else if (!isParticipant) {
+        ct.innerHTML = '<div class="empty-state"><p>🔒 只有对话参与者可以查看</p></div>';
+      } else {
+        // 简洁的头部
+        const counterpart = isPub
+          ? { name: o.taker_name, sid: o.taker_student_id, role: '对方' }
+          : { name: o.publisher_name, sid: o.publisher_student_id, role: isAdmin ? '对方（发起人）' : '对方' };
+        ct.innerHTML = ''
+          + '<div style="text-align:center;padding:16px 0 12px;border-bottom:1px solid var(--border);margin-bottom:16px">'
+          + '<div style="font-size:2rem;margin-bottom:6px">💬</div>'
+          + '<h3 style="margin:0">' + esc(counterpart.name || '未知') + '</h3>'
+          + '<p style="color:var(--text-secondary);font-size:.85rem;margin:4px 0">学号 ' + esc(counterpart.sid || '?') + ' · <span style="color:var(--text-muted)">' + timeAgo(o.created_at) + '</span></p>'
+          + '</div>';
+        // 加载评论区
+        await loadComments(issueNum);
+        startCommentPolling(issueNum);
+        // 结尾按钮：管理员或本人可以"关闭对话"
+        const canClose = isAdmin || isPub;
+        if (canClose) {
+          const closeBtn = document.createElement('div');
+          closeBtn.style.cssText = 'text-align:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)';
+          closeBtn.innerHTML = '<button class="btn btn-sm btn-outline" onclick="adminEndChat(' + issueNum + ')">结束对话并清除记录</button>';
+          ct.appendChild(closeBtn);
+        }
+      }
+      return;
+    }
 
     let actions = '';
     if (!isQA) {
@@ -930,12 +972,10 @@ async function showDetail(issueNum) {
       const uid = S.user._issue_number || S.user.student_id;
       const sid = S.user.student_id;
       const isPublisher = (o.publisher_id == uid) || (o.publisher_id == sid) || (o.publisher_student_id == uid) || (o.publisher_student_id == sid);
-      console.log('DEBUG showDetail:', { uid, sid, publisher_id: o.publisher_id, publisher_student_id: o.publisher_student_id, isPublisher });
       if (isPublisher) {
         let payInfo = o.taker_payment_info || '';
         let payImage = o.taker_payment_image || '';
 
-        // 如果订单里没有收款信息，尝试从接单人用户数据实时拉取
         if (!payInfo && !payImage && o.taker_id) {
           try {
             const allUsers = await ghIssues('user', 'all');
@@ -945,20 +985,17 @@ async function showDetail(issueNum) {
                 return (u._issue_number && u._issue_number == o.taker_id) || u.student_id == o.taker_id;
               } catch(e) { return false; }
             });
-            console.log('DEBUG takerUser found:', !!takerUser);
             if (takerUser) {
               const tu = JSON.parse(takerUser.body);
               payInfo = tu.payment_info || '';
               payImage = tu.payment_image || '';
-              console.log('DEBUG taker payment:', { payInfo, hasImage: !!payImage });
-              // 回写到订单中，下次就不需要再查了
               if (payInfo || payImage) {
                 o.taker_payment_info = payInfo;
                 o.taker_payment_image = payImage;
                 try { await ghUpdateIssue(issueNum, JSON.stringify(o)); } catch(e) {}
               }
             }
-          } catch(e) { console.error('拉取接单人收款信息失败:', e); }
+          } catch(e) {}
         }
 
         if (payInfo || payImage) {
@@ -992,6 +1029,18 @@ async function showDetail(issueNum) {
     // 启动自动刷新
     startCommentPolling(issueNum);
   } catch(e) { ct.innerHTML = '<p>加载失败</p>'; }
+}
+
+// 管理员结束对话
+async function adminEndChat(inum) {
+  if (!confirm('确定要结束这个对话吗？\n所有聊天记录将被永久删除。')) return;
+  try {
+    await deleteAllComments(inum);
+    await ghCloseIssue(inum);
+    toast('对话已结束，记录已清除', 'success');
+    closeDetailModal();
+    if (S.page === 'my') loadMyOrders();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
 }
 
 function closeDetailModal() {
