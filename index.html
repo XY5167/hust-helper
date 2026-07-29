@@ -588,6 +588,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     <div class="modal-tabs" style="margin-bottom:16px">
       <button class="modal-tab active" id="adminTabUsers" onclick="switchAdminTab('users')">👤 用户审核</button>
       <button class="modal-tab" id="adminTabRunners" onclick="switchAdminTab('runners')">🛵 跑腿认证</button>
+      <button class="modal-tab" id="adminTabManage" onclick="switchAdminTab('manage')">📋 用户管理</button>
     </div>
     <div id="adminContent"><p>加载中...</p></div>
   </div>
@@ -1317,10 +1318,12 @@ let _adminTab = 'users'; // 'users' | 'runners'
 function switchAdminTab(tab) {
   _adminTab = tab;
   document.querySelectorAll('#adminModal .modal-tab').forEach(t => t.classList.remove('active'));
-  const activeTab = document.getElementById('adminTab' + (tab === 'users' ? 'Users' : 'Runners'));
+  const tabMap = { users: 'Users', runners: 'Runners', manage: 'Manage' };
+  const activeTab = document.getElementById('adminTab' + tabMap[tab]);
   if (activeTab) activeTab.classList.add('active');
   if (tab === 'users') loadAdminPanel();
-  else loadRunnerReviews();
+  else if (tab === 'runners') loadRunnerReviews();
+  else if (tab === 'manage') loadUserManagement();
 }
 
 async function showAdminPanel() {
@@ -1536,6 +1539,91 @@ async function rejectRunner(anum, sid) {
 
     toast('已拒绝 ' + sid + ' 的跑腿认证', 'info');
     await loadRunnerReviews();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+// ============ 用户管理 ============
+async function loadUserManagement() {
+  const ct = document.getElementById('adminContent');
+  ct.innerHTML = '<p>加载中...</p>';
+  try {
+    const issues = await ghIssues('user', 'all');
+    const users = issues.map(i => {
+      try { const u = JSON.parse(i.body); u._issue_number = i.number; u._state = i.state; return u; }
+      catch(e) { return null; }
+    }).filter(u => u).sort((a, b) => (a.student_id || '').localeCompare(b.student_id || ''));
+
+    if (users.length === 0) {
+      ct.innerHTML = '<div class="empty-state"><p>暂无用户</p></div>';
+      return;
+    }
+
+    let html = '<p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:14px">共 <strong>' + users.length + '</strong> 个用户（含已关闭账号）</p>';
+    html += '<div style="max-height:450px;overflow-y:auto">';
+    for (const u of users) {
+      const stateBadge = u._state === 'open'
+        ? '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:99px;font-size:.72rem">正常</span>'
+        : '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:99px;font-size:.72rem">已关闭</span>';
+      const statusBadge = u.status === 'approved'
+        ? '<span style="color:#16a34a;font-size:.75rem">✅ 已审核</span>'
+        : u.status === 'pending'
+        ? '<span style="color:#f59e0b;font-size:.75rem">⏳ 待审核</span>'
+        : u.status === 'rejected'
+        ? '<span style="color:#dc2626;font-size:.75rem">❌ 已拒绝</span>'
+        : '<span style="color:#94a3b8;font-size:.75rem">⚠️ 状态未知</span>';
+      const runnerBadge = u.runner_verified
+        ? '<span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:99px;font-size:.7rem;margin-left:4px">🛵 跑腿</span>'
+        : '';
+
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
+        + '<div style="min-width:0;flex:1">'
+        + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
+        + '<strong>' + esc(u.name || '?') + '</strong>'
+        + runnerBadge
+        + stateBadge
+        + '</div>'
+        + '<div style="font-size:.8rem;color:var(--text-secondary)">' + esc(u.student_id || '?')
+        + (u.phone ? ' · 📱 ' + esc(u.phone) : '')
+        + (u.dorm ? ' · 📍 ' + esc(u.dorm) : '')
+        + '</div>'
+        + '<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">' + statusBadge + ' · ' + timeAgo(u.created_at) + ' 注册' + '</div>'
+        + '</div>'
+        + '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:12px">';
+      if (u._state === 'open') {
+        html += '<button class="btn btn-sm btn-danger" onclick="kickUser(' + u._issue_number + ',\'' + esc(u.name || u.student_id) + '\')" style="white-space:nowrap">🚫 踢出</button>';
+      } else {
+        html += '<button class="btn btn-sm btn-success" onclick="reactivateUser(' + u._issue_number + ',\'' + esc(u.name || u.student_id) + '\')" style="white-space:nowrap">🔄 恢复</button>';
+      }
+      html += '</div></div>';
+    }
+    html += '</div>';
+
+    ct.innerHTML = html;
+  } catch(e) {
+    ct.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
+  }
+}
+
+async function kickUser(inum, name) {
+  if (!confirm('确定要踢出用户「' + name + '」吗？\n\n踢出后该用户将无法登录。')) return;
+  try {
+    await ghCloseIssue(inum);
+    toast('已踢出用户「' + name + '」', 'success');
+    await loadUserManagement();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+async function reactivateUser(inum, name) {
+  if (!confirm('确定要恢复用户「' + name + '」吗？')) return;
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: 'open' })
+    });
+    if (!res.ok) throw new Error('恢复失败');
+    toast('已恢复用户「' + name + '」', 'success');
+    await loadUserManagement();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
 }
 
