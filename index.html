@@ -856,16 +856,15 @@ function switchTaskTab(tab) {
   document.getElementById('secondhandFilters').style.display = (tab === 'secondhand') ? 'flex' : 'none';
   document.getElementById('borrowFilters').style.display = (tab === 'borrow') ? 'flex' : 'none';
   document.getElementById('qaFilters').style.display = (tab === 'qa') ? 'flex' : 'none';
-  // 问答和借物隐藏区域/价格筛选
+  // 问答隐藏区域/价格筛选，借物保留区域和价格筛选
   const dormFilter = document.getElementById('taskDormFilter');
   const sortSelect = document.getElementById('taskSortSelect');
   const isQA = tab === 'qa';
-  const isBorrow = tab === 'borrow';
-  if (dormFilter) dormFilter.style.display = (isQA || isBorrow) ? 'none' : '';
+  if (dormFilter) dormFilter.style.display = isQA ? 'none' : '';
   if (sortSelect) {
-    sortSelect.style.display = (isQA || isBorrow) ? 'none' : '';
-    // 问答和借物只保留最新/最早排序
-    if (isQA || isBorrow) {
+    sortSelect.style.display = isQA ? 'none' : '';
+    // 问答只保留最新/最早排序
+    if (isQA) {
       sortSelect.innerHTML = '<option value="newest">🕐 最新发布</option><option value="oldest">🕐 最早发布</option>';
     } else {
       sortSelect.innerHTML = '<option value="newest">🕐 最新发布</option><option value="oldest">🕐 最早发布</option><option value="price_high">💰 价格从高到低</option><option value="price_low">💰 价格从低到高</option>';
