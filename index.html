@@ -1877,10 +1877,13 @@ async function takeOrder(inum) {
     await ghUpdateIssue(inum, JSON.stringify(o));
     toast('接单成功！请提醒对方查看你的收款信息', 'success');
     closeDetailModal();
-    if (S.page === 'task') refreshCurrentTab();
-    else if (S.page !== 'home' && S.page !== 'my') {
-      loadOrders(S.page, S.filter[S.page] || 'all');
+    // 乐观更新：直接从缓存中更新该订单状态
+    if (_cachedOrders) {
+      const idx = _cachedOrders.findIndex(x => x._issue_number === inum);
+      if (idx !== -1) { _cachedOrders[idx].status = 'taken'; _cachedOrders[idx].taker_name = S.user.name; _cachedOrders[idx].taker_student_id = S.user.student_id; renderOrders(_cachedOrders); }
     }
+    if (S.page === 'my') loadMyOrders();
+    else if (S.page === 'task') { /* 已通过缓存更新，但异步再拉一次确保数据一致 */ setTimeout(() => refreshCurrentTab(), 1500); }
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -1899,10 +1902,13 @@ async function completeOrder(inum) {
     await deleteAllComments(inum);
     toast('订单完成！', 'success');
     closeDetailModal();
-    if (S.page === 'task') refreshCurrentTab();
-    else if (S.page !== 'home' && S.page !== 'my') {
-      loadOrders(S.page, S.filter[S.page] || 'all');
+    // 乐观更新：直接从缓存中移除已完成订单
+    if (_cachedOrders) {
+      _cachedOrders = _cachedOrders.filter(x => x._issue_number !== inum);
+      renderOrders(_cachedOrders);
     }
+    if (S.page === 'my') loadMyOrders();
+    else if (S.page === 'task') { setTimeout(() => refreshCurrentTab(), 1500); }
     loadStats();
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -1921,10 +1927,13 @@ async function cancelOrder(inum) {
     await deleteAllComments(inum);
     toast('订单已取消', 'info');
     closeDetailModal();
-    if (S.page === 'task') refreshCurrentTab();
-    else if (S.page !== 'home' && S.page !== 'my') {
-      loadOrders(S.page, S.filter[S.page] || 'all');
+    // 乐观更新：直接从缓存中移除已取消订单
+    if (_cachedOrders) {
+      _cachedOrders = _cachedOrders.filter(x => x._issue_number !== inum);
+      renderOrders(_cachedOrders);
     }
+    if (S.page === 'my') loadMyOrders();
+    else if (S.page === 'task') { setTimeout(() => refreshCurrentTab(), 1500); }
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -2731,12 +2740,12 @@ async function autoCleanOldOrders() {
 }
 setTimeout(autoCleanOldOrders, 5000);
 
-// 自动刷新：每15秒刷新一次当前页面数据
+// 自动刷新：每5秒刷新一次当前页面数据（配合乐观更新做兜底）
 setInterval(function(){
   if(S.page==='home')loadStats();
   else if(S.page==='my')loadMyOrders();
   else if(S.page==='task')refreshCurrentTab();
-},15000);
+},5000);
 // ============ TOAST ============
 function toast(msg, type, duration) {
   const c = document.getElementById('toastContainer');
