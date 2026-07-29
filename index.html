@@ -1297,9 +1297,15 @@ async function showUserProfile(studentId) {
       }).filter(o => o && (o.publisher_id == myUid || o.taker_id == myUid) && (o.publisher_id == theirUid || o.taker_id == theirUid));
       commonOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       const latest = commonOrders[0];
-      chatBtnHtml = latest
-        ? '<div style="text-align:center;margin-bottom:16px"><button class="btn btn-primary" onclick="closeUserProfileModal();showDetail(' + latest._num + ')">💬 发起私信</button></div>'
-        : '<div style="text-align:center;margin-bottom:16px;padding:10px;background:var(--bg);border-radius:8px;font-size:.85rem;color:var(--text-secondary)">💡 你们还没有共同订单，无法发起私信</div>';
+      const isAdmin = S.user.student_id === ADMIN_STUDENT_ID;
+      if (latest) {
+        chatBtnHtml = '<div style="text-align:center;margin-bottom:16px"><button class="btn btn-primary" onclick="closeUserProfileModal();showDetail(' + latest._num + ')">💬 发起私信</button></div>';
+      } else if (isAdmin) {
+        // 管理员：无共同订单时也可创建私信对话
+        chatBtnHtml = '<div style="text-align:center;margin-bottom:16px"><button class="btn btn-primary" onclick="closeUserProfileModal();adminStartChat(\'' + esc(user.student_id) + '\',\'' + esc(user.name || '') + '\',\'' + (user._issue_number || '') + '\')">💬 发起私信</button></div>';
+      } else {
+        chatBtnHtml = '<div style="text-align:center;margin-bottom:16px;padding:10px;background:var(--bg);border-radius:8px;font-size:.85rem;color:var(--text-secondary)">💡 你们还没有共同订单，无法发起私信</div>';
+      }
     }
 
     ct.innerHTML = ''
@@ -1328,6 +1334,46 @@ async function showUserProfile(studentId) {
 
 function closeUserProfileModal() {
   document.getElementById('userProfileModal').classList.remove('active');
+}
+
+// ============ 管理员发起私信 ============
+async function adminStartChat(targetSid, targetName, targetIssueNum) {
+  if (!S.user || S.user.student_id !== ADMIN_STUDENT_ID) {
+    toast('仅管理员可用', 'error');
+    return;
+  }
+
+  try {
+    // 创建一个私密对话订单（type=chat，管理员发布，目标用户作为接单人）
+    const chatOrder = {
+      type: 'chat',
+      category: 'other',
+      title: '管理员对话 ' + targetName,
+      description: '管理员向 ' + targetName + '（' + targetSid + '）发起的私信对话',
+      price: 0,
+      fee: 0,
+      location: '',
+      urgency: 'normal',
+      deadline: '',
+      payment: '',
+      images: [],
+      status: 'taken', // 直接设为已接单，这样双方都可以评论
+      publisher_id: S.user._issue_number || S.user.student_id,
+      publisher_name: S.user.name,
+      publisher_student_id: S.user.student_id,
+      publisher_dorm: S.user.dorm || '',
+      taker_id: targetIssueNum || targetSid,
+      taker_name: targetName,
+      taker_student_id: targetSid,
+      created_at: new Date().toISOString()
+    };
+
+    const newIssue = await ghCreateIssue('[对话] ' + targetName, JSON.stringify(chatOrder), ['order', 'chat']);
+    toast('对话已创建，正在打开...', 'success');
+    showDetail(newIssue.number);
+  } catch(e) {
+    toast('创建对话失败：' + e.message, 'error');
+  }
 }
 
 // ============ 管理员审核 ============
