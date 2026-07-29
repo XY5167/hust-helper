@@ -1665,7 +1665,7 @@ async function handleAuth(e) {
         if (dup.state === 'open') {
           err.textContent = '该学号已注册，请直接登录。如果忘记密码请联系管理员。';
         } else {
-          err.textContent = '该学号已注册但账号被关闭，请联系管理员恢复。';
+          err.textContent = '该学号曾注册但账号被关闭，请用原密码直接登录以恢复账号。';
         }
         err.style.display = 'block';
         return;
@@ -1701,7 +1701,20 @@ async function handleAuth(e) {
         } catch(e) { return false; }
       });
       if (!found) { err.textContent = '学号或密码错误'; err.style.display = 'block'; return; }
-      if (found.state !== 'open') { err.textContent = '该账号已被停用，请联系管理员'; err.style.display = 'block'; return; }
+      if (found.state !== 'open') {
+        // 账号被关闭（可能是清理数据时误关），只要密码正确就自动重新激活
+        const reopenRes = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + found.number, {
+          method: 'PATCH',
+          headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: 'open' })
+        });
+        if (!reopenRes.ok) {
+          err.textContent = '账号恢复失败，请联系管理员';
+          err.style.display = 'block';
+          return;
+        }
+        toast('账号已自动恢复可用状态', 'success');
+      }
       const u = JSON.parse(found.body);
       // 检查审核状态
       if (u.status === 'pending') {
