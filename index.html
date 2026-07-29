@@ -54,6 +54,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .user-menu{display:flex;align-items:center;gap:10px}
 .user-name{font-weight:600;font-size:.88rem}
 .user-verified{font-size:.7rem;background:var(--success);color:#fff;padding:2px 7px;border-radius:99px}
+.user-runner-badge{font-size:.68rem;background:#f97316;color:#fff;padding:2px 8px;border-radius:99px;margin-left:4px;font-weight:600}
 .user-balance{display:none}
 
 /* Buttons */
@@ -122,6 +123,11 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .type-report{background:#f3e8ff;color:#7c3aed}
 .type-repair{background:#fce7f3;color:#be185d}
 .type-other{background:#f1f5f9;color:#475569}
+/* 借物子分类 */
+.type-textbook{background:#fef3c7;color:#92400e}
+.type-device{background:#dbeafe;color:#1e40af}
+.type-sports{background:#dcfce7;color:#166534}
+.type-tool{background:#f3e8ff;color:#7c3aed}
 .order-card-status{font-size:.72rem;padding:3px 9px;border-radius:99px}
 .status-open{background:#dcfce7;color:#166534}
 .status-taken{background:#fef3c7;color:#92400e}
@@ -263,6 +269,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     <!-- 板块 Tab -->
     <div class="tab-bar" id="taskTabBar" style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0">
       <button class="tab-btn active" data-tasktab="task" onclick="switchTaskTab('task')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:600;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;transition:all .2s">🏃 跑腿代办</button>
+      <button class="tab-btn" data-tasktab="borrow" onclick="switchTaskTab('borrow')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">📦 有偿借物</button>
       <button class="tab-btn" data-tasktab="secondhand" onclick="switchTaskTab('secondhand')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">🔄 二手交易</button>
       <button class="tab-btn" data-tasktab="qa" onclick="switchTaskTab('qa')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">💬 有问必答</button>
     </div>
@@ -283,6 +290,15 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <button class="filter-btn" data-filter="electronic" onclick="filterOrders('secondhand','electronic')">💻 电子产品</button>
       <button class="filter-btn" data-filter="daily" onclick="filterOrders('secondhand','daily')">🏠 生活用品</button>
       <button class="filter-btn" data-filter="other" onclick="filterOrders('secondhand','other')">📌 其他</button>
+    </div>
+    <!-- 借物子分类 -->
+    <div class="filter-bar" id="borrowFilters" style="display:none">
+      <button class="filter-btn active" data-filter="all" onclick="filterOrders('borrow','all')">全部</button>
+      <button class="filter-btn" data-filter="textbook" onclick="filterOrders('borrow','textbook')">📖 教材参考书</button>
+      <button class="filter-btn" data-filter="device" onclick="filterOrders('borrow','device')">📱 数码设备</button>
+      <button class="filter-btn" data-filter="sports" onclick="filterOrders('borrow','sports')">⚽ 体育器材</button>
+      <button class="filter-btn" data-filter="tool" onclick="filterOrders('borrow','tool')">🔧 生活工具</button>
+      <button class="filter-btn" data-filter="other" onclick="filterOrders('borrow','other')">📌 其他</button>
     </div>
     <!-- 问答子分类 -->
     <div class="filter-bar" id="qaFilters" style="display:none">
@@ -407,6 +423,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <label>类型</label>
         <select id="publishType" required onchange="updatePublishCategories()">
           <option value="task">跑腿代办</option>
+          <option value="borrow">有偿借物</option>
           <option value="secondhand">二手交易</option>
           <option value="qa">有问必答</option>
         </select>
@@ -486,6 +503,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <div id="myPaymentPreview" style="margin-top:12px"></div>
     </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+      <button class="btn btn-outline btn-sm" onclick="showRunnerApply()" style="display:none" id="btnRunnerApply">🛵 申请跑腿认证</button>
       <button class="btn btn-outline btn-sm" onclick="showReportsView()" style="display:none" id="btnReports">📋 反馈中心</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0" id="myOrderTabs">
@@ -553,11 +571,38 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   </div>
 </div>
 
+<!-- Runner Apply Modal -->
+<div class="modal-overlay" id="runnerApplyModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeRunnerApply()">&times;</button>
+    <h3 style="margin-bottom:16px">🛵 申请跑腿认证</h3>
+    <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:16px">通过认证后即可接单跑腿赚钱。请上传清晰的学生证照片用于身份核实。</p>
+    <div id="runnerApplyInfo" style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;font-size:.85rem">
+      <strong>当前状态：</strong><span id="runnerStatusText" style="color:var(--text-muted)">未申请</span>
+    </div>
+    <div class="form-group">
+      <label>学生证照片（正面，含学号和姓名）</label>
+      <input type="file" id="runnerStudentCard" accept="image/*">
+      <p class="form-hint">请上传清晰的学生证照片，仅用于身份核实，审核通过后不会公开。</p>
+    </div>
+    <div class="form-group">
+      <label>补充说明（选填）</label>
+      <input type="text" id="runnerApplyNote" placeholder="如：我是韵苑这边的，可以接紫菘和韵苑的订单">
+    </div>
+    <p class="form-error" id="runnerApplyError" style="display:none"></p>
+    <button class="btn btn-primary btn-block" onclick="submitRunnerApply()">提交申请</button>
+  </div>
+</div>
+
 <!-- Admin Panel Modal -->
 <div class="modal-overlay" id="adminModal">
   <div class="modal modal-lg">
     <button class="modal-close" onclick="closeAdminModal()">&times;</button>
-    <h3 style="margin-bottom:16px">🛡️ 管理员审核</h3>
+    <h3 style="margin-bottom:16px">🛡️ 管理员面板</h3>
+    <div class="modal-tabs" style="margin-bottom:16px">
+      <button class="modal-tab active" id="adminTabUsers" onclick="switchAdminTab('users')">👤 用户审核</button>
+      <button class="modal-tab" id="adminTabRunners" onclick="switchAdminTab('runners')">🛵 跑腿认证</button>
+    </div>
     <div id="adminContent"><p>加载中...</p></div>
   </div>
 </div>
@@ -573,7 +618,7 @@ const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
 const REPO = 'XY5167/hust-helper-backend';
 const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
 
-const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', secondhand: 'all', qa: 'all' }, taskTab: 'task', myTab: 'all' };
+const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', secondhand: 'all', qa: 'all', borrow: 'all' }, taskTab: 'task', myTab: 'all' };
 
 // 初始化
 (function() {
@@ -643,15 +688,7 @@ function navigate(page) {
   if (nl) nl.classList.add('active');
   if (page === 'home') loadStats();
   else if (page === 'my') loadMyOrders();
-  else if (page === 'task') {
-    if (S.taskTab === 'secondhand') {
-      loadOrders('secondhand', S.filter.secondhand || 'all');
-    } else if (S.taskTab === 'qa') {
-      loadOrders('qa', S.filter.qa || 'all');
-    } else {
-      loadOrders('task', S.filter.task || 'all');
-    }
-  }
+  else if (page === 'task') refreshCurrentTab();
 }
 
 // ============ STATS ============
@@ -675,6 +712,11 @@ async function loadStats() {
 // ============ ORDERS ============
 let _cachedOrders = null;
 let _cachedType = null;
+
+function refreshCurrentTab() {
+  const tab = S.taskTab || 'task';
+  loadOrders(tab, S.filter[tab] || 'all');
+}
 
 async function loadOrders(type, cat) {
   const grid = document.getElementById('taskOrders');
@@ -704,6 +746,8 @@ async function loadOrders(type, cat) {
       orders = orders.filter(o => o.type === 'secondhand');
     } else if (type === 'qa') {
       orders = orders.filter(o => o.type === 'qa');
+    } else if (type === 'borrow') {
+      orders = orders.filter(o => o.type === 'borrow');
     } else {
       orders = orders.filter(o => o.type === 'task' || o.type === 'errand' || o.type === 'skill');
     }
@@ -726,14 +770,14 @@ function renderOrders(orders) {
   if (!grid) return;
 
   if (orders.length === 0) {
-    const emptyText = _cachedType === 'qa' ? '暂无问答' : '暂无匹配订单';
-    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>' + emptyText + '</p></div>';
+    const emptyMap = { task: '暂无跑腿订单，来做第一个发布者吧', secondhand: '暂无二手物品，快来发布吧', qa: '暂无问答，来提出你的问题吧', borrow: '暂无可借物品，来发布你的需求吧' };
+    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>' + (emptyMap[_cachedType] || '暂无匹配内容') + '</p></div>';
     return;
   }
 
   grid.innerHTML = orders.map(o => {
-    const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答'};
-    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业'};
+    const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答', borrow:'借物'};
+    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
     const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
     const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
@@ -749,7 +793,7 @@ function renderOrders(orders) {
       + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
       + '</div>'
       + '<div class="order-card-footer">'
-      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a></span>'
+      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
       + '<span>' + timeAgo(o.created_at) + '</span>'
       + '</div></div>';
   }).join('');
@@ -824,7 +868,24 @@ function switchTaskTab(tab) {
   }
   document.getElementById('taskFilters').style.display = (tab === 'task') ? 'flex' : 'none';
   document.getElementById('secondhandFilters').style.display = (tab === 'secondhand') ? 'flex' : 'none';
+  document.getElementById('borrowFilters').style.display = (tab === 'borrow') ? 'flex' : 'none';
   document.getElementById('qaFilters').style.display = (tab === 'qa') ? 'flex' : 'none';
+  // 问答和借物隐藏区域/价格筛选
+  const dormFilter = document.getElementById('taskDormFilter');
+  const sortSelect = document.getElementById('taskSortSelect');
+  const isQA = tab === 'qa';
+  const isBorrow = tab === 'borrow';
+  if (dormFilter) dormFilter.style.display = (isQA || isBorrow) ? 'none' : '';
+  if (sortSelect) {
+    sortSelect.style.display = (isQA || isBorrow) ? 'none' : '';
+    // 问答和借物只保留最新/最早排序
+    if (isQA || isBorrow) {
+      sortSelect.innerHTML = '<option value="newest">🕐 最新发布</option><option value="oldest">🕐 最早发布</option>';
+    } else {
+      sortSelect.innerHTML = '<option value="newest">🕐 最新发布</option><option value="oldest">🕐 最早发布</option><option value="price_high">💰 价格从高到低</option><option value="price_low">💰 价格从低到高</option>';
+    }
+    sortSelect.value = 'newest';
+  }
   loadOrders(tab, S.filter[tab] || 'all');
 }
 
@@ -844,7 +905,7 @@ async function showDetail(issueNum) {
     const o = JSON.parse(issue.body);
     o._issue_number = issueNum;
 
-    const tl = {errand:'跑腿代办', secondhand:'二手交易', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答'};
+    const tl = {errand:'跑腿代办', secondhand:'二手交易', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答', borrow:'有偿借物'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
     const isQA = o.type === 'qa';
 
@@ -931,8 +992,8 @@ async function showDetail(issueNum) {
       + (isQA ? '' : '<div class="detail-price">¥' + o.price.toFixed(2) + '</div>')
       + '<div class="detail-meta">'
       + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
-      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a></span>'
-      + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_name) + '</a></span>' : ''))
+      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
+      + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_name) + '</a>' + (o.taker_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>' : ''))
       + '<span>🕐 ' + timeAgo(o.created_at) + '</span>'
       + (isQA ? '' : urgencyHTML + deadlineHTML)
       + '</div>'
@@ -1266,12 +1327,27 @@ function closeUserProfileModal() {
 }
 
 // ============ 管理员审核 ============
+let _adminTab = 'users'; // 'users' | 'runners'
+
+function switchAdminTab(tab) {
+  _adminTab = tab;
+  document.querySelectorAll('#adminModal .modal-tab').forEach(t => t.classList.remove('active'));
+  const activeTab = document.getElementById('adminTab' + (tab === 'users' ? 'Users' : 'Runners'));
+  if (activeTab) activeTab.classList.add('active');
+  if (tab === 'users') loadAdminPanel();
+  else loadRunnerReviews();
+}
+
 async function showAdminPanel() {
   if (!S.user || S.user.student_id !== ADMIN_STUDENT_ID) {
     toast('仅管理员可访问', 'error');
     return;
   }
   document.getElementById('adminModal').classList.add('active');
+  _adminTab = 'users';
+  document.querySelectorAll('#adminModal .modal-tab').forEach(t => t.classList.remove('active'));
+  const tab = document.getElementById('adminTabUsers');
+  if (tab) tab.classList.add('active');
   await loadAdminPanel();
 }
 
@@ -1289,13 +1365,11 @@ async function loadAdminPanel() {
       catch(e) { return null; }
     }).filter(u => u);
 
-    // 分类
     const pending = users.filter(u => u.status === 'pending');
     const approved = users.filter(u => u.status !== 'pending' && u.status !== 'rejected' && u._state === 'open');
     const rejected = users.filter(u => u.status === 'rejected');
 
     let html = '';
-    // 待审核
     html += '<h4 style="margin-bottom:10px">⏳ 待审核 (' + pending.length + ')</h4>';
     if (pending.length === 0) {
       html += '<p style="color:var(--text-secondary);margin-bottom:16px">暂无待审核用户</p>';
@@ -1306,6 +1380,7 @@ async function loadAdminPanel() {
           + '<div><strong>' + esc(u.name) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span>'
           + (u.email ? '<br><span style="font-size:.8rem;color:var(--text-secondary)">📧 ' + esc(u.email) + '</span>' : '')
           + (u.phone ? ' <span style="font-size:.8rem;color:var(--text-secondary)">📱 ' + esc(u.phone) + '</span>' : '')
+          + (u.dorm ? ' <span style="font-size:.8rem;color:var(--text-secondary)">📍 ' + esc(u.dorm) + '</span>' : '')
           + '<br><span style="font-size:.75rem;color:var(--text-muted)">' + timeAgo(u.created_at) + ' 注册</span></div>'
           + '<div style="display:flex;gap:6px;flex-shrink:0">'
           + '<button class="btn btn-sm btn-success" onclick="approveUser(' + u._issue_number + ')">通过</button>'
@@ -1314,7 +1389,6 @@ async function loadAdminPanel() {
       }
       html += '</div>';
     }
-    // 已审核用户数
     html += '<h4 style="margin-bottom:10px">✅ 已通过用户 (' + approved.length + ')</h4>';
     html += '<h4 style="margin-bottom:10px">❌ 已拒绝用户 (' + rejected.length + ')</h4>';
 
@@ -1333,6 +1407,12 @@ async function approveUser(inum) {
     const u = JSON.parse(issue.body);
     u.status = 'approved';
     await ghUpdateIssue(inum, JSON.stringify(u));
+    // 如果当前登录用户就是被审核人，更新本地状态
+    if (S.user && (S.user._issue_number === inum || S.user.student_id === u.student_id)) {
+      S.user.status = 'approved';
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      updateUI();
+    }
     toast('已通过审核', 'success');
     await loadAdminPanel();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
@@ -1347,14 +1427,141 @@ async function rejectUser(inum) {
     const u = JSON.parse(issue.body);
     u.status = 'rejected';
     await ghUpdateIssue(inum, JSON.stringify(u));
+    if (S.user && (S.user._issue_number === inum || S.user.student_id === u.student_id)) {
+      S.user.status = 'rejected';
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      updateUI();
+    }
     toast('已拒绝该用户', 'info');
     await loadAdminPanel();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+// ============ 跑腿认证审核 ============
+async function loadRunnerReviews() {
+  const ct = document.getElementById('adminContent');
+  ct.innerHTML = '<p>加载中...</p>';
+  try {
+    const issues = await ghIssues('runner_apply', 'all');
+    const applications = issues.map(i => {
+      try { const a = JSON.parse(i.body); a._num = i.number; a._state = i.state; return a; }
+      catch(e) { return null; }
+    }).filter(a => a);
+
+    const pending = applications.filter(a => a.status === 'pending');
+    const approved = applications.filter(a => a.status === 'approved');
+    const rejected = applications.filter(a => a.status === 'rejected');
+
+    let html = '';
+    html += '<h4 style="margin-bottom:10px">⏳ 待审核跑腿申请 (' + pending.length + ')</h4>';
+    if (pending.length === 0) {
+      html += '<p style="color:var(--text-secondary);margin-bottom:16px">暂无待审核的跑腿申请</p>';
+    } else {
+      html += '<div style="max-height:350px;overflow-y:auto;margin-bottom:16px">';
+      for (const a of pending) {
+        html += '<div style="padding:12px 14px;background:var(--bg);border-radius:8px;margin-bottom:10px">'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+          + '<div><strong>' + esc(a.name) + '</strong> <span style="color:var(--text-muted)">' + esc(a.student_id) + '</span>'
+          + (a.dorm ? ' <span style="font-size:.8rem;color:var(--text-secondary)">📍 ' + esc(a.dorm) + '</span>' : '')
+          + '</div>'
+          + '<span style="font-size:.75rem;color:var(--text-muted)">' + timeAgo(a.created_at) + '</span>'
+          + '</div>'
+          + (a.note ? '<div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:8px">💬 ' + esc(a.note) + '</div>' : '')
+          + (a.student_card_image ? '<div style="margin-bottom:8px"><img src="' + a.student_card_image + '" style="max-width:260px;max-height:200px;border-radius:8px;border:1px solid var(--border);cursor:pointer" onclick="window.open(\'' + a.student_card_image + '\')" title="点击查看大图"></div>' : '<div style="color:var(--danger);font-size:.8rem;margin-bottom:8px">⚠️ 未上传学生证照片</div>')
+          + '<div style="display:flex;gap:6px">'
+          + '<button class="btn btn-sm btn-success" onclick="approveRunner(' + a._num + ',\'' + esc(a.student_id) + '\')">✅ 通过认证</button>'
+          + '<button class="btn btn-sm btn-danger" onclick="rejectRunner(' + a._num + ',\'' + esc(a.student_id) + '\')">❌ 拒绝</button>'
+          + '</div></div>';
+      }
+      html += '</div>';
+    }
+    html += '<h4 style="margin-bottom:10px">✅ 已通过 (' + approved.length + ')</h4>';
+    html += '<h4 style="margin-bottom:10px">❌ 已拒绝 (' + rejected.length + ')</h4>';
+
+    ct.innerHTML = html;
+  } catch(e) {
+    ct.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
+  }
+}
+
+async function approveRunner(anum, sid) {
+  try {
+    // 1. 更新跑腿申请状态
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + anum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const a = JSON.parse(issue.body);
+    a.status = 'approved';
+    a.reviewed_at = new Date().toISOString();
+    await ghUpdateIssue(anum, JSON.stringify(a));
+
+    // 2. 找到对应用户，设置 runner_verified = true
+    const users = await ghIssues('user', 'all');
+    const userIssue = users.find(i => {
+      try { const u = JSON.parse(i.body); return u.student_id === sid; }
+      catch(e) { return false; }
+    });
+    if (userIssue) {
+      const u = JSON.parse(userIssue.body);
+      u.runner_verified = true;
+      u.runner_apply_num = anum;
+      await ghUpdateIssue(userIssue.number, JSON.stringify(u));
+      // 如果当前登录用户就是被审核人，更新本地状态
+      if (S.user && S.user.student_id === sid) {
+        S.user.runner_verified = true;
+        S.user.runner_apply_num = anum;
+        localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+        updateUI();
+      }
+    }
+
+    toast('✅ 已通过 ' + sid + ' 的跑腿认证', 'success');
+    await loadRunnerReviews();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+async function rejectRunner(anum, sid) {
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + anum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const a = JSON.parse(issue.body);
+    a.status = 'rejected';
+    a.reviewed_at = new Date().toISOString();
+    await ghUpdateIssue(anum, JSON.stringify(a));
+
+    // 如果之前通过过，移除认证
+    const users = await ghIssues('user', 'all');
+    const userIssue = users.find(i => {
+      try { const u = JSON.parse(i.body); return u.student_id === sid; }
+      catch(e) { return false; }
+    });
+    if (userIssue) {
+      const u = JSON.parse(userIssue.body);
+      u.runner_verified = false;
+      await ghUpdateIssue(userIssue.number, JSON.stringify(u));
+      if (S.user && S.user.student_id === sid) {
+        S.user.runner_verified = false;
+        localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+        updateUI();
+      }
+    }
+
+    toast('已拒绝 ' + sid + ' 的跑腿认证', 'info');
+    await loadRunnerReviews();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
 }
 
 async function takeOrder(inum) {
   if (!S.user) { showAuthModal(); return; }
   if (!checkApproved()) return;
+  // 跑腿认证检查：只有认证跑腿才能接单（跑腿代办和二手交易）
+  if (!S.user.runner_verified) {
+    toast('⚠️ 接单需要先通过跑腿认证。请到「我的」页面申请跑腿认证，上传学生证照片。', 'info');
+    return;
+  }
   try {
     const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
@@ -1367,16 +1574,15 @@ async function takeOrder(inum) {
     o.taker_id = S.user._issue_number || S.user.student_id;
     o.taker_name = S.user.name;
     o.taker_student_id = S.user.student_id;
+    o.taker_runner_verified = S.user.runner_verified || false;
     // 接单时自动把接单人的收款码写入订单
     o.taker_payment_info = S.user.payment_info || '';
     o.taker_payment_image = S.user.payment_image || '';
     await ghUpdateIssue(inum, JSON.stringify(o));
     toast('接单成功！请提醒对方查看你的收款信息', 'success');
     closeDetailModal();
-    if (S.page === 'task') {
-      if (S.taskTab === 'secondhand') loadOrders('secondhand', S.filter.secondhand || 'all');
-      else loadOrders('task', S.filter.task || 'all');
-    } else if (S.page !== 'home' && S.page !== 'my') {
+    if (S.page === 'task') refreshCurrentTab();
+    else if (S.page !== 'home' && S.page !== 'my') {
       loadOrders(S.page, S.filter[S.page] || 'all');
     }
   } catch(e) { toast(e.message, 'error'); }
@@ -1395,10 +1601,8 @@ async function completeOrder(inum) {
     await ghUpdateIssue(inum, JSON.stringify(o));
     toast('订单完成！', 'success');
     closeDetailModal();
-    if (S.page === 'task') {
-      if (S.taskTab === 'secondhand') loadOrders('secondhand', S.filter.secondhand || 'all');
-      else loadOrders('task', S.filter.task || 'all');
-    } else if (S.page !== 'home' && S.page !== 'my') {
+    if (S.page === 'task') refreshCurrentTab();
+    else if (S.page !== 'home' && S.page !== 'my') {
       loadOrders(S.page, S.filter[S.page] || 'all');
     }
     loadStats();
@@ -1417,10 +1621,8 @@ async function cancelOrder(inum) {
     await ghUpdateIssue(inum, JSON.stringify(o));
     toast('订单已取消', 'info');
     closeDetailModal();
-    if (S.page === 'task') {
-      if (S.taskTab === 'secondhand') loadOrders('secondhand', S.filter.secondhand || 'all');
-      else loadOrders('task', S.filter.task || 'all');
-    } else if (S.page !== 'home' && S.page !== 'my') {
+    if (S.page === 'task') refreshCurrentTab();
+    else if (S.page !== 'home' && S.page !== 'my') {
       loadOrders(S.page, S.filter[S.page] || 'all');
     }
   } catch(e) { toast(e.message, 'error'); }
@@ -1618,10 +1820,8 @@ async function handleAuth(e) {
     } catch(ex) { err.textContent = '登录失败：' + ex.message; err.style.display = 'block'; return; }
   }
   loadStats();
-  if (S.page === 'task') {
-    if (S.taskTab === 'secondhand') loadOrders('secondhand', S.filter.secondhand || 'all');
-    else loadOrders('task', S.filter.task || 'all');
-  } else if (S.page !== 'home' && S.page !== 'my') {
+  if (S.page === 'task') refreshCurrentTab();
+  else if (S.page !== 'home' && S.page !== 'my') {
     loadOrders(S.page, S.filter[S.page] || 'all');
   }
 }
@@ -1663,6 +1863,7 @@ function updatePublishCategories() {
   const t = document.getElementById('publishType').value;
   const cats = {
     task: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'print',l:'帮忙打印'},{v:'report',l:'代写报告'},{v:'repair',l:'维修'},{v:'other',l:'其他任务'}],
+    borrow: [{v:'textbook',l:'教材参考书'},{v:'device',l:'数码设备'},{v:'sports',l:'体育器材'},{v:'tool',l:'生活工具'},{v:'other',l:'其他物品'}],
     secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'daily',l:'生活用品'},{v:'other',l:'其他'}],
     qa: [{v:'course',l:'选课学习'},{v:'exam',l:'考研保研'},{v:'life',l:'校园生活'},{v:'job',l:'实习就业'},{v:'other',l:'其他问题'}]
   };
@@ -1737,20 +1938,19 @@ async function handlePublish(e) {
     publisher_name: S.user.name,
     publisher_student_id: S.user.student_id,
     publisher_dorm: S.user.dorm || '',
+    publisher_runner_verified: S.user.runner_verified || false,
     taker_id: null, taker_name: null,
     created_at: new Date().toISOString()
   };
 
   try {
     const label = type === 'qa' ? 'qa' : 'order';
-    const prefix = type === 'qa' ? '[问答] ' : '[订单] ';
+    const prefix = type === 'qa' ? '[问答] ' : (type === 'borrow' ? '[借物] ' : '[订单] ');
     await ghCreateIssue(prefix + title, JSON.stringify(order), [label, type, cat]);
     toast('发布成功！', 'success');
     closePublishModal();
     if (S.page === 'task') {
-      if (S.taskTab === 'secondhand') loadOrders('secondhand', S.filter.secondhand || 'all');
-      else if (S.taskTab === 'qa') loadOrders('qa', S.filter.qa || 'all');
-      else loadOrders('task', S.filter.task || 'all');
+      refreshCurrentTab();
     } else {
       loadOrders(S.page, S.filter[S.page] || 'all');
     }
@@ -1766,6 +1966,21 @@ function updateUI() {
     menu.style.display = 'flex';
     btn.style.display = 'none';
     document.getElementById('userNameDisplay').textContent = S.user.name || S.user.student_id;
+    // 显示认证跑腿徽章
+    const verifiedEl = menu.querySelector('.user-verified');
+    if (verifiedEl) {
+      if (S.user.runner_verified) {
+        verifiedEl.textContent = '认证跑腿';
+        verifiedEl.style.background = '#f97316';
+        verifiedEl.style.display = 'inline-block';
+      } else if (S.user.status === 'approved') {
+        verifiedEl.textContent = '已实名';
+        verifiedEl.style.background = '#16a34a';
+        verifiedEl.style.display = 'inline-block';
+      } else {
+        verifiedEl.style.display = 'none';
+      }
+    }
     // 管理员显示审核入口
     const adminBtn = document.getElementById('btnAdmin');
     if (S.user.student_id === ADMIN_STUDENT_ID) {
@@ -1813,11 +2028,13 @@ async function loadMyOrders(myTab) {
   const tabsEl = document.getElementById('myOrderTabs');
   const listEl = document.getElementById('myOrdersList');
   const btnReports = document.getElementById('btnReports');
+  const btnRunnerApply = document.getElementById('btnRunnerApply');
 
   if (!S.user) {
     if (profile) profile.style.display = 'none';
     if (tabsEl) tabsEl.style.display = 'none';
     if (btnReports) btnReports.style.display = 'none';
+    if (btnRunnerApply) btnRunnerApply.style.display = 'none';
     if (listEl) listEl.innerHTML = '<p style="color:var(--text-secondary)">请先登录...</p>';
     return;
   }
@@ -1827,6 +2044,7 @@ async function loadMyOrders(myTab) {
     if (profile) profile.style.display = 'none';
     if (tabsEl) tabsEl.style.display = 'none';
     if (btnReports) btnReports.style.display = 'none';
+    if (btnRunnerApply) btnRunnerApply.style.display = 'none';
     if (listEl) listEl.innerHTML = '<p style="color:var(--danger)">用户信息不完整，请退出后重新登录。</p>';
     return;
   }
@@ -1834,6 +2052,10 @@ async function loadMyOrders(myTab) {
   if (profile) profile.style.display = 'block';
   if (tabsEl) tabsEl.style.display = 'flex';
   if (btnReports) btnReports.style.display = 'inline-flex';
+  // 跑腿认证按钮：未认证且已通过用户审核的显示
+  if (btnRunnerApply) {
+    btnRunnerApply.style.display = (S.user.status === 'approved' && !S.user.runner_verified) ? 'inline-flex' : 'none';
+  }
 
   const tab = myTab || S.myTab || 'all';
   S.myTab = tab;
@@ -1894,8 +2116,8 @@ async function loadMyOrders(myTab) {
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
-    const tl = {task:'跑腿代办', secondhand:'二手', errand:'跑腿代办', skill:'跑腿代办', qa:'问答'};
-    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业'};
+    const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答'};
+    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
 
     if (orders.length === 0) {
       listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p></div>';
@@ -2013,7 +2235,110 @@ async function saveMyPayment() {
   }
 }
 
-// ============ 图床上传（ImgBB，免费无限制） ============
+// ============ 跑腿认证申请 ============
+function showRunnerApply() {
+  if (!S.user) { showAuthModal(); return; }
+  if (!checkApproved()) return;
+  document.getElementById('runnerApplyModal').classList.add('active');
+  document.getElementById('runnerApplyError').style.display = 'none';
+  document.getElementById('runnerApplyInfo').style.display = 'block';
+  // 显示当前状态
+  const statusText = document.getElementById('runnerStatusText');
+  if (S.user.runner_verified) {
+    statusText.textContent = '✅ 已认证跑腿';
+    statusText.style.color = '#16a34a';
+    document.getElementById('runnerApplyInfo').style.background = '#dcfce7';
+  } else if (S.user.runner_apply_num) {
+    statusText.textContent = '⏳ 申请审核中...';
+    statusText.style.color = '#f59e0b';
+    document.getElementById('runnerApplyInfo').style.background = '#fef9e7';
+  } else {
+    statusText.textContent = '未申请';
+    statusText.style.color = 'var(--text-muted)';
+    document.getElementById('runnerApplyInfo').style.background = 'var(--bg)';
+  }
+}
+
+function closeRunnerApply() {
+  document.getElementById('runnerApplyModal').classList.remove('active');
+  document.getElementById('runnerStudentCard').value = '';
+  document.getElementById('runnerApplyNote').value = '';
+}
+
+async function submitRunnerApply() {
+  if (!S.user) { showAuthModal(); return; }
+  const err = document.getElementById('runnerApplyError');
+  err.style.display = 'none';
+
+  // 检查是否已经认证或已申请
+  if (S.user.runner_verified) {
+    err.textContent = '您已经是认证跑腿了！';
+    err.style.display = 'block';
+    return;
+  }
+
+  // 检查是否已有待审核的申请
+  try {
+    const existing = await ghIssues('runner_apply', 'all');
+    const dup = existing.find(i => {
+      try { const a = JSON.parse(i.body); return a.student_id === S.user.student_id && a.status === 'pending'; }
+      catch(e) { return false; }
+    });
+    if (dup) {
+      err.textContent = '您已经提交过申请，请耐心等待管理员审核。';
+      err.style.display = 'block';
+      return;
+    }
+  } catch(e) {}
+
+  // 上传学生证照片
+  const imgFile = document.getElementById('runnerStudentCard').files[0];
+  if (!imgFile) {
+    err.textContent = '请上传学生证照片（正面，含学号和姓名）';
+    err.style.display = 'block';
+    return;
+  }
+
+  err.textContent = '正在上传学生证照片...';
+  err.style.display = 'block';
+
+  let cardImage = '';
+  try {
+    cardImage = await uploadToImgBB(imgFile);
+    if (!cardImage) throw new Error('上传失败');
+  } catch(e) {
+    err.textContent = '照片上传失败：' + e.message;
+    err.style.display = 'block';
+    return;
+  }
+
+  const note = document.getElementById('runnerApplyNote').value.trim();
+
+  const applyData = {
+    student_id: S.user.student_id,
+    name: S.user.name,
+    dorm: S.user.dorm || '',
+    phone: S.user.phone || '',
+    student_card_image: cardImage,
+    note: note,
+    status: 'pending',
+    created_at: new Date().toISOString()
+  };
+
+  try {
+    const newIssue = await ghCreateIssue('[跑腿认证] ' + S.user.name + ' - ' + S.user.student_id, JSON.stringify(applyData), ['runner_apply']);
+    // 更新本地用户状态
+    S.user.runner_apply_num = newIssue.number;
+    localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+    toast('✅ 申请已提交！请等待管理员审核。', 'success');
+    closeRunnerApply();
+  } catch(e) {
+    err.textContent = '提交失败：' + e.message;
+    err.style.display = 'block';
+  }
+}
+
+// ============ 图床上传（ImgBB，免费无限制） ===========
 async function uploadToImgBB(file) {
   const formData = new FormData();
   formData.append('image', file);
@@ -2139,11 +2464,7 @@ setTimeout(autoCleanOldOrders, 5000);
 setInterval(function(){
   if(S.page==='home')loadStats();
   else if(S.page==='my')loadMyOrders();
-  else if(S.page==='task'){
-    if(S.taskTab==='secondhand')loadOrders('secondhand',S.filter.secondhand||'all');
-    else if(S.taskTab==='qa')loadOrders('qa',S.filter.qa||'all');
-    else loadOrders('task',S.filter.task||'all');
-  }
+  else if(S.page==='task')refreshCurrentTab();
 },15000);
 // ============ TOAST ============
 function toast(msg, type, duration) {
