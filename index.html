@@ -589,6 +589,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <button class="modal-tab active" id="adminTabUsers" onclick="switchAdminTab('users')">👤 用户审核</button>
       <button class="modal-tab" id="adminTabRunners" onclick="switchAdminTab('runners')">🛵 跑腿认证</button>
       <button class="modal-tab" id="adminTabManage" onclick="switchAdminTab('manage')">📋 用户管理</button>
+      <button class="modal-tab" id="adminTabReports" onclick="switchAdminTab('reports')">⚠️ 投诉处理</button>
     </div>
     <div id="adminContent"><p>加载中...</p></div>
   </div>
@@ -1257,7 +1258,7 @@ async function submitReport() {
   }
 }
 
-// 查询某用户的投诉次数
+// 查询某用户的投诉次数（仅统计被裁定为"成立"的）
 async function getUserReportCount(targetId) {
   try {
     const reports = await ghIssues('report', 'all');
@@ -1265,7 +1266,8 @@ async function getUserReportCount(targetId) {
     for (const r of reports) {
       try {
         const rp = JSON.parse(r.body);
-        if ((rp.target_id == targetId) && rp.status === 'open') count++;
+        // 只有管理员裁定为 resolved（投诉成立）的才算入封停计数
+        if ((rp.target_id == targetId) && rp.status === 'resolved') count++;
       } catch(e) {}
     }
     return count;
@@ -1295,7 +1297,9 @@ async function showReportsView() {
     ct.innerHTML = myReports.map(r => {
       const isMe = r.reporter_id == uid;
       const badge = isMe ? '<span style="color:#f59e0b;font-size:.75rem">我发起的</span>' : '<span style="color:#dc2626;font-size:.75rem">投诉我的</span>';
-      const statusBadge = r.status === 'open' ? '<span style="color:#f59e0b">处理中</span>' : '<span style="color:#16a34a">已解决</span>';
+      const statusMap = { open: '<span style="color:#f59e0b">⏳ 处理中</span>', resolved: '<span style="color:#dc2626">⚠️ 投诉成立</span>', dismissed: '<span style="color:#16a34a">🤝 双方和解</span>', malicious: '<span style="color:#7c3aed">🚫 恶意投诉</span>' };
+      const statusBadge = statusMap[r.status] || '<span style="color:#94a3b8">未知</span>';
+      const resolutionNote = r.resolution_note ? '<div style="font-size:.82rem;color:var(--text-secondary);margin-top:6px;background:var(--bg);padding:8px;border-radius:6px;border-left:3px solid var(--primary)">📝 处理说明：' + esc(r.resolution_note) + '</div>' : '';
       return '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
         + '<span style="font-weight:600">' + esc(r.target_name) + ' - ' + esc(r.reason) + '</span>'
@@ -1303,6 +1307,7 @@ async function showReportsView() {
         + '</div>'
         + '<div style="font-size:.85rem;color:var(--text-secondary)">订单：' + esc(r.order_title || '') + '</div>'
         + '<div style="font-size:.85rem;color:var(--text-muted);margin-top:4px">' + esc(r.description || '') + '</div>'
+        + resolutionNote
         + '<div style="font-size:.75rem;color:var(--text-muted);margin-top:6px">' + timeAgo(r.created_at) + '</div>'
         + '</div>';
     }).join('');
@@ -1497,17 +1502,18 @@ async function adminStartChat(targetSid, targetName, targetIssueNum) {
 }
 
 // ============ 管理员审核 ============
-let _adminTab = 'users'; // 'users' | 'runners'
+let _adminTab = 'users'; // 'users' | 'runners' | 'manage' | 'reports'
 
 function switchAdminTab(tab) {
   _adminTab = tab;
   document.querySelectorAll('#adminModal .modal-tab').forEach(t => t.classList.remove('active'));
-  const tabMap = { users: 'Users', runners: 'Runners', manage: 'Manage' };
+  const tabMap = { users: 'Users', runners: 'Runners', manage: 'Manage', reports: 'Reports' };
   const activeTab = document.getElementById('adminTab' + tabMap[tab]);
   if (activeTab) activeTab.classList.add('active');
   if (tab === 'users') loadAdminPanel();
   else if (tab === 'runners') loadRunnerReviews();
   else if (tab === 'manage') loadUserManagement();
+  else if (tab === 'reports') loadReportManagement();
 }
 
 async function showAdminPanel() {
@@ -1821,6 +1827,123 @@ async function reactivateUser(inum, name) {
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
 }
 
+// ============ 投诉处理（管理员） ============
+async function loadReportManagement() {
+  const ct = document.getElementById('adminContent');
+  ct.innerHTML = '<p>加载中...</p>';
+  try {
+    const reports = await ghIssues('report', 'all');
+    const allReports = reports.map(r => {
+      try { const rp = JSON.parse(r.body); rp._num = r.number; rp._state = r.state; return rp; }
+      catch(e) { return null; }
+    }).filter(r => r).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    const openReports = allReports.filter(r => r.status === 'open');
+    const closedReports = allReports.filter(r => r.status !== 'open');
+
+    const reasonMap = {
+      resolved: '<span style="color:#dc2626">⚠️ 投诉成立</span>',
+      dismissed: '<span style="color:#16a34a">🤝 双方和解</span>',
+      malicious: '<span style="color:#7c3aed">🚫 恶意投诉</span>'
+    };
+
+    let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">'
+      + '<p style="font-size:.85rem;color:var(--text-secondary);margin:0">'
+      + '<strong style="color:#f59e0b">' + openReports.length + '</strong> 条待处理，'
+      + '<strong style="color:var(--text-secondary)">' + closedReports.length + '</strong> 条已处理'
+      + '</p></div>';
+
+    if (allReports.length === 0) {
+      html += '<div class="empty-state"><div class="empty-state-icon">✅</div><p>暂无投诉记录</p></div>';
+      ct.innerHTML = html;
+      return;
+    }
+
+    html += '<div style="max-height:450px;overflow-y:auto">';
+    for (const r of allReports) {
+      const isOpen = r.status === 'open';
+      const statusLabel = reasonMap[r.status] || (isOpen ? '<span style="color:#f59e0b">⏳ 处理中</span>' : '<span style="color:#94a3b8">已处理</span>');
+
+      html += '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+        + '<div>'
+        + '<strong>' + esc(r.target_name) + '</strong>'
+        + ' <span style="font-size:.82rem;color:var(--text-muted)">被 ' + esc(r.reporter_name) + ' 投诉</span>'
+        + '</div>'
+        + '<span style="font-size:.8rem">' + statusLabel + '</span>'
+        + '</div>'
+        + '<div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:4px">'
+        + '📌 ' + esc(r.reason) + ' · 订单：' + esc(r.order_title || '无标题')
+        + '</div>'
+        + '<div style="font-size:.82rem;color:var(--text-muted);margin-bottom:4px;white-space:pre-wrap">' + esc(r.description || '') + '</div>'
+        + (r.resolution_note ? '<div style="font-size:.82rem;color:var(--text-secondary);margin-bottom:6px;background:#f8fafc;padding:8px;border-radius:6px;border-left:3px solid var(--primary)">📝 ' + esc(r.resolution_note) + '</div>' : '')
+        + '<div style="font-size:.75rem;color:var(--text-muted);margin-bottom:8px">' + timeAgo(r.created_at) + '</div>';
+
+      if (isOpen) {
+        html += '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+          + '<button class="btn btn-sm btn-danger" onclick="handleReport(' + r._num + ',\'resolved\')">✅ 投诉成立</button>'
+          + '<button class="btn btn-sm btn-success" onclick="handleReport(' + r._num + ',\'dismissed\')">🤝 双方和解</button>'
+          + '<button class="btn btn-sm" style="background:#7c3aed;color:#fff" onclick="handleReport(' + r._num + ',\'malicious\')">🚫 恶意投诉</button>'
+          + '</div>';
+      }
+
+      html += '</div>';
+    }
+    html += '</div>';
+
+    ct.innerHTML = html;
+  } catch(e) {
+    ct.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
+  }
+}
+
+async function handleReport(num, action) {
+  const labels = { resolved: '投诉成立', dismissed: '双方和解', malicious: '恶意投诉' };
+  const label = labels[action] || action;
+  const note = prompt('请输入处理说明（可选）：');
+  if (note === null) return;
+
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + num, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    if (!res.ok) throw new Error('获取投诉失败');
+    const issue = await res.json();
+    const r = JSON.parse(issue.body);
+    r.status = action;
+    r.resolution_note = note || '';
+    r.resolved_at = new Date().toISOString();
+    r.resolved_by = S.user.name;
+
+    await ghUpdateIssue(num, JSON.stringify(r));
+
+    if (action === 'resolved') {
+      const count = await getUserReportCount(r.target_id);
+      if (count >= 5) {
+        toast('⚠️ 该用户累计 ' + count + ' 次投诉成立，已达封停阈值！请到「用户管理」中处理。', 'info');
+      }
+    }
+    if (action === 'malicious') {
+      try {
+        const allReports = await ghIssues('report', 'all');
+        let maliciousCount = 0;
+        for (const ri of allReports) {
+          try {
+            const rp = JSON.parse(ri.body);
+            if (rp.reporter_id == r.reporter_id && rp.status === 'malicious') maliciousCount++;
+          } catch(e) {}
+        }
+        if (maliciousCount >= 3) {
+          toast('⚠️ ' + esc(r.reporter_name) + ' 累计 ' + maliciousCount + ' 次恶意投诉，建议封停该用户！', 'info');
+        }
+      } catch(e) {}
+    }
+
+    toast('已标记为「' + label + '」', 'success');
+    await loadReportManagement();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
 async function cleanClosedUsers() {
   // 找出所有已关闭用户
   const issues = await ghIssues('user', 'all');
@@ -2078,10 +2201,10 @@ async function handleAuth(e) {
         err.style.display = 'block';
         return;
       }
-      // 检查投诉次数
+      // 检查投诉次数（仅统计管理员裁定为"投诉成立"的）
       const reportCount = await getUserReportCount(u._issue_number || u.student_id);
       if (reportCount >= 5) {
-        err.textContent = '该账号已被多次投诉（' + reportCount + '次），已自动封停。如需申诉请联系管理员。';
+        err.textContent = '该账号已被累计投诉 ' + reportCount + ' 次且均裁定成立，已自动封停。如需申诉请联系管理员。';
         err.style.display = 'block';
         return;
       }
