@@ -1741,9 +1741,12 @@ async function handleAuth(e) {
 }
 
 function logout() {
+  if (!confirm('确定要退出登录吗？')) return;
   S.user = null;
   localStorage.removeItem('hust_current_user');
   updateUI();
+  // 切到首页
+  navigate('home');
   toast('已退出登录', 'info');
 }
 
