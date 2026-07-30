@@ -633,11 +633,19 @@ function checkSensitive(text) {
 // ============ GITHUB API ============
 async function ghIssues(label, state) {
   const s = state || 'open';
-  const res = await fetch('https://api.github.com/repos/' + REPO + '/issues?labels=' + encodeURIComponent(label) + '&state=' + s + '&per_page=100', {
-    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
-  });
-  if (!res.ok) throw new Error('API error ' + res.status);
-  return res.json();
+  let allIssues = [];
+  let page = 1;
+  while (true) {
+    const url = 'https://api.github.com/repos/' + REPO + '/issues?labels=' + encodeURIComponent(label) + '&state=' + s + '&per_page=100&page=' + page;
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN } });
+    if (!res.ok) throw new Error('API error ' + res.status);
+    const issues = await res.json();
+    if (!issues || issues.length === 0) break;
+    allIssues = allIssues.concat(issues);
+    if (issues.length < 100) break; // 最后一页
+    page++;
+  }
+  return allIssues;
 }
 
 async function ghCreateIssue(title, body, labels) {
@@ -681,6 +689,7 @@ async function ghCloseIssue(number) {
 // ============ NAVIGATION ============
 function navigate(page) {
   S.page = page;
+  _lastUserAction = Date.now(); // 重置空闲计时
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   const el = document.getElementById('page-' + page);
@@ -1143,11 +1152,22 @@ async function loadComments(issueNum) {
   const el = document.getElementById('detailComments');
   if (!el) return;
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum + '/comments?per_page=50', {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
-    });
-    if (!res.ok) { el.innerHTML = ''; return; }
-    const comments = await res.json();
+    // 分页加载评论（每页 100 条，循环拉取）
+    let allComments = [];
+    let page = 1;
+    while (true) {
+      const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum + '/comments?per_page=100&page=' + page, {
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+      });
+      if (!res.ok) break;
+      const comments = await res.json();
+      if (!comments || comments.length === 0) break;
+      allComments = allComments.concat(comments);
+      if (comments.length < 100) break;
+      page++;
+    }
+    const comments = allComments;
+    if (comments.length === 0) { el.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:20px">暂无消息，发送第一条吧</p>'; return; }
 
     // 获取订单信息用于私密过滤
     let order = null;
@@ -1273,7 +1293,9 @@ function startCommentPolling(issueNum) {
   stopCommentPolling();
   _commentIssueNum = issueNum;
   _commentTimer = setInterval(() => {
-    if (_commentIssueNum) loadComments(_commentIssueNum);
+    if (!_commentIssueNum) return;
+    if (document.hidden) return; // 页面隐藏时跳过
+    loadComments(_commentIssueNum);
   }, 8000);
 }
 
@@ -2154,14 +2176,23 @@ async function cancelOrder(inum) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
-// 删除订单所有评论
+// 删除订单所有评论（分页拉取全部再逐条删除）
 async function deleteAllComments(inum) {
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum + '/comments?per_page=100', {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
-    });
-    if (!res.ok) return;
-    const comments = await res.json();
+    let allComments = [];
+    let page = 1;
+    while (true) {
+      const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum + '/comments?per_page=100&page=' + page, {
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+      });
+      if (!res.ok) break;
+      const comments = await res.json();
+      if (!comments || comments.length === 0) break;
+      allComments = allComments.concat(comments);
+      if (comments.length < 100) break;
+      page++;
+    }
+    const comments = allComments;
     for (const c of comments) {
       await fetch('https://api.github.com/repos/' + REPO + '/issues/comments/' + c.id, {
         method: 'DELETE',
@@ -2912,12 +2943,22 @@ async function cleanOldData(days) {
         if (o.status !== 'completed' && o.status !== 'cancelled') continue;
         const created = new Date(o.created_at).getTime();
         if (now - created > maxAge) {
-          // 先删评论
+          // 先删评论（分页拉取全部）
           try {
-            const comments = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issue.number + '/comments?per_page=100', {
-              headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
-            }).then(r => r.json());
-            for (const c of comments) {
+            let allComments = [];
+            let cp = 1;
+            while (true) {
+              const cr = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issue.number + '/comments?per_page=100&page=' + cp, {
+                headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+              });
+              if (!cr.ok) break;
+              const cList = await cr.json();
+              if (!cList || cList.length === 0) break;
+              allComments = allComments.concat(cList);
+              if (cList.length < 100) break;
+              cp++;
+            }
+            for (const c of allComments) {
               await fetch('https://api.github.com/repos/' + REPO + '/issues/comments/' + c.id, {
                 method: 'DELETE',
                 headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
@@ -2979,12 +3020,56 @@ async function autoCleanOldOrders() {
 }
 setTimeout(autoCleanOldOrders, 5000);
 
-// 自动刷新：每5秒刷新一次当前页面数据（配合乐观更新做兜底）
-setInterval(function(){
-  if(S.page==='home')loadStats();
-  else if(S.page==='my')loadMyOrders();
-  else if(S.page==='task')refreshCurrentTab();
-},5000);
+// ============ 智能轮询（页面可见时快、隐藏时慢、空闲时停） ============
+let _pollTimer = null;
+let _pollInterval = 5000;  // 当前轮询间隔（毫秒）
+let _lastUserAction = Date.now();
+
+// 记录用户操作时间
+document.addEventListener('click', () => { _lastUserAction = Date.now(); });
+document.addEventListener('keydown', () => { _lastUserAction = Date.now(); });
+document.addEventListener('scroll', () => { _lastUserAction = Date.now(); });
+
+function startSmartPolling() {
+  stopSmartPolling();
+  _pollTimer = setInterval(() => {
+    // 页面隐藏时跳过
+    if (document.hidden) return;
+
+    // 30 秒无操作 → 降为 15 秒轮询
+    const idle = Date.now() - _lastUserAction;
+    const targetInterval = idle > 30000 ? 15000 : 5000;
+
+    // 只在达到目标间隔时刷新
+    if (_pollInterval !== targetInterval) {
+      _pollInterval = targetInterval;
+      // 重启定时器以应用新间隔
+      stopSmartPolling();
+      _pollTimer = setInterval(arguments.callee, _pollInterval);
+      return;
+    }
+
+    if (S.page === 'home') loadStats();
+    else if (S.page === 'my') loadMyOrders();
+    else if (S.page === 'task') refreshCurrentTab();
+  }, _pollInterval);
+}
+
+function stopSmartPolling() {
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+
+// 页面可见性变化时恢复轮询
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && S.page && !_pollTimer) {
+    _lastUserAction = Date.now();
+    _pollInterval = 5000;
+    startSmartPolling();
+  }
+});
+
+// 启动
+startSmartPolling();
 // ============ TOAST ============
 function toast(msg, type, duration) {
   const c = document.getElementById('toastContainer');
@@ -3127,10 +3212,10 @@ handleAuth = async function(e) {
   }
 })();
 
-// 每 10 秒检查一次通知
+// 每 15 秒检查一次通知（降低频率，页面隐藏时跳过）
 setInterval(function() {
-  if (S.user) checkOrderNotifications();
-}, 10000);
+  if (S.user && !document.hidden) checkOrderNotifications();
+}, 15000);
 </script>
 
 </body>
