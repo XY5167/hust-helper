@@ -597,6 +597,30 @@ const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
 
 const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all' }, taskTab: 'task', myTab: 'all', goodsSubTab: 'all', goodsCategory: 'all' };
 
+// ============ 敏感词过滤 ============
+const SENSITIVE_WORDS = new Set([
+  '代写','代考','替考','代做','代课','论文代写','作业代写','毕业设计代做',
+  '枪手','作弊','抄袭','考试答案','四六级答案',
+  '赌博','赌球','吸毒','毒品','大麻','摇头丸','冰毒',
+  '高利贷','裸贷','校园贷','套路贷','刷单','传销',
+  '约炮','嫖娼','卖淫','一夜情','包养','援交',
+  '傻逼','草泥马','操你','fuck','shit',
+  '枪支','弹药','管制刀具','迷药','安眠药',
+  '自杀','自残','跳楼'
+]);
+const SENSITIVE_MIN_LEN = 2, SENSITIVE_MAX_LEN = 10;
+function checkSensitive(text) {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  for (let len = SENSITIVE_MIN_LEN; len <= SENSITIVE_MAX_LEN; len++) {
+    for (let i = 0; i <= t.length - len; i++) {
+      const sub = t.substring(i, i + len);
+      if (SENSITIVE_WORDS.has(sub)) return sub;
+    }
+  }
+  return null;
+}
+
 // 初始化
 (function() {
   const saved = localStorage.getItem('hust_current_user');
@@ -760,11 +784,17 @@ function renderOrders(orders) {
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
     const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
     const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
+    // 缩略图预览
+    const imgList = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
+    const thumbHTML = imgList.length > 0
+      ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList.slice(0, 3).map(img => '<img src="' + img + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList.length > 3 ? '<div style="width:80px;height:80px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList.length - 3) + '</div>' : '') + '</div>'
+      : '';
     return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
       + '<div class="order-card-header">'
       + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>'
       + '<span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span>'
       + '</div>'
+      + thumbHTML
       + '<div class="order-card-title">' + esc(o.title) + urgencyBadge + '</div>'
       + (o.description ? '<div class="order-card-desc">' + esc(o.description) + '</div>' : '')
       + '<div class="order-card-meta">'
@@ -1221,6 +1251,9 @@ async function sendComment(issueNum) {
   const input = document.getElementById('commentInput');
   const text = input.value.trim();
   if (!text) return;
+
+  const sw = checkSensitive(text);
+  if (sw) { toast('消息包含敏感词「' + sw + '」，请修改后发送', 'error'); return; }
 
   input.disabled = true;
   try {
@@ -2371,6 +2404,8 @@ async function handlePublish(e) {
   const imgFiles = document.getElementById('publishImage').files;
 
   if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
+  const sensitiveWord = checkSensitive(title + ' ' + desc);
+  if (sensitiveWord) { err.textContent = '内容包含敏感词「' + sensitiveWord + '」，请修改后重新发布'; err.style.display = 'block'; return; }
   if (type !== 'qa' && !price) { err.textContent = '请填写报酬金额'; err.style.display = 'block'; return; }
 
   // 图片上传到图床（ImgBB，免费，单张32MB）
@@ -2380,7 +2415,7 @@ async function handlePublish(e) {
     err.textContent = '正在上传图片...';
     err.style.display = 'block';
     for (const f of imgFiles) {
-      if (f.size > 32 * 1024 * 1024) { err.textContent = '单张图片请控制在32MB以内'; err.style.display = 'block'; return; }
+      if (f.size > 5 * 1024 * 1024) { err.textContent = '单张图片请控制在5MB以内（大图自动压缩）'; err.style.display = 'block'; return; }
       try {
         const url = await uploadToImgBB(f);
         if (url) images.push(url);
@@ -2609,8 +2644,14 @@ async function loadMyOrders(myTab) {
       const metaHTML = isChat
         ? '<div class="order-card-meta"><span style="color:var(--text-muted);font-size:.8rem">💬 私信对话</span></div>'
         : '<div class="order-card-meta"><span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>';
+      // 缩略图
+      const imgList2 = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
+      const thumbHTML2 = imgList2.length > 0
+        ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList2.slice(0, 3).map(img => '<img src="' + img + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList2.length > 3 ? '<div style="width:80px;height:80px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList2.length - 3) + '</div>' : '') + '</div>'
+        : '';
       return '<div class="order-card" style="margin-bottom:12px' + (isChat ? ';border-left:3px solid #8b5cf6' : '') + '" onclick="showDetail(' + o._issue_number + ')">'
         + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span><span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span></div>'
+        + thumbHTML2
         + '<div class="order-card-title">' + esc(o.title) + ' ' + role + '</div>'
         + metaHTML
         + '<div class="order-card-footer"><span>' + timeAgo(o.created_at) + '</span>' + counterpartLink + rateBtn + '</div></div>';
@@ -2808,8 +2849,19 @@ async function submitRunnerApply() {
 
 // ============ 图床上传（ImgBB，免费无限制） ===========
 async function uploadToImgBB(file) {
+  // 大于2MB的图片先压缩再上传
+  let uploadFile = file;
+  if (file.size > 2 * 1024 * 1024) {
+    try {
+      const compressed = await compressImage(file, 1200, 0.75);
+      if (compressed) {
+        const blob = await (await fetch(compressed)).blob();
+        uploadFile = new File([blob], file.name, { type: 'image/jpeg' });
+      }
+    } catch(e) { /* 压缩失败则用原图 */ }
+  }
   const formData = new FormData();
-  formData.append('image', file);
+  formData.append('image', uploadFile);
   const res = await fetch('https://api.imgbb.com/1/upload?key=3e1a8a8f4c3e2b7d9a6f5c4e3d2b1a0f', {
     method: 'POST',
     body: formData
@@ -2817,7 +2869,6 @@ async function uploadToImgBB(file) {
   if (!res.ok) throw new Error('Upload failed: ' + res.status);
   const data = await res.json();
   if (!data.success) throw new Error(data.error?.message || 'Upload failed');
-  // 返回缩略图或原图URL（原图太大则用缩略图）
   return data.data.display_url || data.data.url;
 }
 
