@@ -609,7 +609,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 <script>
 // ============ 管理员配置 ============
 const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
-const ADMIN_PAY_QRCODE = ''; // 管理员收款码图片URL（用于VIP申请弹窗，上传到图床后填入）
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
 // Cloudflare Worker 代理（减少 GitHub API 消耗 + 实时推送）
@@ -2344,17 +2343,32 @@ function isAdminUser() {
 }
 
 // ============ VIP 申请（用户端） ============
-function showVipApply() {
+async function showVipApply() {
   if (!S.user) { showAuthModal(); return; }
   document.getElementById('vipApplyModal').classList.add('active');
-  // 显示收款码
-  const qrContainer = document.getElementById('vipQrcodeContainer');
-  if (ADMIN_PAY_QRCODE) {
-    qrContainer.innerHTML = '<img src="' + ADMIN_PAY_QRCODE + '" style="max-width:220px;border-radius:8px;border:1px solid var(--border)" alt="收款码">';
-  } else {
-    qrContainer.innerHTML = '<div style="padding:30px;background:var(--bg);border-radius:8px;color:var(--text-muted);font-size:.85rem">📷 管理员暂未设置收款码<br><span style="font-size:.75rem">请联系管理员 U202512533 转账 ¥1</span></div>';
-  }
   document.getElementById('vipApplyError').style.display = 'none';
+  // 从管理员用户数据里读取收款码
+  const qrContainer = document.getElementById('vipQrcodeContainer');
+  qrContainer.innerHTML = '<div style="padding:30px;background:var(--bg);border-radius:8px;color:var(--text-muted);font-size:.85rem">加载收款码中...</div>';
+  try {
+    const issues = await ghIssues('user', 'all');
+    const adminUser = issues.find(i => {
+      try { return JSON.parse(i.body).student_id === ADMIN_STUDENT_ID; } catch(e) { return false; }
+    });
+    if (adminUser) {
+      const adminData = JSON.parse(adminUser.body);
+      const qrImage = adminData.payment_image || '';
+      if (qrImage) {
+        qrContainer.innerHTML = '<img src="' + qrImage + '" style="max-width:220px;border-radius:8px;border:1px solid var(--border)" alt="收款码">';
+      } else {
+        qrContainer.innerHTML = '<div style="padding:30px;background:var(--bg);border-radius:8px;color:var(--text-muted);font-size:.85rem">📷 管理员暂未上传收款码<br><span style="font-size:.75rem">请联系管理员 ' + ADMIN_STUDENT_ID + ' 转账 ¥1</span></div>';
+      }
+    } else {
+      qrContainer.innerHTML = '<div style="padding:30px;background:var(--bg);border-radius:8px;color:var(--text-muted);font-size:.85rem">📷 管理员暂未设置收款码<br><span style="font-size:.75rem">请联系管理员 ' + ADMIN_STUDENT_ID + ' 转账 ¥1</span></div>';
+    }
+  } catch(e) {
+    qrContainer.innerHTML = '<div style="padding:30px;background:var(--bg);border-radius:8px;color:var(--text-muted);font-size:.85rem">⚠️ 加载失败，请联系管理员 ' + ADMIN_STUDENT_ID + ' 转账 ¥1</div>';
+  }
 }
 
 function closeVipApply() {
