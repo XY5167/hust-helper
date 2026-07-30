@@ -448,7 +448,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <input type="file" id="publishImage" accept="image/*" multiple>
         <div id="publishImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
       </div>
-      <p class="form-hint" id="publishFeeHint">免费发布，无平台抽成。</p>
+      <p class="form-hint" id="publishFeeHint" style="display:none"></p>
       <p class="form-error" id="publishError"></p>
       <button type="submit" class="btn btn-primary btn-block">发布</button>
     </form>
@@ -463,7 +463,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <p>管理个人信息、收款方式和订单。</p>
     </div>
     <div id="myProfile" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;display:none">
-      <h3 style="font-size:1.1rem;margin-bottom:16px">个人信息</h3>
+      <h3 style="font-size:1.1rem;margin-bottom:16px">个人信息 <span id="myVipBadge" style="display:none;color:#f59e0b;font-size:.85rem">⭐ 会员</span></h3>
       <div class="form-group">
         <label>微信收款码 / 支付宝收款信息</label>
         <input type="text" id="myPaymentInfo" placeholder="如：微信收款码图片链接 或 支付宝账号">
@@ -579,6 +579,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <button class="modal-tab" id="adminTabRunners" onclick="switchAdminTab('runners')">跑腿认证</button>
       <button class="modal-tab" id="adminTabManage" onclick="switchAdminTab('manage')">用户管理</button>
       <button class="modal-tab" id="adminTabReports" onclick="switchAdminTab('reports')">投诉处理</button>
+      <button class="modal-tab" id="adminTabVip" onclick="switchAdminTab('vip')">会员管理</button>
     </div>
     <div id="adminContent"><p>加载中...</p></div>
   </div>
@@ -852,7 +853,7 @@ function renderOrders(orders) {
       + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
       + '</div>'
       + '<div class="order-card-footer">'
-      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
+      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
       + '<span>' + timeAgo(o.created_at) + '</span>'
       + '</div></div>';
   }).join('');
@@ -1152,7 +1153,7 @@ async function showDetail(issueNum) {
       + (isQA ? '' : '<div class="detail-price">¥' + o.price.toFixed(2) + '</div>')
       + '<div class="detail-meta">'
       + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
-      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
+      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
       + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_name) + '</a>' + (o.taker_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>' : ''))
       + '<span>🕐 ' + timeAgo(o.created_at) + '</span>'
       + (isQA ? '' : urgencyHTML + deadlineHTML)
@@ -1634,7 +1635,6 @@ async function createChatOrder(targetSid, targetName, targetIssueNum, sourceOrde
       title: (sourceOrderTitle ? '询问：' + sourceOrderTitle : '对话 ' + targetName),
       description: S.user.name + ' 向 ' + targetName + '（' + targetSid + '）发起的私信对话' + (sourceOrderTitle ? '，关于订单「' + sourceOrderTitle + '」' : ''),
       price: 0,
-      fee: 0,
       location: '',
       urgency: 'normal',
       deadline: '',
@@ -1674,13 +1674,14 @@ let _adminTab = 'users'; // 'users' | 'runners' | 'manage' | 'reports'
 function switchAdminTab(tab) {
   _adminTab = tab;
   document.querySelectorAll('#adminModal .modal-tab').forEach(t => t.classList.remove('active'));
-  const tabMap = { users: 'Users', runners: 'Runners', manage: 'Manage', reports: 'Reports' };
+  const tabMap = { users: 'Users', runners: 'Runners', manage: 'Manage', reports: 'Reports', vip: 'Vip' };
   const activeTab = document.getElementById('adminTab' + tabMap[tab]);
   if (activeTab) activeTab.classList.add('active');
   if (tab === 'users') loadAdminPanel();
   else if (tab === 'runners') loadRunnerReviews();
   else if (tab === 'manage') loadUserManagement();
   else if (tab === 'reports') loadReportManagement();
+  else if (tab === 'vip') loadVipManagement();
 }
 
 async function showAdminPanel() {
@@ -1941,17 +1942,23 @@ async function loadUserManagement() {
       const runnerBadge = u.runner_verified
         ? '<span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:99px;font-size:.7rem;margin-left:4px">🛵 跑腿</span>'
         : '';
+      const vipActive = u.vip_expire && new Date(u.vip_expire) > new Date();
+      const vipBadge = vipActive
+        ? '<span style="color:#f59e0b;font-size:.85rem;margin-left:2px" title="VIP 到期：' + new Date(u.vip_expire).toLocaleDateString('zh-CN') + '">⭐</span>'
+        : '';
 
       html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
         + '<div style="min-width:0;flex:1">'
         + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
         + '<strong>' + esc(u.name || '?') + '</strong>'
+        + vipBadge
         + runnerBadge
         + stateBadge
         + '</div>'
         + '<div style="font-size:.8rem;color:var(--text-secondary)">' + esc(u.student_id || '?')
         + (u.phone ? ' · 📱 ' + esc(u.phone) : '')
         + (u.dorm ? ' · 📍 ' + esc(u.dorm) : '')
+        + (vipActive ? ' · ⭐ 会员到期：' + new Date(u.vip_expire).toLocaleDateString('zh-CN') : '')
         + '</div>'
         + '<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">' + statusBadge + ' · ' + timeAgo(u.created_at) + ' 注册' + '</div>'
         + '</div>'
@@ -1991,6 +1998,107 @@ async function reactivateUser(inum, name) {
     if (!res.ok) throw new Error('恢复失败');
     toast('已恢复用户「' + name + '」', 'success');
     await loadUserManagement();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+// ============ VIP 会员管理（管理员） ============
+async function loadVipManagement() {
+  const ct = document.getElementById('adminContent');
+  ct.innerHTML = '<p>加载中...</p>';
+  try {
+    const issues = await ghIssues('user', 'all');
+    const users = issues.map(i => {
+      try { const u = JSON.parse(i.body); u._issue_number = i.number; u._state = i.state; return u; }
+      catch(e) { return null; }
+    }).filter(u => u && u._state === 'open' && u.status === 'approved');
+
+    const now = new Date();
+    const vipUsers = users.filter(u => u.vip_expire && new Date(u.vip_expire) > now);
+    const normalUsers = users.filter(u => !u.vip_expire || new Date(u.vip_expire) <= now);
+
+    let html = '<h4 style="margin-bottom:12px">⭐ 当前会员（' + vipUsers.length + ' 人）</h4>';
+    if (vipUsers.length === 0) {
+      html += '<p style="color:var(--text-secondary);margin-bottom:20px">暂无会员用户</p>';
+    } else {
+      html += '<div style="max-height:250px;overflow-y:auto;margin-bottom:20px">';
+      for (const u of vipUsers) {
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fffbeb;border-radius:8px;margin-bottom:8px;border:1px solid #fde68a">'
+          + '<div><strong>' + esc(u.name) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span>'
+          + '<br><span style="font-size:.8rem;color:var(--text-secondary)">到期：' + new Date(u.vip_expire).toLocaleDateString('zh-CN') + '</span></div>'
+          + '<div style="display:flex;gap:6px">'
+          + '<button class="btn btn-sm btn-outline" onclick="extendVip(' + u._issue_number + ',\'' + esc(u.name) + '\')">续费 1 个月</button>'
+          + '<button class="btn btn-sm btn-outline" onclick="cancelVip(' + u._issue_number + ',\'' + esc(u.name) + '\')" style="color:var(--danger);border-color:var(--danger)">取消会员</button>'
+          + '</div></div>';
+      }
+      html += '</div>';
+    }
+
+    html += '<h4 style="margin-bottom:12px">普通用户（' + normalUsers.length + ' 人）</h4>';
+    html += '<p style="color:var(--text-secondary);margin-bottom:12px;font-size:.85rem">选择用户开通会员（¥1/月）</p>';
+    html += '<div style="max-height:300px;overflow-y:auto;margin-bottom:16px">';
+    if (normalUsers.length === 0) {
+      html += '<p style="color:var(--text-secondary)">所有用户已是会员</p>';
+    }
+    for (const u of normalUsers) {
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
+        + '<div><strong>' + esc(u.name) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span></div>'
+        + '<button class="btn btn-sm btn-primary" onclick="activateVip(' + u._issue_number + ',\'' + esc(u.name) + '\')">⭐ 开通会员</button>'
+        + '</div>';
+    }
+    html += '</div>';
+
+    ct.innerHTML = html;
+  } catch(e) {
+    ct.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
+  }
+}
+
+async function activateVip(inum, name) {
+  if (!confirm('确认为「' + name + '」开通 1 个月会员（¥1）？')) return;
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const u = JSON.parse(issue.body);
+    const now = new Date();
+    // 如果已有有效会员，从到期日开始续；否则从今天开始
+    const startFrom = (u.vip_expire && new Date(u.vip_expire) > now) ? new Date(u.vip_expire) : now;
+    startFrom.setMonth(startFrom.getMonth() + 1);
+    u.vip_expire = startFrom.toISOString();
+    await ghUpdateIssue(inum, JSON.stringify(u));
+    // 如果当前登录用户就是被操作人，更新本地状态
+    if (S.user && (S.user._issue_number === inum || S.user.student_id === u.student_id)) {
+      S.user.vip_expire = u.vip_expire;
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      updateUI();
+    }
+    toast('⭐ 已为「' + name + '」开通会员，到期：' + startFrom.toLocaleDateString('zh-CN'), 'success');
+    await loadVipManagement();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+async function extendVip(inum, name) {
+  await activateVip(inum, name);
+}
+
+async function cancelVip(inum, name) {
+  if (!confirm('确定取消「' + name + '」的会员资格？')) return;
+  try {
+    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const u = JSON.parse(issue.body);
+    u.vip_expire = null;
+    await ghUpdateIssue(inum, JSON.stringify(u));
+    if (S.user && (S.user._issue_number === inum || S.user.student_id === u.student_id)) {
+      S.user.vip_expire = null;
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      updateUI();
+    }
+    toast('已取消「' + name + '」的会员', 'info');
+    await loadVipManagement();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
 }
 
@@ -2139,9 +2247,50 @@ async function cleanClosedUsers() {
   await loadUserManagement();
 }
 
+// ============ VIP 会员系统 ============
+function isVIP() {
+  if (!S.user) return false;
+  if (!S.user.vip_expire) return false;
+  return new Date(S.user.vip_expire) > new Date();
+}
+
+function isAdminUser() {
+  return S.user && S.user.student_id === ADMIN_STUDENT_ID;
+}
+
+// 获取今天我发布的订单数 / 接的订单数
+async function getTodayMyOrders(type) {
+  // type: 'published' 发布的 | 'taken' 接的
+  const myId = S.user._issue_number || S.user.student_id;
+  const mySid = S.user.student_id;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  try {
+    const issues = await ghIssues('order', 'all');
+    return issues.filter(i => {
+      try {
+        const o = JSON.parse(i.body);
+        if (type === 'published') {
+          return (o.publisher_id == myId || o.publisher_student_id === mySid) && new Date(o.created_at) >= today;
+        } else {
+          return (o.taker_id == myId || o.taker_student_id === mySid) && new Date(o.created_at) >= today;
+        }
+      } catch(e) { return false; }
+    }).length;
+  } catch(e) { return 0; }
+}
+
 async function takeOrder(inum) {
   if (!S.user) { showAuthModal(); return; }
   if (!checkApproved()) return;
+  // 每日接单限制检查（非VIP 1天1单，管理员不受限）
+  if (!isVIP() && !isAdminUser()) {
+    const todayOrders = await getTodayMyOrders('taken');
+    if (todayOrders >= 1) {
+      toast('⚠️ 免费用户每天只能接 1 单。开通会员（¥1/月）即可无限接单！', 'info');
+      return;
+    }
+  }
   // 跑腿认证检查：管理员和已认证跑腿才能接单
   const isAdmin = S.user.student_id === ADMIN_STUDENT_ID;
   if (!S.user.runner_verified && !isAdmin) {
@@ -2311,7 +2460,7 @@ async function handleAuth(e) {
         return;
       }
 
-      const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: 'pending', created_at: new Date().toISOString() };
+      const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: 'pending', vip_expire: null, created_at: new Date().toISOString() };
       let newIssue;
       try {
         newIssue = await ghCreateIssue(sid, JSON.stringify(userData), ['user']);
@@ -2388,6 +2537,7 @@ async function handleAuth(e) {
       // 确保关键字段存在
       u.payment_info = u.payment_info || '';
       u.payment_image = u.payment_image || '';
+      u.vip_expire = u.vip_expire || null;
       S.user = u;
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       updateUI();
@@ -2453,21 +2603,18 @@ function updatePublishCategories() {
   const locGroup = document.getElementById('publishLocation').parentElement;
   const urgencyGroup = document.getElementById('publishUrgency').parentElement;
   const deadlineGroup = document.getElementById('publishDeadline').parentElement;
-  const feeHint = document.getElementById('publishFeeHint');
   if (t === 'qa') {
     priceGroup.style.display = 'none';
     payGroup.style.display = 'none';
     locGroup.style.display = 'none';
     urgencyGroup.style.display = 'none';
     deadlineGroup.style.display = 'none';
-    if (feeHint) feeHint.style.display = 'none';
   } else {
     priceGroup.style.display = 'block';
     payGroup.style.display = 'block';
     locGroup.style.display = 'block';
     urgencyGroup.style.display = 'block';
     deadlineGroup.style.display = 'block';
-    if (feeHint) feeHint.style.display = 'block';
   }
 }
 
@@ -2488,6 +2635,16 @@ async function handlePublish(e) {
   if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
   const sensitiveWord = checkSensitive(title + ' ' + desc);
   if (sensitiveWord) { err.textContent = '内容包含敏感词「' + sensitiveWord + '」，请修改后重新发布'; err.style.display = 'block'; return; }
+
+  // 每日发单限制检查（非VIP 1天1单，管理员不受限，问答不受限）
+  if (type !== 'qa' && !isVIP() && !isAdminUser()) {
+    const todayOrders = await getTodayMyOrders('published');
+    if (todayOrders >= 1) {
+      err.textContent = '免费用户每天只能发布 1 单。开通会员（¥1/月）即可无限发单！';
+      err.style.display = 'block';
+      return;
+    }
+  }
   if (type !== 'qa' && !price) { err.textContent = '请填写报酬金额'; err.style.display = 'block'; return; }
 
   // 图片上传到图床（ImgBB，免费，单张32MB）
@@ -2511,7 +2668,7 @@ async function handlePublish(e) {
   }
 
   const order = {
-    type, category: cat, title, description: desc, price: price || 0, fee: 0,
+    type, category: cat, title, description: desc, price: price || 0,
     location: loc, urgency, deadline, payment,
     images: images,
     status: 'open',
@@ -2520,6 +2677,7 @@ async function handlePublish(e) {
     publisher_student_id: S.user.student_id,
     publisher_dorm: S.user.dorm || '',
     publisher_runner_verified: S.user.runner_verified || false,
+    publisher_vip: isVIP(),
     taker_id: null, taker_name: null,
     created_at: new Date().toISOString()
   };
@@ -2546,7 +2704,7 @@ function updateUI() {
   if (S.user) {
     menu.style.display = 'flex';
     btn.style.display = 'none';
-    document.getElementById('userNameDisplay').textContent = S.user.name || S.user.student_id;
+    document.getElementById('userNameDisplay').textContent = (isVIP() ? '⭐' : '') + (S.user.name || S.user.student_id);
     // 显示认证跑腿徽章
     const verifiedEl = menu.querySelector('.user-verified');
     if (verifiedEl) {
@@ -2633,6 +2791,9 @@ async function loadMyOrders(myTab) {
   if (profile) profile.style.display = 'block';
   if (tabsEl) tabsEl.style.display = 'flex';
   if (btnReports) btnReports.style.display = 'inline-flex';
+  // VIP 标识
+  const vipBadge = document.getElementById('myVipBadge');
+  if (vipBadge) vipBadge.style.display = isVIP() ? 'inline' : 'none';
   // 跑腿认证按钮：未认证且已通过用户审核的显示
   if (btnRunnerApply) {
     btnRunnerApply.style.display = (S.user.status === 'approved' && !S.user.runner_verified) ? 'inline-flex' : 'none';
