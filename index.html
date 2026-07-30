@@ -591,6 +591,10 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
+// Cloudflare Worker 代理（减少 GitHub API 消耗 + 实时推送）
+const USE_WORKER = true; // 设为 false 可切回直连 GitHub
+const WORKER_URL = 'https://hust-hub-proxy.YOUR_SUBDOMAIN.workers.dev'; // 部署后替换
+const API_BASE = USE_WORKER ? WORKER_URL : 'https://api.github.com';
 
 const REPO = 'XY5167/hust-helper-backend';
 const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
@@ -631,8 +635,25 @@ function checkSensitive(text) {
 })();
 
 // ============ GITHUB API ============
+// 通过 Worker 代理（缓存读 + 透传写 + WebSocket 通知）
+function ghApi(path, method, body) {
+  const opts = {
+    method,
+    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  return fetch(API_BASE + path, opts);
+}
+
 async function ghIssues(label, state) {
   const s = state || 'open';
+  if (USE_WORKER) {
+    // 走 Worker 缓存（单次请求拉全量，Worker 内部处理分页）
+    const res = await ghApi('/api/issues?label=' + encodeURIComponent(label) + '&state=' + s, 'GET');
+    if (!res.ok) throw new Error('API error ' + res.status);
+    return res.json();
+  }
+  // 直连模式：分页拉取
   let allIssues = [];
   let page = 1;
   while (true) {
@@ -642,13 +663,21 @@ async function ghIssues(label, state) {
     const issues = await res.json();
     if (!issues || issues.length === 0) break;
     allIssues = allIssues.concat(issues);
-    if (issues.length < 100) break; // 最后一页
+    if (issues.length < 100) break;
     page++;
   }
   return allIssues;
 }
 
 async function ghCreateIssue(title, body, labels) {
+  if (USE_WORKER) {
+    const res = await ghApi('/api/issues', 'POST', { title, body, labels });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || data.message || 'Create failed ' + res.status);
+    }
+    return res.json();
+  }
   const res = await fetch('https://api.github.com/repos/' + REPO + '/issues', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
@@ -667,6 +696,11 @@ async function ghCreateIssue(title, body, labels) {
 }
 
 async function ghUpdateIssue(number, body) {
+  if (USE_WORKER) {
+    const res = await ghApi('/api/issue/' + number, 'PATCH', { body });
+    if (!res.ok) throw new Error('Update failed ' + res.status);
+    return res.json();
+  }
   const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + number, {
     method: 'PATCH',
     headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
@@ -677,6 +711,11 @@ async function ghUpdateIssue(number, body) {
 }
 
 async function ghCloseIssue(number) {
+  if (USE_WORKER) {
+    const res = await ghApi('/api/issue/' + number, 'PATCH', { state: 'closed' });
+    if (!res.ok) throw new Error('Close failed ' + res.status);
+    return res.json();
+  }
   const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + number, {
     method: 'PATCH',
     headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
@@ -1152,19 +1191,25 @@ async function loadComments(issueNum) {
   const el = document.getElementById('detailComments');
   if (!el) return;
   try {
-    // 分页加载评论（每页 100 条，循环拉取）
     let allComments = [];
-    let page = 1;
-    while (true) {
-      const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum + '/comments?per_page=100&page=' + page, {
-        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
-      });
-      if (!res.ok) break;
-      const comments = await res.json();
-      if (!comments || comments.length === 0) break;
-      allComments = allComments.concat(comments);
-      if (comments.length < 100) break;
-      page++;
+    if (USE_WORKER) {
+      // 走 Worker 缓存
+      const res = await ghApi('/api/comments/' + issueNum, 'GET');
+      if (res.ok) allComments = await res.json();
+    } else {
+      // 直连模式：分页拉取
+      let page = 1;
+      while (true) {
+        const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum + '/comments?per_page=100&page=' + page, {
+          headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+        });
+        if (!res.ok) break;
+        const comments = await res.json();
+        if (!comments || comments.length === 0) break;
+        allComments = allComments.concat(comments);
+        if (comments.length < 100) break;
+        page++;
+      }
     }
     const comments = allComments;
     if (comments.length === 0) { el.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:20px">暂无消息，发送第一条吧</p>'; return; }
@@ -1278,11 +1323,15 @@ async function sendComment(issueNum) {
   input.disabled = true;
   try {
     const body = JSON.stringify({ name: S.user.name, student_id: S.user.student_id, text });
-    await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum + '/comments', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body })
-    });
+    if (USE_WORKER) {
+      await ghApi('/api/comments/' + issueNum, 'POST', { body });
+    } else {
+      await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum + '/comments', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body })
+      });
+    }
     input.value = '';
     await loadComments(issueNum);
   } catch(e) { toast('发送失败：' + e.message, 'error'); }
@@ -3070,6 +3119,67 @@ document.addEventListener('visibilitychange', () => {
 
 // 启动
 startSmartPolling();
+
+// ============ WebSocket 实时通知 ============
+let _ws = null;
+let _wsReconnectTimer = null;
+
+function connectWebSocket() {
+  if (!USE_WORKER) return;
+  try {
+    const wsUrl = WORKER_URL.replace('https://', 'wss://') + '/ws';
+    _ws = new WebSocket(wsUrl);
+
+    _ws.onopen = () => {
+      console.log('🔗 WebSocket 已连接，实时通知就绪');
+      // WebSocket 连上后，拉长轮询间隔（因为数据变更会通过 WS 推送）
+      _pollInterval = 30000;
+      stopSmartPolling();
+      startSmartPolling();
+    };
+
+    _ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'refresh') {
+          // 收到刷新通知，立即刷新当前页面数据
+          if (S.page === 'home') loadStats();
+          else if (S.page === 'my') loadMyOrders();
+          else if (S.page === 'task') refreshCurrentTab();
+        } else if (msg.type === 'ping') {
+          _ws.send(JSON.stringify({ type: 'pong' }));
+        }
+      } catch(e) {}
+    };
+
+    _ws.onclose = () => {
+      console.log('🔌 WebSocket 断开，恢复轮询模式');
+      _pollInterval = 5000;
+      stopSmartPolling();
+      startSmartPolling();
+      // 5 秒后重连
+      if (_wsReconnectTimer) clearTimeout(_wsReconnectTimer);
+      _wsReconnectTimer = setTimeout(connectWebSocket, 5000);
+    };
+
+    _ws.onerror = () => {
+      // 连接失败，自动回退到轮询模式（已有轮询兜底）
+    };
+  } catch(e) {
+    // WebSocket 不可用时，轮询模式已覆盖
+  }
+}
+
+// 页面可见时尝试连接 WebSocket
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && USE_WORKER && (!_ws || _ws.readyState > 1)) {
+    connectWebSocket();
+  }
+});
+
+// 初始连接（延迟 1 秒，等页面加载完）
+setTimeout(connectWebSocket, 1000);
+
 // ============ TOAST ============
 function toast(msg, type, duration) {
   const c = document.getElementById('toastContainer');

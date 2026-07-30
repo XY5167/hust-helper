@@ -1,0 +1,21 @@
+name = "hust-hub-proxy"
+main = "src/index.js"
+compatibility_date = "2025-07-30"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "YOUR_KV_ID"
+preview_id = "YOUR_KV_PREVIEW_ID"
+
+[[durable_objects.bindings]]
+name = "WS_ROOM"
+class_name = "WSRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["WSRoom"]
+
+[vars]
+GITHUB_TOKEN = ""
+GITHUB_REPO = "XY5167/hust-helper-backend"
+CACHE_TTL = "5"  # 缓存秒数，5 秒刷新一次
