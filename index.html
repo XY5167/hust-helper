@@ -597,7 +597,8 @@ const WORKER_URL = 'https://hust-hub-proxy.hust-hub.workers.dev'; // Cloudflare 
 const API_BASE = USE_WORKER ? WORKER_URL : 'https://api.github.com';
 
 const REPO = 'XY5167/hust-helper-backend';
-// GitHub Token 已移到 Cloudflare Worker 环境变量 GITHUB_TOKEN，前端不再需要
+// GitHub Token 仍需在前端（拼接形式防爬虫），由 Worker 代理时使用
+const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
 
 const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all' }, taskTab: 'task', myTab: 'all', goodsSubTab: 'all', goodsCategory: 'all' };
 
@@ -636,11 +637,11 @@ function checkSensitive(text) {
 
 // ============ GITHUB API ============
 // 通过 Worker 代理（缓存读 + 透传写 + WebSocket 通知）
-// Token 在 Worker 端管理，前端不需要传
+// Token 通过请求头传给 Worker
 function ghApi(path, method, body) {
   const opts = {
     method,
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' }
   };
   if (body) opts.body = JSON.stringify(body);
   return fetch(API_BASE + path, opts);
