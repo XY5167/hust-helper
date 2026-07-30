@@ -575,10 +575,10 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     <button class="modal-close" onclick="closeAdminModal()">&times;</button>
     <h3 style="margin-bottom:16px">🛡️ 管理员面板</h3>
     <div class="modal-tabs" style="margin-bottom:16px">
-      <button class="modal-tab active" id="adminTabUsers" onclick="switchAdminTab('users')">👤 用户审核</button>
-      <button class="modal-tab" id="adminTabRunners" onclick="switchAdminTab('runners')">🛵 跑腿认证</button>
-      <button class="modal-tab" id="adminTabManage" onclick="switchAdminTab('manage')">📋 用户管理</button>
-      <button class="modal-tab" id="adminTabReports" onclick="switchAdminTab('reports')">⚠️ 投诉处理</button>
+      <button class="modal-tab active" id="adminTabUsers" onclick="switchAdminTab('users')">用户审核</button>
+      <button class="modal-tab" id="adminTabRunners" onclick="switchAdminTab('runners')">跑腿认证</button>
+      <button class="modal-tab" id="adminTabManage" onclick="switchAdminTab('manage')">用户管理</button>
+      <button class="modal-tab" id="adminTabReports" onclick="switchAdminTab('reports')">投诉处理</button>
     </div>
     <div id="adminContent"><p>加载中...</p></div>
   </div>
@@ -592,7 +592,7 @@ const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
 // Cloudflare Worker 代理（减少 GitHub API 消耗 + 实时推送）
-const USE_WORKER = true; // 设为 false 可切回直连 GitHub
+const USE_WORKER = false; // 设为 false 可切回直连 GitHub（Worker 暂时无法访问）
 const WORKER_URL = 'https://hust-hub-proxy.hust-hub.workers.dev'; // Cloudflare Worker 代理地址
 const API_BASE = USE_WORKER ? WORKER_URL : 'https://api.github.com';
 
