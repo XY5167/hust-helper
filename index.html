@@ -478,6 +478,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <div id="myPaymentPreview" style="margin-top:12px"></div>
     </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+      <button class="btn btn-outline btn-sm" onclick="showVipApply()" style="display:none" id="btnVipApply">⭐ 申请开通会员</button>
       <button class="btn btn-outline btn-sm" onclick="showRunnerApply()" style="display:none" id="btnRunnerApply">🛵 申请跑腿认证</button>
       <button class="btn btn-outline btn-sm" onclick="showReportsView()" style="display:none" id="btnReports">📋 反馈中心</button>
     </div>
@@ -569,6 +570,24 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   </div>
 </div>
 
+<!-- VIP 申请弹窗 -->
+<div class="modal-overlay" id="vipApplyModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeVipApply()">&times;</button>
+    <h3 style="margin-bottom:16px">⭐ 开通会员</h3>
+    <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:16px">会员 ¥1/月，无限发单接单。扫描下方收款码付款后点击确认即可。</p>
+    <div id="vipApplyContent" style="text-align:center;margin-bottom:16px">
+      <div id="vipQrcodeContainer" style="margin-bottom:12px">
+        <p style="color:var(--text-muted);font-size:.85rem">管理员收款码加载中...</p>
+      </div>
+      <p style="font-size:.85rem;color:var(--text-secondary)">请使用微信/支付宝扫码支付 <strong style="color:var(--primary)">¥1.00</strong></p>
+      <p style="font-size:.75rem;color:var(--text-muted)">付款后请点击下方按钮，管理员确认后将自动开通</p>
+    </div>
+    <p class="form-error" id="vipApplyError" style="display:none"></p>
+    <button class="btn btn-primary btn-block" onclick="submitVipApply()">✅ 我已完成付款，申请开通</button>
+  </div>
+</div>
+
 <!-- Admin Panel Modal -->
 <div class="modal-overlay" id="adminModal">
   <div class="modal modal-lg">
@@ -590,6 +609,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 <script>
 // ============ 管理员配置 ============
 const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
+const ADMIN_PAY_QRCODE = ''; // 管理员收款码图片URL（用于VIP申请弹窗，上传到图床后填入）
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
 // Cloudflare Worker 代理（减少 GitHub API 消耗 + 实时推送）
@@ -2006,6 +2026,15 @@ async function loadVipManagement() {
   const ct = document.getElementById('adminContent');
   ct.innerHTML = '<p>加载中...</p>';
   try {
+    // 加载待处理的 VIP 申请
+    let vipApplies = [];
+    try {
+      const applyIssues = await ghIssues('vip_apply', 'open');
+      vipApplies = applyIssues.map(i => {
+        try { const a = JSON.parse(i.body); a._num = i.number; return a; } catch(e) { return null; }
+      }).filter(a => a && a.status === 'pending');
+    } catch(e) { /* vip_apply label 可能还不存在 */ }
+
     const issues = await ghIssues('user', 'all');
     const users = issues.map(i => {
       try { const u = JSON.parse(i.body); u._issue_number = i.number; u._state = i.state; return u; }
@@ -2016,7 +2045,25 @@ async function loadVipManagement() {
     const vipUsers = users.filter(u => u.vip_expire && new Date(u.vip_expire) > now);
     const normalUsers = users.filter(u => !u.vip_expire || new Date(u.vip_expire) <= now);
 
-    let html = '<h4 style="margin-bottom:12px">⭐ 当前会员（' + vipUsers.length + ' 人）</h4>';
+    let html = '';
+
+    // 待处理申请
+    if (vipApplies.length > 0) {
+      html += '<h4 style="margin-bottom:12px;color:#f59e0b">⏳ 待确认申请（' + vipApplies.length + '）</h4>';
+      html += '<div style="max-height:200px;overflow-y:auto;margin-bottom:20px">';
+      for (const a of vipApplies) {
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fffbeb;border-radius:8px;margin-bottom:8px;border:1px solid #fde68a">'
+          + '<div><strong>' + esc(a.name) + '</strong> <span style="color:var(--text-muted)">' + esc(a.student_id) + '</span>'
+          + '<br><span style="font-size:.75rem;color:var(--text-secondary)">' + timeAgo(a.created_at) + ' 提交申请</span></div>'
+          + '<div style="display:flex;gap:6px">'
+          + '<button class="btn btn-sm btn-primary" onclick="approveVipApply(' + a._num + ',\'' + esc(a.student_id) + '\',\'' + esc(a.name) + '\')">✅ 确认开通</button>'
+          + '<button class="btn btn-sm btn-outline" onclick="rejectVipApply(' + a._num + ')" style="color:var(--danger)">✕ 拒绝</button>'
+          + '</div></div>';
+      }
+      html += '</div>';
+    }
+
+    html += '<h4 style="margin-bottom:12px">⭐ 当前会员（' + vipUsers.length + ' 人）</h4>';
     if (vipUsers.length === 0) {
       html += '<p style="color:var(--text-secondary);margin-bottom:20px">暂无会员用户</p>';
     } else {
@@ -2098,6 +2145,44 @@ async function cancelVip(inum, name) {
       updateUI();
     }
     toast('已取消「' + name + '」的会员', 'info');
+    await loadVipManagement();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+// 确认 VIP 申请（管理员）
+async function approveVipApply(applyNum, studentId, name) {
+  if (!confirm('确认为「' + name + '」开通 1 个月会员（¥1）？')) return;
+  try {
+    // 1. 关闭申请 Issue
+    await ghCloseIssue(applyNum);
+    // 2. 找到对应用户并开通会员
+    const issues = await ghIssues('user', 'all');
+    const userIssue = issues.find(i => {
+      try { return JSON.parse(i.body).student_id === studentId; } catch(e) { return false; }
+    });
+    if (!userIssue) { toast('未找到用户', 'error'); return; }
+    const u = JSON.parse(userIssue.body);
+    const now = new Date();
+    const startFrom = (u.vip_expire && new Date(u.vip_expire) > now) ? new Date(u.vip_expire) : now;
+    startFrom.setMonth(startFrom.getMonth() + 1);
+    u.vip_expire = startFrom.toISOString();
+    await ghUpdateIssue(userIssue.number, JSON.stringify(u));
+    // 更新本地状态
+    if (S.user && S.user.student_id === studentId) {
+      S.user.vip_expire = u.vip_expire;
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      updateUI();
+    }
+    toast('⭐ 已为「' + name + '」开通会员，到期：' + startFrom.toLocaleDateString('zh-CN'), 'success');
+    await loadVipManagement();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+async function rejectVipApply(applyNum) {
+  if (!confirm('确定拒绝此申请？')) return;
+  try {
+    await ghCloseIssue(applyNum);
+    toast('已拒绝申请', 'info');
     await loadVipManagement();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
 }
@@ -2256,6 +2341,44 @@ function isVIP() {
 
 function isAdminUser() {
   return S.user && S.user.student_id === ADMIN_STUDENT_ID;
+}
+
+// ============ VIP 申请（用户端） ============
+function showVipApply() {
+  if (!S.user) { showAuthModal(); return; }
+  document.getElementById('vipApplyModal').classList.add('active');
+  // 显示收款码
+  const qrContainer = document.getElementById('vipQrcodeContainer');
+  if (ADMIN_PAY_QRCODE) {
+    qrContainer.innerHTML = '<img src="' + ADMIN_PAY_QRCODE + '" style="max-width:220px;border-radius:8px;border:1px solid var(--border)" alt="收款码">';
+  } else {
+    qrContainer.innerHTML = '<div style="padding:30px;background:var(--bg);border-radius:8px;color:var(--text-muted);font-size:.85rem">📷 管理员暂未设置收款码<br><span style="font-size:.75rem">请联系管理员 U202512533 转账 ¥1</span></div>';
+  }
+  document.getElementById('vipApplyError').style.display = 'none';
+}
+
+function closeVipApply() {
+  document.getElementById('vipApplyModal').classList.remove('active');
+}
+
+async function submitVipApply() {
+  const err = document.getElementById('vipApplyError');
+  try {
+    // 创建一个 vip_apply 类型的 Issue
+    const body = JSON.stringify({
+      type: 'vip_apply',
+      student_id: S.user.student_id,
+      name: S.user.name,
+      status: 'pending', // pending / approved / rejected
+      created_at: new Date().toISOString()
+    });
+    await ghCreateIssue('[VIP申请] ' + S.user.name + ' - ' + S.user.student_id, body, ['vip_apply']);
+    toast('⭐ 申请已提交！管理员确认收款后将为你开通会员。', 'success');
+    closeVipApply();
+  } catch(e) {
+    err.textContent = '提交失败：' + e.message;
+    err.style.display = 'block';
+  }
 }
 
 // 获取今天我发布的订单数 / 接的订单数
@@ -2768,12 +2891,14 @@ async function loadMyOrders(myTab) {
   const listEl = document.getElementById('myOrdersList');
   const btnReports = document.getElementById('btnReports');
   const btnRunnerApply = document.getElementById('btnRunnerApply');
+  const btnVipApply = document.getElementById('btnVipApply');
 
   if (!S.user) {
     if (profile) profile.style.display = 'none';
     if (tabsEl) tabsEl.style.display = 'none';
     if (btnReports) btnReports.style.display = 'none';
     if (btnRunnerApply) btnRunnerApply.style.display = 'none';
+    if (btnVipApply) btnVipApply.style.display = 'none';
     if (listEl) listEl.innerHTML = '<p style="color:var(--text-secondary)">请先登录...</p>';
     return;
   }
@@ -2784,6 +2909,7 @@ async function loadMyOrders(myTab) {
     if (tabsEl) tabsEl.style.display = 'none';
     if (btnReports) btnReports.style.display = 'none';
     if (btnRunnerApply) btnRunnerApply.style.display = 'none';
+    if (btnVipApply) btnVipApply.style.display = 'none';
     if (listEl) listEl.innerHTML = '<p style="color:var(--danger)">用户信息不完整，请退出后重新登录。</p>';
     return;
   }
@@ -2794,6 +2920,10 @@ async function loadMyOrders(myTab) {
   // VIP 标识
   const vipBadge = document.getElementById('myVipBadge');
   if (vipBadge) vipBadge.style.display = isVIP() ? 'inline' : 'none';
+  // VIP 申请按钮：已审核通过且非VIP的用户显示
+  if (btnVipApply) {
+    btnVipApply.style.display = (S.user.status === 'approved' && !isVIP()) ? 'inline-flex' : 'none';
+  }
   // 跑腿认证按钮：未认证且已通过用户审核的显示
   if (btnRunnerApply) {
     btnRunnerApply.style.display = (S.user.status === 'approved' && !S.user.runner_verified) ? 'inline-flex' : 'none';
