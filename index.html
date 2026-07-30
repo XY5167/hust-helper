@@ -593,11 +593,11 @@ const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
 // 数据存储在 GitHub Issues 中，所有人共享
 // Cloudflare Worker 代理（减少 GitHub API 消耗 + 实时推送）
 const USE_WORKER = true; // 设为 false 可切回直连 GitHub
-const WORKER_URL = 'https://hust-hub-proxy.YOUR_SUBDOMAIN.workers.dev'; // 部署后替换
+const WORKER_URL = 'https://hust-hub-proxy.hust-hub.workers.dev'; // Cloudflare Worker 代理地址
 const API_BASE = USE_WORKER ? WORKER_URL : 'https://api.github.com';
 
 const REPO = 'XY5167/hust-helper-backend';
-const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
+// GitHub Token 已移到 Cloudflare Worker 环境变量 GITHUB_TOKEN，前端不再需要
 
 const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all' }, taskTab: 'task', myTab: 'all', goodsSubTab: 'all', goodsCategory: 'all' };
 
@@ -636,10 +636,11 @@ function checkSensitive(text) {
 
 // ============ GITHUB API ============
 // 通过 Worker 代理（缓存读 + 透传写 + WebSocket 通知）
+// Token 在 Worker 端管理，前端不需要传
 function ghApi(path, method, body) {
   const opts = {
     method,
-    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json' }
   };
   if (body) opts.body = JSON.stringify(body);
   return fetch(API_BASE + path, opts);
