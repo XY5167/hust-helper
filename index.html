@@ -275,7 +275,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <button class="filter-btn" data-filter="express" onclick="filterOrders('task','express')">📦 代拿快递</button>
       <button class="filter-btn" data-filter="food" onclick="filterOrders('task','food')">🍔 代取外卖</button>
       <button class="filter-btn" data-filter="print" onclick="filterOrders('task','print')">🖨️ 帮忙打印</button>
-      <button class="filter-btn" data-filter="report" onclick="filterOrders('task','report')">📝 代写报告</button>
+
       <button class="filter-btn" data-filter="repair" onclick="filterOrders('task','repair')">🔧 维修</button>
       <button class="filter-btn" data-filter="other" onclick="filterOrders('task','other')">📌 其他</button>
     </div>
@@ -756,7 +756,7 @@ function renderOrders(orders) {
 
   grid.innerHTML = orders.map(o => {
     const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答', borrow:'借物', goods:'物品流转'};
-    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
+    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
     const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
     const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
@@ -2326,7 +2326,7 @@ function closePublishModal() {
 function updatePublishCategories() {
   const t = document.getElementById('publishType').value;
   const cats = {
-    task: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'print',l:'帮忙打印'},{v:'report',l:'代写报告'},{v:'repair',l:'维修'},{v:'other',l:'其他任务'}],
+    task: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'print',l:'帮忙打印'},{v:'repair',l:'维修'},{v:'other',l:'其他任务'}],
     borrow: [{v:'textbook',l:'教材参考书'},{v:'device',l:'数码设备'},{v:'sports',l:'体育器材'},{v:'tool',l:'生活工具'},{v:'other',l:'其他物品'}],
     secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'daily',l:'生活用品'},{v:'other',l:'其他'}],
     qa: [{v:'course',l:'选课学习'},{v:'exam',l:'考研保研'},{v:'life',l:'校园生活'},{v:'job',l:'实习就业'},{v:'other',l:'其他问题'}]
@@ -2581,7 +2581,7 @@ async function loadMyOrders(myTab) {
 
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
     const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答', chat:'💬 私信', goods:'物品流转'};
-    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
+    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
 
     if (orders.length === 0) {
       listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p></div>';
