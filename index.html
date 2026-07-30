@@ -251,7 +251,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     <div class="section" style="padding-top:24px">
       <div class="hero-actions" style="margin:0">
         <button class="btn btn-primary btn-lg" onclick="navigate('task')">浏览任务大厅</button>
-        <button class="btn btn-outline btn-lg" onclick="navigate('task');setTimeout(()=>switchTaskTab('secondhand'),100)">逛逛二手交易</button>
+        <button class="btn btn-outline btn-lg" onclick="navigate('task');setTimeout(()=>switchTaskTab('goods'),100)">逛逛物品流转</button>
       </div>
     </div>
   </div>
@@ -266,8 +266,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     <!-- 板块 Tab -->
     <div class="tab-bar" id="taskTabBar" style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0">
       <button class="tab-btn active" data-tasktab="task" onclick="switchTaskTab('task')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:600;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;transition:all .2s">🏃 跑腿代办</button>
-      <button class="tab-btn" data-tasktab="borrow" onclick="switchTaskTab('borrow')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">📦 有偿借物</button>
-      <button class="tab-btn" data-tasktab="secondhand" onclick="switchTaskTab('secondhand')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">🔄 二手交易</button>
+      <button class="tab-btn" data-tasktab="goods" onclick="switchTaskTab('goods')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">📦 物品流转</button>
       <button class="tab-btn" data-tasktab="qa" onclick="switchTaskTab('qa')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">💬 有问必答</button>
     </div>
     <!-- 任务子分类 -->
@@ -280,23 +279,13 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <button class="filter-btn" data-filter="repair" onclick="filterOrders('task','repair')">🔧 维修</button>
       <button class="filter-btn" data-filter="other" onclick="filterOrders('task','other')">📌 其他</button>
     </div>
-    <!-- 二手子分类 -->
-    <div class="filter-bar" id="secondhandFilters" style="display:none">
-      <button class="filter-btn active" data-filter="all" onclick="filterOrders('secondhand','all')">全部</button>
-      <button class="filter-btn" data-filter="book" onclick="filterOrders('secondhand','book')">📚 教材书籍</button>
-      <button class="filter-btn" data-filter="electronic" onclick="filterOrders('secondhand','electronic')">💻 电子产品</button>
-      <button class="filter-btn" data-filter="daily" onclick="filterOrders('secondhand','daily')">🏠 生活用品</button>
-      <button class="filter-btn" data-filter="other" onclick="filterOrders('secondhand','other')">📌 其他</button>
+    <!-- 物品流转子分类 -->
+    <div class="filter-bar" id="goodsFilters" style="display:none">
+      <button class="filter-btn active" data-goods-sub="all" onclick="switchGoodsSubTab('all')">全部</button>
+      <button class="filter-btn" data-goods-sub="sale" onclick="switchGoodsSubTab('sale')">🛒 出售转让</button>
+      <button class="filter-btn" data-goods-sub="rent" onclick="switchGoodsSubTab('rent')">📦 短期租借</button>
     </div>
-    <!-- 借物子分类 -->
-    <div class="filter-bar" id="borrowFilters" style="display:none">
-      <button class="filter-btn active" data-filter="all" onclick="filterOrders('borrow','all')">全部</button>
-      <button class="filter-btn" data-filter="textbook" onclick="filterOrders('borrow','textbook')">📖 教材参考书</button>
-      <button class="filter-btn" data-filter="device" onclick="filterOrders('borrow','device')">📱 数码设备</button>
-      <button class="filter-btn" data-filter="sports" onclick="filterOrders('borrow','sports')">⚽ 体育器材</button>
-      <button class="filter-btn" data-filter="tool" onclick="filterOrders('borrow','tool')">🔧 生活工具</button>
-      <button class="filter-btn" data-filter="other" onclick="filterOrders('borrow','other')">📌 其他</button>
-    </div>
+    <div class="filter-bar" id="goodsCategoryFilters" style="display:none;margin-top:4px"></div>
     <!-- 问答子分类 -->
     <div class="filter-bar" id="qaFilters" style="display:none">
       <button class="filter-btn active" data-filter="all" onclick="filterOrders('qa','all')">全部</button>
@@ -409,8 +398,8 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <label>类型</label>
         <select id="publishType" required onchange="updatePublishCategories()">
           <option value="task">跑腿代办</option>
-          <option value="borrow">有偿借物</option>
-          <option value="secondhand">二手交易</option>
+          <option value="secondhand">物品流转 - 出售转让</option>
+          <option value="borrow">物品流转 - 短期租借</option>
           <option value="qa">有问必答</option>
         </select>
       </div>
@@ -606,7 +595,7 @@ const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
 const REPO = 'XY5167/hust-helper-backend';
 const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
 
-const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', secondhand: 'all', qa: 'all', borrow: 'all' }, taskTab: 'task', myTab: 'all' };
+const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all' }, taskTab: 'task', myTab: 'all', goodsSubTab: 'all', goodsCategory: 'all' };
 
 // 初始化
 (function() {
@@ -703,7 +692,8 @@ let _cachedType = null;
 
 function refreshCurrentTab() {
   const tab = S.taskTab || 'task';
-  loadOrders(tab, S.filter[tab] || 'all');
+  const cat = tab === 'goods' ? (S.goodsCategory || 'all') : (S.filter[tab] || 'all');
+  loadOrders(tab, cat);
 }
 
 async function loadOrders(type, cat) {
@@ -730,12 +720,13 @@ async function loadOrders(type, cat) {
     }).filter(o => o && o.status === 'open');
 
     // 根据类型筛选
-    if (type === 'secondhand') {
-      orders = orders.filter(o => o.type === 'secondhand');
-    } else if (type === 'qa') {
+    if (type === 'qa') {
       orders = orders.filter(o => o.type === 'qa');
-    } else if (type === 'borrow') {
-      orders = orders.filter(o => o.type === 'borrow');
+    } else if (type === 'goods') {
+      const sub = S.goodsSubTab || 'all';
+      if (sub === 'sale') orders = orders.filter(o => o.type === 'secondhand');
+      else if (sub === 'rent') orders = orders.filter(o => o.type === 'borrow');
+      else orders = orders.filter(o => o.type === 'secondhand' || o.type === 'borrow');
     } else {
       orders = orders.filter(o => o.type === 'task' || o.type === 'errand' || o.type === 'skill');
     }
@@ -758,13 +749,13 @@ function renderOrders(orders) {
   if (!grid) return;
 
   if (orders.length === 0) {
-    const emptyMap = { task: '暂无跑腿订单，来做第一个发布者吧', secondhand: '暂无二手物品，快来发布吧', qa: '暂无问答，来提出你的问题吧', borrow: '暂无可借物品，来发布你的需求吧' };
+    const emptyMap = { task: '暂无跑腿订单，来做第一个发布者吧', goods: '暂无物品流转信息，快来发布吧', qa: '暂无问答，来提出你的问题吧' };
     grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>' + (emptyMap[_cachedType] || '暂无匹配内容') + '</p></div>';
     return;
   }
 
   grid.innerHTML = orders.map(o => {
-    const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答', borrow:'借物'};
+    const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答', borrow:'借物', goods:'物品流转'};
     const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
     const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
@@ -841,6 +832,59 @@ function filterOrders(type, cat) {
   loadOrders(type, cat);
 }
 
+// ============ 物品流转子筛选 ============
+function switchGoodsSubTab(sub) {
+  S.goodsSubTab = sub;
+  S.goodsCategory = 'all';
+  updateGoodsSubTabUI();
+  updateGoodsCategoryFilters();
+  loadOrders('goods', 'all');
+}
+
+function updateGoodsSubTabUI() {
+  const bar = document.getElementById('goodsFilters');
+  if (!bar) return;
+  bar.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  const fb = bar.querySelector('[data-goods-sub="' + S.goodsSubTab + '"]');
+  if (fb) fb.classList.add('active');
+}
+
+function updateGoodsCategoryFilters() {
+  const bar = document.getElementById('goodsCategoryFilters');
+  if (!bar) return;
+  const sub = S.goodsSubTab || 'all';
+  let buttons = '';
+  if (sub === 'sale') {
+    buttons = '<button class="filter-btn active" data-filter="all" onclick="filterGoodsCat(\'all\')">全部</button>'
+      + '<button class="filter-btn" data-filter="book" onclick="filterGoodsCat(\'book\')">📚 教材书籍</button>'
+      + '<button class="filter-btn" data-filter="electronic" onclick="filterGoodsCat(\'electronic\')">💻 电子产品</button>'
+      + '<button class="filter-btn" data-filter="daily" onclick="filterGoodsCat(\'daily\')">🏠 生活用品</button>'
+      + '<button class="filter-btn" data-filter="other" onclick="filterGoodsCat(\'other\')">📌 其他</button>';
+  } else if (sub === 'rent') {
+    buttons = '<button class="filter-btn active" data-filter="all" onclick="filterGoodsCat(\'all\')">全部</button>'
+      + '<button class="filter-btn" data-filter="textbook" onclick="filterGoodsCat(\'textbook\')">📖 教材参考书</button>'
+      + '<button class="filter-btn" data-filter="device" onclick="filterGoodsCat(\'device\')">📱 数码设备</button>'
+      + '<button class="filter-btn" data-filter="sports" onclick="filterGoodsCat(\'sports\')">⚽ 体育器材</button>'
+      + '<button class="filter-btn" data-filter="tool" onclick="filterGoodsCat(\'tool\')">🔧 生活工具</button>'
+      + '<button class="filter-btn" data-filter="other" onclick="filterGoodsCat(\'other\')">📌 其他</button>';
+  } else {
+    buttons = '<span style="font-size:.82rem;color:var(--text-muted);padding:4px 8px">选择「出售转让」或「短期租借」后查看品类</span>';
+  }
+  bar.innerHTML = buttons;
+}
+
+function filterGoodsCat(cat) {
+  S.goodsCategory = cat;
+  // 更新品类筛选栏的 active
+  const bar = document.getElementById('goodsCategoryFilters');
+  if (bar) {
+    bar.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    const fb = bar.querySelector('[data-filter="' + cat + '"]');
+    if (fb) fb.classList.add('active');
+  }
+  loadOrders('goods', cat);
+}
+
 function switchTaskTab(tab) {
   S.taskTab = tab;
   document.querySelectorAll('#taskTabBar .tab-btn').forEach(b => {
@@ -855,17 +899,16 @@ function switchTaskTab(tab) {
     activeTab.style.fontWeight = '600';
   }
   document.getElementById('taskFilters').style.display = (tab === 'task') ? 'flex' : 'none';
-  document.getElementById('secondhandFilters').style.display = (tab === 'secondhand') ? 'flex' : 'none';
-  document.getElementById('borrowFilters').style.display = (tab === 'borrow') ? 'flex' : 'none';
+  document.getElementById('goodsFilters').style.display = (tab === 'goods') ? 'flex' : 'none';
+  document.getElementById('goodsCategoryFilters').style.display = (tab === 'goods') ? 'flex' : 'none';
   document.getElementById('qaFilters').style.display = (tab === 'qa') ? 'flex' : 'none';
-  // 问答隐藏区域/价格筛选，借物保留区域和价格筛选
+  // 问答隐藏区域/价格筛选
   const dormFilter = document.getElementById('taskDormFilter');
   const sortSelect = document.getElementById('taskSortSelect');
   const isQA = tab === 'qa';
   if (dormFilter) dormFilter.style.display = isQA ? 'none' : '';
   if (sortSelect) {
     sortSelect.style.display = isQA ? 'none' : '';
-    // 问答只保留最新/最早排序
     if (isQA) {
       sortSelect.innerHTML = '<option value="newest">🕐 最新发布</option><option value="oldest">🕐 最早发布</option>';
     } else {
@@ -873,7 +916,15 @@ function switchTaskTab(tab) {
     }
     sortSelect.value = 'newest';
   }
-  loadOrders(tab, S.filter[tab] || 'all');
+  if (tab === 'goods') {
+    // 确保 goodsSubTab 已初始化
+    if (!S.goodsSubTab) S.goodsSubTab = 'all';
+    updateGoodsCategoryFilters();
+    updateGoodsSubTabUI();
+    loadOrders('goods', 'all');
+  } else {
+    loadOrders(tab, S.filter[tab] || 'all');
+  }
 }
 
 // ============ DETAIL ============
@@ -892,7 +943,7 @@ async function showDetail(issueNum) {
     const o = JSON.parse(issue.body);
     o._issue_number = issueNum;
 
-    const tl = {errand:'跑腿代办', secondhand:'二手交易', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答', borrow:'有偿借物', chat:'私信对话'};
+    const tl = {errand:'跑腿代办', secondhand:'出售转让', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答', borrow:'短期租借', chat:'私信对话'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
     const isQA = o.type === 'qa';
     const isChat = o.type === 'chat';
@@ -2529,7 +2580,7 @@ async function loadMyOrders(myTab) {
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
-    const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答', chat:'💬 私信'};
+    const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答', chat:'💬 私信', goods:'物品流转'};
     const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',report:'代写报告',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
 
     if (orders.length === 0) {
