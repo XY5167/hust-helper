@@ -435,8 +435,9 @@ input,select,textarea{font-family:inherit;font-size:1rem}
           </select>
         </div>
         <div class="form-group">
-          <label>截止时间（超时无人接单自动取消）</label>
+          <label>截止时间（选填，超时无人接单自动取消）</label>
           <input type="datetime-local" id="publishDeadline">
+          <p class="form-hint">留空则不限时，订单不会自动过期。</p>
         </div>
       </div>
       <div class="form-group">
@@ -2723,13 +2724,6 @@ function showPublishModal() {
   if (!checkApproved()) return;
   document.getElementById('publishModal').classList.add('active');
   updatePublishCategories();
-  // 默认截止时间：今晚 21:00
-  const dl = document.getElementById('publishDeadline');
-  if (dl && !dl.value) {
-    const t = new Date();
-    t.setHours(21, 0, 0, 0);
-    dl.value = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0') + 'T21:00';
-  }
 }
 
 function checkApproved() {
