@@ -435,8 +435,8 @@ input,select,textarea{font-family:inherit;font-size:1rem}
           </select>
         </div>
         <div class="form-group">
-          <label>截止时间</label>
-          <input type="text" id="publishDeadline" placeholder="如：今晚8点前">
+          <label>截止时间（超时无人接单自动取消）</label>
+          <input type="datetime-local" id="publishDeadline">
         </div>
       </div>
       <div class="form-group">
@@ -813,6 +813,24 @@ async function loadOrders(type, cat) {
       } catch(e) { return null; }
     }).filter(o => o && o.status === 'open');
 
+    // 自动过期检查：截止时间已过且无人接单的，自动关闭
+    const now = new Date();
+    for (const o of orders) {
+      if (o.deadline && !o.taker_id) {
+        const dl = new Date(o.deadline);
+        if (!isNaN(dl.getTime()) && dl < now) {
+          // 已过期，自动关闭
+          o.status = 'expired';
+          try {
+            await ghUpdateIssue(o._issue_number, JSON.stringify(o));
+            await ghCloseIssue(o._issue_number);
+          } catch(e) { /* 静默处理 */ }
+        }
+      }
+    }
+    // 过滤掉已过期的
+    orders = orders.filter(o => o.status === 'open');
+
     // 根据类型筛选
     if (type === 'qa') {
       orders = orders.filter(o => o.type === 'qa');
@@ -851,7 +869,7 @@ function renderOrders(orders) {
   grid.innerHTML = orders.map(o => {
     const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答', borrow:'借物', goods:'物品流转'};
     const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
-    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
+    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
     const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
     // 缩略图预览
@@ -1044,7 +1062,7 @@ async function showDetail(issueNum) {
     o._issue_number = issueNum;
 
     const tl = {errand:'跑腿代办', secondhand:'出售转让', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答', borrow:'短期租借', chat:'私信对话'};
-    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
+    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const isQA = o.type === 'qa';
     const isChat = o.type === 'chat';
 
@@ -2705,6 +2723,13 @@ function showPublishModal() {
   if (!checkApproved()) return;
   document.getElementById('publishModal').classList.add('active');
   updatePublishCategories();
+  // 默认截止时间：今晚 21:00
+  const dl = document.getElementById('publishDeadline');
+  if (dl && !dl.value) {
+    const t = new Date();
+    t.setHours(21, 0, 0, 0);
+    dl.value = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0') + 'T21:00';
+  }
 }
 
 function checkApproved() {
@@ -2983,25 +3008,23 @@ async function loadMyOrders(myTab) {
     else if (tab === 'taken') orders = orders.filter(o => o.taker_id == uid);
     else orders = orders.filter(o => o.publisher_id == uid || o.taker_id == uid);
 
-    // 自动取消超时订单
-    const now = Date.now();
-    const timeout24h = 24 * 60 * 60 * 1000;
-    const timeout48h = 48 * 60 * 60 * 1000;
+    // 自动过期处理：截止时间已过且无人接单 → 自动取消
+    const now = new Date();
     for (const o of orders) {
-      const created = new Date(o.created_at).getTime();
-      if (o.status === 'open' && (now - created > timeout24h)) {
-        o.status = 'cancelled';
-        try { await ghUpdateIssue(o._issue_number, JSON.stringify(o)); } catch(e) {}
-      }
-      if (o.status === 'taken' && (now - created > timeout48h)) {
-        o.status = 'cancelled';
-        try { await ghUpdateIssue(o._issue_number, JSON.stringify(o)); } catch(e) {}
+      if (o.status === 'open' && o.deadline && !o.taker_id) {
+        const dl = new Date(o.deadline);
+        if (!isNaN(dl.getTime()) && dl < now) {
+          o.status = 'cancelled';
+          o.cancel_reason = '超时无人接单，系统自动取消';
+          try { await ghUpdateIssue(o._issue_number, JSON.stringify(o)); } catch(e) {}
+          try { await ghCloseIssue(o._issue_number); } catch(e) {}
+        }
       }
     }
 
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
+    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答', chat:'💬 私信', goods:'物品流转'};
     const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
 
