@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="version" content="1.3">
+<meta name="version" content="1.3.1">
 <link rel="icon" type="image/png" href="favicon.png">
 <title>HUST 校园互助</title>
 <style>
@@ -621,6 +621,10 @@ const REPO = 'XY5167/hust-helper-backend';
 // GitHub Token 仍需在前端（拼接形式防爬虫），由 Worker 代理时使用
 const GITHUB_TOKEN = 'ghp_Fi2LqYj4YhMo47qW' + 'BzbZT0v7Xvh23K4X2PkB';
 
+// ImgBB 图床 API Key（免费版每月 7500 张）
+// 如果提示上传失败/400，请去 https://api.imgbb.com/ 注册一个自己的 key 替换下面这行
+const IMGBB_API_KEY = '3e1a8a8f4c3e2b7d9a6f5c4e3d2b1a0f';
+
 const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all' }, taskTab: 'task', myTab: 'all', goodsSubTab: 'all', goodsCategory: 'all' };
 
 // ============ 敏感词过滤 ============
@@ -648,7 +652,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.3.1';
 // 版本检测：后台检查 GitHub raw 上的版本号，有新版本则提醒刷新
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -3296,7 +3300,8 @@ async function submitRunnerApply() {
 
   let cardImage = '';
   try {
-    cardImage = await uploadToImgBB(imgFile);
+    // 学生证照片：最大 10MB，压缩到宽 1920/质量 0.85，保证文字清晰
+    cardImage = await uploadToImgBB(imgFile, { maxSize: 10 * 1024 * 1024, maxWidth: 1920, quality: 0.85 });
     if (!cardImage) throw new Error('上传失败');
   } catch(e) {
     err.textContent = '照片上传失败：' + e.message;
@@ -3331,31 +3336,49 @@ async function submitRunnerApply() {
 }
 
 // ============ 图床上传（ImgBB，免费无限制） ===========
-async function uploadToImgBB(file) {
-  // 大于2MB的图片先压缩再上传
+async function uploadToImgBB(file, opts = {}) {
+  const maxSize = opts.maxSize || 10 * 1024 * 1024;     // 默认最大 10MB
+  const compressThreshold = opts.compressThreshold || 2 * 1024 * 1024; // 超过 2MB 压缩
+  const maxWidth = opts.maxWidth || 1920;                // 默认最大宽 1920
+  const quality = opts.quality || 0.85;                  // 默认质量 0.85
+
+  if (!file.type.startsWith('image/')) {
+    throw new Error('请上传图片文件（jpg/png/webp 等）');
+  }
+  if (file.size > maxSize) {
+    throw new Error('图片过大，请控制在 ' + (maxSize / 1024 / 1024).toFixed(0) + 'MB 以内');
+  }
+
+  // 大于阈值的图片先压缩再上传
   let uploadFile = file;
-  if (file.size > 2 * 1024 * 1024) {
+  if (file.size > compressThreshold) {
     try {
-      const compressed = await compressImage(file, 1200, 0.75);
+      const compressed = await compressImage(file, maxWidth, quality);
       if (compressed) {
         const blob = await (await fetch(compressed)).blob();
         uploadFile = new File([blob], file.name, { type: 'image/jpeg' });
       }
     } catch(e) { /* 压缩失败则用原图 */ }
   }
+
+  // ImgBB 免费账号最大支持约 32MB，超过会返回 400
   const formData = new FormData();
   formData.append('image', uploadFile);
-  const res = await fetch('https://api.imgbb.com/1/upload?key=3e1a8a8f4c3e2b7d9a6f5c4e3d2b1a0f', {
+  const res = await fetch('https://api.imgbb.com/1/upload?key=' + IMGBB_API_KEY, {
     method: 'POST',
     body: formData
   });
-  if (!res.ok) throw new Error('Upload failed: ' + res.status);
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('ImgBB upload error:', res.status, text);
+    throw new Error('Upload failed: ' + res.status + '（请检查 ImgBB API Key 是否有效）');
+  }
   const data = await res.json();
   if (!data.success) throw new Error(data.error?.message || 'Upload failed');
   return data.data.display_url || data.data.url;
 }
 
-function compressImage(file, maxWidth = 400, quality = 0.6) {
+function compressImage(file, maxWidth = 1920, quality = 0.85) {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
