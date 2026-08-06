@@ -1,5 +1,559 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HUST 校园互助</title>
+<style>
+:root {
+.nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px;gap:20px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:1.15rem}
+.nav-links{display:flex;gap:2px}
+.nav-link{padding:8px 14px;border-radius:var(--radius-xs);font-size:.88rem;font-weight:500;color:var(--text-secondary);transition:all .15s;border:none;background:none}
+.nav-link:hover{background:var(--bg-hover);color:var(--text)}
+.nav-link.active{background:var(--primary-light);color:var(--primary)}
+.header-actions{display:flex;align-items:center;gap:8px}
+.user-menu{display:flex;align-items:center;gap:10px}
+.user-name{font-weight:600;font-size:.88rem}
+.user-verified{font-size:.7rem;background:var(--success);color:#fff;padding:2px 7px;border-radius:99px}
+.user-balance{font-size:.83rem;color:var(--primary);font-weight:500}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border-radius:var(--radius-xs);font-size:.88rem;font-weight:500;border:none;transition:all .15s}
+.btn-block{width:100%}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+
+/* Hero */
+.hero{padding:70px 0 50px;text-align:center;background:linear-gradient(180deg,#eff6ff 0%,var(--bg) 100%)}
+.type-errand{background:#fef3c7;color:#92400e}
+.type-secondhand{background:#dbeafe;color:#1e40af}
+.type-skill{background:#dcfce7;color:#166534}
+.order-card-status{font-size:.72rem;padding:3px 9px;border-radius:99px}
+.status-open{background:#dcfce7;color:#166534}
+.status-taken{background:#fef3c7;color:#92400e}
+    <a href="#" class="logo" onclick="navigate('home')">HUST互助</a>
+    <nav class="nav-links" id="navLinks">
+      <a href="#" class="nav-link active" data-page="home" onclick="navigate('home')">首页</a>
+      <a href="#" class="nav-link" data-page="errand" onclick="navigate('errand')">跑腿代取</a>
+      <a href="#" class="nav-link" data-page="secondhand" onclick="navigate('secondhand')">二手交易</a>
+      <a href="#" class="nav-link" data-page="skill" onclick="navigate('skill')">技能服务</a>
+    </nav>
+    <div class="header-actions" id="headerActions">
+      <button class="btn btn-outline btn-sm" onclick="showAuthModal()" id="btnLogin">登录</button>
+      <div class="user-menu" id="userMenu" style="display:none">
+        <span class="user-name" id="userNameDisplay"></span>
+        <span class="user-verified" title="已实名">已实名</span>
+        <span class="user-balance" id="userBalance"></span>
+        <button class="btn btn-outline btn-sm" onclick="showPublishModal()">+ 发布</button>
+        <button class="btn btn-ghost btn-sm" onclick="logout()">退出</button>
+      </div>
+    </div>
+  <div class="hero">
+    <div class="container">
+      <h1 class="hero-title">校园生活，<span class="highlight">互相帮忙</span></h1>
+      <p class="hero-subtitle">跑腿代取 · 二手交易 · 技能服务 — 华科学子的互助平台</p>
+      <div class="hero-stats" id="heroStats">
+        <div class="stat-item"><span class="stat-num" id="statOrders">0</span><span class="stat-label">订单总数</span></div>
+        <div class="stat-item"><span class="stat-num" id="statCompleted">0</span><span class="stat-label">已完成</span></div>
+        <div class="stat-item"><span class="stat-num" id="statUsers">0</span><span class="stat-label">实名用户</span></div>
+      </div>
+      <div class="hero-actions">
+        <button class="btn btn-primary btn-lg" onclick="navigate('errand')">找人代取</button>
+        <button class="btn btn-outline btn-lg" onclick="navigate('errand')">我要接单</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="section">
+      <h2 class="section-title">三大服务</h2>
+      <div class="card-grid">
+        <div class="service-card" onclick="navigate('errand')">
+          <div class="service-icon">📦</div>
+          <h3>跑腿代取</h3>
+          <p>代拿快递、外卖，省时省力。发布需求或接单赚钱，每单平台仅抽成5%。</p>
+          <span class="service-tag">热门</span>
+        </div>
+        <div class="service-card" onclick="navigate('secondhand')">
+          <div class="service-icon">🔄</div>
+          <h3>二手交易</h3>
+          <p>毕业季淘好物，课本、电器、日用品。学长学姐实惠转让，学弟学妹放心入手。</p>
+          <span class="service-tag">毕业季</span>
+        </div>
+        <div class="service-card" onclick="navigate('skill')">
+          <div class="service-icon">🛠️</div>
+          <h3>技能服务</h3>
+          <p>帮打印、帮写报告、修电脑...发布你的需求，有能力的人来帮你搞定。</p>
+          <span class="service-tag">灵活</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="page" id="page-errand" style="display:none">
+  <div class="container">
+    <div class="page-header">
+      <h2>📦 跑腿代取</h2>
+      <p>不想下楼？找人代拿快递、外卖。想赚零花钱？来接单！</p>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-btn active" data-filter="all" onclick="filterOrders('errand','all')">全部</button>
+      <button class="filter-btn" data-filter="express" onclick="filterOrders('errand','express')">代拿快递</button>
+      <button class="filter-btn" data-filter="food" onclick="filterOrders('errand','food')">代取外卖</button>
+      <button class="filter-btn" data-filter="other" onclick="filterOrders('errand','other')">其他跑腿</button>
+    </div>
+    <div class="order-grid" id="errandOrders"></div>
+  </div>
+</section>
+
+<section class="page" id="page-secondhand" style="display:none">
+  <div class="container">
+    <div class="page-header">
+      <h2>🔄 二手交易</h2>
+      <p>毕业季好物转让，物尽其用，实惠你我他。</p>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-btn active" data-filter="all" onclick="filterOrders('secondhand','all')">全部</button>
+      <button class="filter-btn" data-filter="book" onclick="filterOrders('secondhand','book')">教材书籍</button>
+      <button class="filter-btn" data-filter="electronic" onclick="filterOrders('secondhand','electronic')">电子产品</button>
+      <button class="filter-btn" data-filter="daily" onclick="filterOrders('secondhand','daily')">生活用品</button>
+      <button class="filter-btn" data-filter="other" onclick="filterOrders('secondhand','other')">其他</button>
+    </div>
+    <div class="order-grid" id="secondhandOrders"></div>
+  </div>
+</section>
+
+<section class="page" id="page-skill" style="display:none">
+  <div class="container">
+    <div class="page-header">
+      <h2>🛠️ 技能服务</h2>
+      <p>发布需求，找到对的人帮你搞定。帮打印、帮写报告、修电脑...</p>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-btn active" data-filter="all" onclick="filterOrders('skill','all')">全部</button>
+      <button class="filter-btn" data-filter="print" onclick="filterOrders('skill','print')">帮忙打印</button>
+      <button class="filter-btn" data-filter="report" onclick="filterOrders('skill','report')">代写报告</button>
+      <button class="filter-btn" data-filter="repair" onclick="filterOrders('skill','repair')">维修</button>
+      <button class="filter-btn" data-filter="other" onclick="filterOrders('skill','other')">其他</button>
+    </div>
+    <div class="order-grid" id="skillOrders"></div>
+  </div>
+</section>
+
+<!-- Auth Modal -->
+<div class="modal-overlay" id="authModal">
+          <label>手机号</label>
+          <input type="text" id="authPhone" placeholder="方便联系（选填）">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+      <div class="form-group">
+        <label>类型</label>
+        <select id="publishType" required onchange="updatePublishCategories()">
+          <option value="errand">跑腿代取</option>
+          <option value="secondhand">二手交易</option>
+          <option value="skill">技能服务</option>
+        </select>
+      </div>
+      <div class="form-group">
+          <input type="text" id="publishLocation" placeholder="如：韵苑/紫菘/东校区">
+        </div>
+      </div>
+      <p class="form-hint">平台收取5%服务费。发布后可从余额中扣除。</p>
+      <p class="form-error" id="publishError"></p>
+      <button type="submit" class="btn btn-primary btn-block">发布</button>
+    </form>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ============ LOCAL STORAGE DATABASE ============
+const DB = {
+  get(k) { try { return JSON.parse(localStorage.getItem('hust_'+k)) } catch(e) { return null } },
+  set(k,v) { localStorage.setItem('hust_'+k, JSON.stringify(v)) },
+  users() { return this.get('users') || [] },
+  orders() { return this.get('orders') || [] },
+  messages() { return this.get('messages') || [] },
+  saveUsers(arr) { this.set('users', arr) },
+  saveOrders(arr) { this.set('orders', arr) },
+  saveMessages(arr) { this.set('messages', arr) },
+  nextId(arr) { return arr.length > 0 ? Math.max(...arr.map(x=>x.id)) + 1 : 1 },
+};
+
+// Hash password
+function hash(pw) {
+  let h = 0;
+  for (let i = 0; i < pw.length; i++) {
+    const c = pw.charCodeAt(i);
+    h = ((h << 5) - h) + c;
+    h |= 0;
+  }
+  return 'hust_' + Math.abs(h).toString(16);
+}
+
+// ============ STATE ============
+const S = {
+  user: null,
+  page: 'home',
+  authTab: 'login',
+  filter: { errand: 'all', secondhand: 'all', skill: 'all' }
+};
+
+// Init
+(function() {
+  const saved = localStorage.getItem('hust_current_user');
+  if (saved) try { S.user = JSON.parse(saved); } catch(e) {}
+  updateUI();
+  loadStats();
+})();
+
+// ============ NAVIGATION ============
+function navigate(page) {
+  S.page = page;
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  const el = document.getElementById('page-' + page);
+  const nl = document.querySelector('[data-page="' + page + '"]');
+  if (nl) nl.classList.add('active');
+  if (page === 'home') loadStats();
+  else loadOrders(page, S.filter[page] || 'all');
+}
+
+// ============ STATS ============
+function loadStats() {
+  const orders = DB.orders();
+  const users = DB.users();
+  animateNum('statOrders', orders.length);
+  animateNum('statCompleted', orders.filter(o => o.status === 'completed').length);
+  animateNum('statUsers', users.length);
+}
+
+function animateNum(id, tgt) {
+  const el = document.getElementById(id);
+  const start = parseInt(el.textContent) || 0;
+  const dur = 500, ts = Date.now();
+  function tick() {
+    const p = Math.min((Date.now() - ts) / dur, 1);
+    el.textContent = Math.floor(start + (tgt - start) * (1 - Math.pow(1 - p, 3)));
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// ============ ORDERS ============
+function loadOrders(type, cat) {
+  const grid = document.getElementById(type + 'Orders');
+  if (!grid) return;
+  let orders = DB.orders().filter(o => o.type === type && o.status === 'open');
+  if (cat !== 'all') orders = orders.filter(o => o.category === cat);
+  orders.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+  if (orders.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>暂无订单，来发布第一个吧！</p></div>';
+    return;
+  }
+  grid.innerHTML = orders.map(o => {
+    const tl = {errand:'跑腿',secondhand:'二手',skill:'技能'};
+    const sl = {open:'待接单',taken:'已接单',completed:'已完成',cancelled:'已取消'};
+    const pub = DB.users().find(u => u.id === o.publisher_id);
+    return `<div class="order-card" data-oid="${o.id}" onclick="showDetail(${o.id})">
+      <div class="order-card-header">
+        <span class="order-card-type type-${o.type}">${tl[o.type]}</span>
+        <span class="order-card-status status-${o.status}">${sl[o.status]}</span>
+      </div>
+      <div class="order-card-title">${esc(o.title)}</div>
+      ${o.description ? '<div class="order-card-desc">' + esc(o.description) + '</div>' : ''}
+      <div class="order-card-meta">
+        <span class="order-card-price">¥${o.price.toFixed(2)}</span>
+        ${o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : ''}
+      </div>
+      <div class="order-card-footer">
+        <span>发布者：${esc(pub ? (pub.name || pub.student_id) : '未知')}</span>
+        <span>${timeAgo(o.created_at)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterOrders(type, cat) {
+  S.filter[type] = cat;
+  const bar = document.querySelector('#page-' + type + ' .filter-bar');
+  if (bar) {
+    bar.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    const fb = bar.querySelector('[data-filter="' + cat + '"]');
+    if (fb) fb.classList.add('active');
+  }
+  loadOrders(type, cat);
+}
+
+// ============ DETAIL ============
+function showDetail(oid) {
+  const modal = document.getElementById('detailModal');
+  const ct = document.getElementById('detailContent');
+  modal.classList.add('active');
+  const o = DB.orders().find(x => x.id === oid);
+  if (!o) { ct.innerHTML = '<p>订单不存在</p>'; return; }
+
+  const tl = {errand:'跑腿代取',secondhand:'二手交易',skill:'技能服务'};
+  const sl = {open:'待接单',taken:'已接单',completed:'已完成',cancelled:'已取消'};
+  const pub = DB.users().find(u => u.id === o.publisher_id);
+  const tkr = DB.users().find(u => u.id === o.taker_id);
+  const msgs = DB.messages().filter(m => m.order_id === oid).sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+
+  let actions = '';
+  if (S.user && o.status === 'open' && o.publisher_id !== S.user.id) {
+    actions += '<button class="btn btn-primary" onclick="takeOrder(' + oid + ')">接单</button>';
+  }
+  if (S.user && o.status === 'taken' && o.taker_id === S.user.id) {
+    actions += '<button class="btn btn-success" onclick="completeOrder(' + oid + ')">确认完成</button>';
+  }
+  if (S.user && (o.publisher_id === S.user.id || o.taker_id === S.user.id) && (o.status === 'open' || o.status === 'taken')) {
+    actions += '<button class="btn btn-danger" onclick="cancelOrder(' + oid + ')">取消订单</button>';
+  }
+
+  let chat = '';
+  if (S.user && (o.publisher_id === S.user.id || o.taker_id === S.user.id) && o.status === 'taken') {
+    const msgsHTML = msgs.map(m => {
+      const s = DB.users().find(u => u.id === m.sender_id);
+      return '<div class="chat-msg"><strong>' + esc(s ? (s.name || s.student_id) : '?') + '：</strong>' + esc(m.content) + '</div>';
+    }).join('');
+    chat = '<div class="detail-section"><h4>💬 沟通</h4>' + (msgsHTML || '<p style="color:var(--text-muted);font-size:.83rem">暂无消息</p>') +
+      '<div class="chat-input-row"><input type="text" id="chatInput" placeholder="发送消息..."><button class="btn btn-primary btn-sm" onclick="sendMsg(' + oid + ')">发送</button></div></div>';
+  }
+
+  ct.innerHTML = `
+    <div class="detail-header">
+      <span class="detail-type type-${o.type}">${tl[o.type]}</span>
+      <span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">${sl[o.status]}</span>
+    </div>
+    <h3 class="detail-title">${esc(o.title)}</h3>
+    <div class="detail-price">¥${o.price.toFixed(2)} <span style="font-size:.78rem;color:var(--text-muted);font-weight:400">（平台抽成 ¥${o.fee.toFixed(2)}）</span></div>
+    <div class="detail-meta">
+      <span>📌 ${esc(o.location || '未指定')}</span>
+      <span>👤 发布：${esc(pub ? (pub.name || pub.student_id) : '未知')}</span>
+      ${tkr ? '<span>🤝 接单：' + esc(tkr.name || tkr.student_id) + '</span>' : ''}
+      <span>🕐 ${timeAgo(o.created_at)}</span>
+    </div>
+    <div class="detail-desc">${esc(o.description || '无详细描述')}</div>
+    <div class="detail-actions">${actions}</div>
+    ${chat}
+  `;
+}
+
+function closeDetailModal() { document.getElementById('detailModal').classList.remove('active'); }
+
+function takeOrder(oid) {
+  if (!S.user) { showAuthModal(); return; }
+  const orders = DB.orders();
+  const o = orders.find(x => x.id === oid);
+  if (!o || o.status !== 'open') return;
+  if (o.publisher_id === S.user.id) { toast('不能接自己的订单', 'error'); return; }
+  o.status = 'taken';
+  o.taker_id = S.user.id;
+  DB.saveOrders(orders);
+  toast('接单成功！', 'success');
+  closeDetailModal();
+  loadOrders(S.page, S.filter[S.page] || 'all');
+}
+
+function completeOrder(oid) {
+  if (!confirm('确认订单已完成？')) return;
+  const orders = DB.orders();
+  const o = orders.find(x => x.id === oid);
+  if (!o || o.status !== 'taken') return;
+  o.status = 'completed';
+  const fee = o.fee;
+  const income = o.price - fee;
+
+  // Update balances
+  const users = DB.users();
+  const tkr = users.find(u => u.id === o.taker_id);
+  const pub = users.find(u => u.id === o.publisher_id);
+  if (tkr) tkr.balance = (tkr.balance || 0) + income;
+  if (pub) pub.balance = (pub.balance || 0) - o.price;
+
+  DB.saveOrders(orders);
+  DB.saveUsers(users);
+
+  // Update current user
+  const me = users.find(u => u.id === S.user.id);
+  if (me) { S.user = me; localStorage.setItem('hust_current_user', JSON.stringify(me)); updateUI(); }
+
+  toast('订单完成！收入 ¥' + income.toFixed(2) + '（平台抽成 ¥' + fee.toFixed(2) + '）', 'success');
+  closeDetailModal();
+  loadOrders(S.page, S.filter[S.page] || 'all');
+}
+
+function cancelOrder(oid) {
+  if (!confirm('确定取消此订单？')) return;
+  const orders = DB.orders();
+  const o = orders.find(x => x.id === oid);
+  if (!o) return;
+  o.status = 'cancelled';
+  DB.saveOrders(orders);
+  toast('订单已取消', 'info');
+  closeDetailModal();
+  loadOrders(S.page, S.filter[S.page] || 'all');
+}
+
+function sendMsg(oid) {
+  const input = document.getElementById('chatInput');
+  const content = input.value.trim();
+  if (!content || !S.user) return;
+  const msgs = DB.messages();
+  msgs.push({ id: DB.nextId(msgs), order_id: oid, sender_id: S.user.id, content, created_at: new Date().toISOString() });
+  DB.saveMessages(msgs);
+  input.value = '';
+  showDetail(oid);
+}
+
+// ============ AUTH ============
+  document.getElementById('authError').style.display = 'none';
+}
+
+function handleAuth(e) {
+  e.preventDefault();
+  const sid = document.getElementById('authStudentId').value.trim().toUpperCase();
+  const pw = document.getElementById('authPassword').value.trim();
+  const name = document.getElementById('authName').value.trim();
+  const phone = document.getElementById('authPhone').value.trim();
+  const err = document.getElementById('authError');
+
+  if (!sid || !pw) { err.textContent = '请填写学号和密码'; err.style.display = 'block'; return; }
+  if (!/^U\d{9,}$/.test(sid)) { err.textContent = '请输入有效的华科学号（如 U202312345）'; err.style.display = 'block'; return; }
+
+  const users = DB.users();
+
+  if (S.authTab === 'register') {
+    if (!name) { err.textContent = '请输入真实姓名完成实名认证'; err.style.display = 'block'; return; }
+    if (users.find(u => u.student_id === sid)) { err.textContent = '该学号已注册'; err.style.display = 'block'; return; }
+    const newUser = { id: DB.nextId(users), student_id: sid, name, phone, password: hash(pw), balance: 0, created_at: new Date().toISOString() };
+    users.push(newUser);
+    DB.saveUsers(users);
+    S.user = newUser;
+    localStorage.setItem('hust_current_user', JSON.stringify(newUser));
+    updateUI();
+    closeAuthModal();
+    toast('注册成功，已实名认证', 'success');
+  } else {
+    const u = users.find(x => x.student_id === sid && x.password === hash(pw));
+    if (!u) { err.textContent = '学号或密码错误'; err.style.display = 'block'; return; }
+    S.user = u;
+    localStorage.setItem('hust_current_user', JSON.stringify(u));
+    updateUI();
+    closeAuthModal();
+    toast('登录成功', 'success');
+  }
+  loadStats();
+  if (S.page !== 'home') loadOrders(S.page, S.filter[S.page] || 'all');
+}
+
+function logout() {
+  S.user = null;
+  localStorage.removeItem('hust_current_user');
+  updateUI();
+  toast('已退出登录', 'info');
+}
+
+// ============ PUBLISH ============
+function showPublishModal() {
+  if (!S.user) { showAuthModal(); return; }
+  document.getElementById('publishModal').classList.add('active');
+  updatePublishCategories();
+}
+
+function closePublishModal() {
+function updatePublishCategories() {
+  const t = document.getElementById('publishType').value;
+  const cats = {
+    errand: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'other',l:'其他跑腿'}],
+    secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'daily',l:'生活用品'},{v:'other',l:'其他'}],
+    skill: [{v:'print',l:'帮忙打印'},{v:'report',l:'代写报告'},{v:'repair',l:'维修'},{v:'other',l:'其他技能'}]
+  };
+  document.getElementById('publishCategory').innerHTML = cats[t].map(c => '<option value="'+c.v+'">'+c.l+'</option>').join('');
+}
+
+function handlePublish(e) {
+  e.preventDefault();
+  const err = document.getElementById('publishError');
+  const type = document.getElementById('publishType').value;
+  const cat = document.getElementById('publishCategory').value;
+  const title = document.getElementById('publishTitle').value.trim();
+  const desc = document.getElementById('publishDesc').value.trim();
+  const price = parseFloat(document.getElementById('publishPrice').value);
+  const loc = document.getElementById('publishLocation').value.trim();
+
+  if (!title || !price) { err.textContent = '请填写标题和报酬'; err.style.display = 'block'; return; }
+  if (price <= 0) { err.textContent = '报酬必须大于0'; err.style.display = 'block'; return; }
+
+  const fee = Math.round(price * 0.05 * 100) / 100;
+  const orders = DB.orders();
+  const o = {
+    id: DB.nextId(orders), type, category: cat, title, description: desc,
+    price, fee, location: loc, status: 'open',
+    publisher_id: S.user.id, taker_id: null,
+    created_at: new Date().toISOString()
+  };
+  orders.push(o);
+  DB.saveOrders(orders);
+  toast('发布成功！平台将抽成 ¥' + fee.toFixed(2), 'success');
+  closePublishModal();
+  loadOrders(S.page, S.filter[S.page] || 'all');
+  loadStats();
+}
+
+// ============ UI ============
+  if (S.user) {
+    menu.style.display = 'flex';
+    btn.style.display = 'none';
+    document.getElementById('userNameDisplay').textContent = S.user.name || S.user.student_id;
+    document.getElementById('userBalance').textContent = '余额 ¥' + (S.user.balance || 0).toFixed(2);
+  } else {
+    menu.style.display = 'none';
+    btn.style.display = 'inline-flex';
+  }
+}
+
+// ============ TOAST ============
+function toast(msg, type) {
+  const c = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + (type || 'info');
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 2500);
+}
+
+// ============ HELPERS ============
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function timeAgo(ds) {
+  if (!ds) return '';
+  const d = new Date(ds);
+  const diff = Math.floor((Date.now() - d) / 1000);
+  if (diff < 60) return '刚刚';
+  if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+  return ds.slice(0, 10);
+}
+
+// Modal outside click
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('active');
+});
+</script>
+
+</body>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,37 +565,6 @@
 <title>HUST 校园互助</title>
 <style>
 :root {
-  --primary: #1a73e8;
-  --primary-dark: #1557b0;
-  --primary-light: #e8f0fe;
-  --accent: #f97316;
-  --success: #16a34a;
-  --danger: #dc2626;
-  --bg: #f8fafc;
-  --bg-card: #ffffff;
-  --bg-hover: #f1f5f9;
-  --text: #1e293b;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --border: #e2e8f0;
-  --border-light: #f1f5f9;
-  --shadow: 0 1px 3px rgba(0,0,0,.1);
-  --shadow-md: 0 4px 6px rgba(0,0,0,.07);
-  --shadow-lg: 0 10px 25px rgba(0,0,0,.1);
-  --radius: 12px;
-  --radius-sm: 8px;
-  --radius-xs: 6px;
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{font-size:16px;-webkit-font-smoothing:antialiased}
-body{font-family:'Inter','Noto Sans SC',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
-a{color:inherit;text-decoration:none}
-button{cursor:pointer;font-family:inherit}
-input,select,textarea{font-family:inherit;font-size:1rem}
-.container{max-width:1100px;margin:0 auto;padding:0 24px}
-
-/* Header */
-.header{background:rgba(255,255,255,.85);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
 .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px;gap:20px}
 .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:1.15rem}
 .nav-links{display:flex;gap:2px}
@@ -59,14 +582,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 
 /* Buttons */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border-radius:var(--radius-xs);font-size:.88rem;font-weight:500;border:none;transition:all .15s}
-.btn-primary{background:var(--primary);color:#fff}
-.btn-primary:hover{background:var(--primary-dark);box-shadow:var(--shadow-md)}
-.btn-outline{background:transparent;color:var(--text);border:1.5px solid var(--border)}
-.btn-outline:hover{background:var(--bg-hover)}
-.btn-ghost{background:transparent;color:var(--text-secondary)}
-.btn-ghost:hover{color:var(--text);background:var(--bg-hover)}
-.btn-sm{padding:5px 12px;font-size:.8rem}
-.btn-lg{padding:13px 28px;font-size:1rem}
 .btn-block{width:100%}
 .btn-success{background:var(--success);color:#fff}
 .btn-danger{background:var(--danger);color:#fff}
@@ -75,45 +590,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 
 /* Hero */
 .hero{padding:70px 0 50px;text-align:center;background:linear-gradient(180deg,#eff6ff 0%,var(--bg) 100%)}
-.hero-title{font-size:2.4rem;font-weight:800;margin-bottom:10px;letter-spacing:-.5px}
-.highlight{color:var(--primary)}
-.hero-subtitle{font-size:1.1rem;color:var(--text-secondary);margin-bottom:36px}
-.hero-stats{display:flex;justify-content:center;gap:44px;margin-bottom:36px}
-.stat-item{display:flex;flex-direction:column;align-items:center}
-.stat-num{font-size:1.8rem;font-weight:700;color:var(--primary)}
-.stat-label{font-size:.82rem;color:var(--text-muted);margin-top:4px}
-.hero-actions{display:flex;justify-content:center;gap:12px}
-
-/* Sections */
-.section{padding:56px 0}
-.section-title{font-size:1.4rem;font-weight:700;margin-bottom:28px;text-align:center}
-
-/* Service Cards */
-.card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-.service-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:26px 22px;transition:all .2s;cursor:pointer;position:relative}
-.service-card:hover{border-color:var(--primary);box-shadow:var(--shadow-lg);transform:translateY(-2px)}
-.service-icon{font-size:2.2rem;margin-bottom:14px}
-.service-card h3{font-size:1.1rem;font-weight:600;margin-bottom:6px}
-.service-card p{font-size:.88rem;color:var(--text-secondary);line-height:1.6}
-.service-tag{position:absolute;top:14px;right:14px;background:var(--primary-light);color:var(--primary);padding:2px 9px;border-radius:99px;font-size:.72rem;font-weight:600}
-
-/* Page Header */
-.page-header{margin:28px 0 20px}
-.page-header h2{font-size:1.4rem;font-weight:700;margin-bottom:4px}
-.page-header p{color:var(--text-secondary);font-size:.9rem}
-
-/* Filter Bar */
-.filter-bar{display:flex;gap:6px;margin-bottom:22px;flex-wrap:wrap}
-.filter-btn{padding:7px 14px;border:1.5px solid var(--border);border-radius:99px;background:var(--bg-card);font-size:.83rem;font-weight:500;color:var(--text-secondary);transition:all .15s}
-.filter-btn:hover{border-color:var(--text-muted)}
-.filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
-
-/* Order Grid */
-.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;margin-bottom:40px}
-.order-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px;transition:all .15s;cursor:pointer}
-.order-card:hover{border-color:var(--primary);box-shadow:var(--shadow-md)}
-.order-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
-.order-card-type{font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:99px}
 .type-errand{background:#fef3c7;color:#92400e}
 .type-secondhand{background:#dbeafe;color:#1e40af}
 .type-skill{background:#dcfce7;color:#166534}
@@ -131,87 +607,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .order-card-status{font-size:.72rem;padding:3px 9px;border-radius:99px}
 .status-open{background:#dcfce7;color:#166534}
 .status-taken{background:#fef3c7;color:#92400e}
-.status-completed{background:#f1f5f9;color:#64748b}
-.status-cancelled{background:#fee2e2;color:#991b1b}
-.order-card-title{font-size:.97rem;font-weight:600;margin-bottom:6px}
-.order-card-desc{font-size:.83rem;color:var(--text-secondary);margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.order-card-meta{display:flex;justify-content:space-between;align-items:center}
-.order-card-price{font-size:1.15rem;font-weight:700;color:var(--accent)}
-.order-card-location{font-size:.78rem;color:var(--text-muted)}
-.order-card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light);font-size:.78rem;color:var(--text-muted)}
-
-/* Modals */
-.modal-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);align-items:center;justify-content:center}
-.modal-overlay.active{display:flex}
-.modal{background:var(--bg-card);border-radius:var(--radius);padding:28px;width:90%;max-width:430px;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto;animation:modalIn .2s ease;position:relative}
-.modal-lg{max-width:550px}
-@keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
-.modal-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:1.4rem;color:var(--text-muted);padding:4px;line-height:1}
-.modal-close:hover{color:var(--text)}
-.modal h3{font-size:1.15rem;font-weight:700;margin-bottom:22px}
-.modal-tabs{display:flex;margin-bottom:22px;border-bottom:2px solid var(--border)}
-.modal-tab{flex:1;padding:9px;text-align:center;background:none;border:none;font-size:.88rem;font-weight:500;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
-.modal-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
-
-/* Forms */
-.form-group{margin-bottom:15px}
-.form-group label{display:block;font-size:.83rem;font-weight:500;margin-bottom:5px;color:var(--text-secondary)}
-.form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 13px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg);transition:all .15s}
-.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.form-hint{font-size:.78rem;color:var(--text-muted);margin-bottom:10px}
-.form-error{font-size:.83rem;color:var(--danger);margin-bottom:10px;display:none}
-.verify-badge{display:inline-block;font-size:.68rem;font-weight:600;background:var(--success);color:#fff;padding:1px 7px;border-radius:99px;margin-left:5px;vertical-align:middle}
-
-/* Detail */
-.detail-header{margin-bottom:16px}
-.detail-type{display:inline-block;font-size:.73rem;font-weight:600;padding:3px 11px;border-radius:99px;margin-bottom:10px}
-.detail-title{font-size:1.2rem;font-weight:700;margin-bottom:6px}
-.detail-price{font-size:1.4rem;font-weight:700;color:var(--accent);margin-bottom:14px}
-.detail-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:.83rem;color:var(--text-secondary);margin-bottom:14px}
-.detail-desc{font-size:.88rem;line-height:1.7;margin-bottom:18px;white-space:pre-wrap}
-.detail-actions{display:flex;gap:8px;margin-bottom:18px}
-.detail-section{margin-top:18px;padding-top:18px;border-top:1px solid var(--border)}
-.detail-section h4{font-size:.9rem;font-weight:600;margin-bottom:10px}
-.chat-msg{padding:7px 11px;border-radius:var(--radius-xs);margin-bottom:6px;background:var(--bg);font-size:.83rem;line-height:1.5}
-.chat-msg strong{color:var(--primary)}
-.chat-input-row{display:flex;gap:8px;margin-top:10px}
-.chat-input-row input{flex:1}
-
-/* Toast */
-.toast-container{position:fixed;top:72px;right:20px;z-index:300;display:flex;flex-direction:column;gap:6px}
-.toast{padding:10px 18px;border-radius:var(--radius-xs);font-size:.87rem;font-weight:500;animation:slideIn .3s ease;box-shadow:var(--shadow-md);max-width:340px}
-.toast-success{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
-.toast-error{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
-.toast-info{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe}
-@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-
-/* Empty */
-.empty-state{text-align:center;padding:56px 16px;color:var(--text-muted)}
-.empty-state-icon{font-size:2.8rem;margin-bottom:14px}
-.empty-state p{font-size:.9rem}
-
-/* Responsive */
-@media(max-width:768px){
-  .card-grid{grid-template-columns:1fr}
-  .hero-title{font-size:1.7rem}
-  .hero-stats{gap:22px}
-  .order-grid{grid-template-columns:1fr}
-  .nav-links{overflow-x:auto;gap:0}
-  .form-row{grid-template-columns:1fr}
-  .modal{padding:22px;width:95%}
-}
-@media(max-width:480px){
-  .container{padding:0 14px}
-  .hero{padding:44px 0 30px}
-  .hero-title{font-size:1.4rem}
-}
-</style>
-</head>
-<body>
-
-<header class="header">
-  <div class="container nav-inner">
     <a href="#" class="logo" onclick="navigate('home')">HUST互助</a>
     <nav class="nav-links" id="navLinks">
       <a href="#" class="nav-link active" data-page="home" onclick="navigate('home')">首页</a>
@@ -228,10 +623,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <button class="btn btn-ghost btn-sm" onclick="logout()">退出</button>
       </div>
     </div>
-  </div>
-</header>
-
-<section class="page" id="page-home">
   <div class="hero">
     <div class="container">
       <h1 class="hero-title">校园生活，<span class="highlight">互相帮忙</span></h1>
@@ -320,23 +711,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 
 <!-- Auth Modal -->
 <div class="modal-overlay" id="authModal">
-  <div class="modal">
-    <button class="modal-close" onclick="closeAuthModal()">&times;</button>
-    <div class="modal-tabs">
-      <button class="modal-tab active" onclick="switchAuthTab('login')">登录</button>
-      <button class="modal-tab" onclick="switchAuthTab('register')">注册</button>
-    </div>
-    <form id="authForm" onsubmit="handleAuth(event)">
-      <div class="form-group">
-        <label>学号</label>
-        <input type="text" id="authStudentId" required placeholder="如 U202312345">
-      </div>
-      <div id="registerExtra" style="display:none">
-        <div class="form-group">
-          <label>真实姓名 <span class="verify-badge">实名认证</span></label>
-          <input type="text" id="authName" placeholder="请输入真实姓名">
-        </div>
-        <div class="form-group">
           <label>手机号</label>
           <input type="text" id="authPhone" placeholder="方便联系（选填）">
         </div>
@@ -380,20 +754,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       </div>
       <div class="form-group">
         <label>密码</label>
-        <input type="password" id="authPassword" required placeholder="输入密码" minlength="6">
-      </div>
-      <p class="form-error" id="authError"></p>
-      <button type="submit" class="btn btn-primary btn-block" id="authSubmit">登录</button>
-    </form>
-  </div>
-</div>
-
-<!-- Publish Modal -->
-<div class="modal-overlay" id="publishModal">
-  <div class="modal modal-lg">
-    <button class="modal-close" onclick="closePublishModal()">&times;</button>
-    <h3>发布需求</h3>
-    <form id="publishForm" onsubmit="handlePublish(event)">
       <div class="form-group">
         <label>类型</label>
         <select id="publishType" required onchange="updatePublishCategories()">
@@ -404,24 +764,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         </select>
       </div>
       <div class="form-group">
-        <label>子分类</label>
-        <select id="publishCategory"></select>
-      </div>
-      <div class="form-group">
-        <label>标题</label>
-        <input type="text" id="publishTitle" required placeholder="简要描述你的需求">
-      </div>
-      <div class="form-group">
-        <label>详细描述</label>
-        <textarea id="publishDesc" rows="3" placeholder="详细说明需求、地点等"></textarea>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>报酬 (¥)</label>
-          <input type="number" id="publishPrice" required placeholder="金额" step="0.01" min="1">
-        </div>
-        <div class="form-group">
-          <label>地点</label>
           <input type="text" id="publishLocation" placeholder="如：韵苑/紫菘/东校区">
         </div>
       </div>
@@ -435,8 +777,9 @@ input,select,textarea{font-family:inherit;font-size:1rem}
           </select>
         </div>
         <div class="form-group">
-          <label>截止时间</label>
-          <input type="text" id="publishDeadline" placeholder="如：今晚8点前">
+          <label>截止时间（选填，超时无人接单自动取消）</label>
+          <input type="datetime-local" id="publishDeadline">
+          <p class="form-hint">留空则不限时，订单不会自动过期。</p>
         </div>
       </div>
       <div class="form-group">
@@ -448,7 +791,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <input type="file" id="publishImage" accept="image/*" multiple>
         <div id="publishImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
       </div>
-      <p class="form-hint" id="publishFeeHint">免费发布，无平台抽成。</p>
+      <p class="form-hint" id="publishFeeHint" style="display:none"></p>
       <p class="form-error" id="publishError"></p>
       <button type="submit" class="btn btn-primary btn-block">发布</button>
     </form>
@@ -463,7 +806,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <p>管理个人信息、收款方式和订单。</p>
     </div>
     <div id="myProfile" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;display:none">
-      <h3 style="font-size:1.1rem;margin-bottom:16px">个人信息</h3>
+      <h3 style="font-size:1.1rem;margin-bottom:16px">个人信息 <span id="myVipBadge" style="display:none;color:#f59e0b;font-size:.85rem">⭐ 会员</span></h3>
       <div class="form-group">
         <label>微信收款码 / 支付宝收款信息</label>
         <input type="text" id="myPaymentInfo" placeholder="如：微信收款码图片链接 或 支付宝账号">
@@ -478,6 +821,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <div id="myPaymentPreview" style="margin-top:12px"></div>
     </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+      <button class="btn btn-outline btn-sm" onclick="showVipApply()" style="display:none" id="btnVipApply">⭐ 申请开通会员</button>
       <button class="btn btn-outline btn-sm" onclick="showRunnerApply()" style="display:none" id="btnRunnerApply">🛵 申请跑腿认证</button>
       <button class="btn btn-outline btn-sm" onclick="showReportsView()" style="display:none" id="btnReports">📋 反馈中心</button>
     </div>
@@ -569,16 +913,35 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   </div>
 </div>
 
+<!-- VIP 申请弹窗 -->
+<div class="modal-overlay" id="vipApplyModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closeVipApply()">&times;</button>
+    <h3 style="margin-bottom:16px">⭐ 开通会员</h3>
+    <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:16px">会员 ¥1/月，无限发单接单。扫描下方收款码付款后点击确认即可。</p>
+    <div id="vipApplyContent" style="text-align:center;margin-bottom:16px">
+      <div id="vipQrcodeContainer" style="margin-bottom:12px">
+        <p style="color:var(--text-muted);font-size:.85rem">管理员收款码加载中...</p>
+      </div>
+      <p style="font-size:.85rem;color:var(--text-secondary)">请使用微信/支付宝扫码支付 <strong style="color:var(--primary)">¥1.00</strong></p>
+      <p style="font-size:.75rem;color:var(--text-muted)">付款后请点击下方按钮，管理员确认后将自动开通</p>
+    </div>
+    <p class="form-error" id="vipApplyError" style="display:none"></p>
+    <button class="btn btn-primary btn-block" onclick="submitVipApply()">✅ 我已完成付款，申请开通</button>
+  </div>
+</div>
+
 <!-- Admin Panel Modal -->
 <div class="modal-overlay" id="adminModal">
   <div class="modal modal-lg">
     <button class="modal-close" onclick="closeAdminModal()">&times;</button>
     <h3 style="margin-bottom:16px">🛡️ 管理员面板</h3>
     <div class="modal-tabs" style="margin-bottom:16px">
-      <button class="modal-tab active" id="adminTabUsers" onclick="switchAdminTab('users')">👤 用户审核</button>
-      <button class="modal-tab" id="adminTabRunners" onclick="switchAdminTab('runners')">🛵 跑腿认证</button>
-      <button class="modal-tab" id="adminTabManage" onclick="switchAdminTab('manage')">📋 用户管理</button>
-      <button class="modal-tab" id="adminTabReports" onclick="switchAdminTab('reports')">⚠️ 投诉处理</button>
+      <button class="modal-tab active" id="adminTabUsers" onclick="switchAdminTab('users')">用户审核</button>
+      <button class="modal-tab" id="adminTabRunners" onclick="switchAdminTab('runners')">跑腿认证</button>
+      <button class="modal-tab" id="adminTabManage" onclick="switchAdminTab('manage')">用户管理</button>
+      <button class="modal-tab" id="adminTabReports" onclick="switchAdminTab('reports')">投诉处理</button>
+      <button class="modal-tab" id="adminTabVip" onclick="switchAdminTab('vip')">会员管理</button>
     </div>
     <div id="adminContent"><p>加载中...</p></div>
   </div>
@@ -592,13 +955,13 @@ const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
 // Cloudflare Worker 代理（减少 GitHub API 消耗 + 实时推送）
-const USE_WORKER = true; // 设为 false 可切回直连 GitHub
+const USE_WORKER = true; // 设为 false 可切回直连 GitHub（Worker 暂时无法访问）
 const WORKER_URL = 'https://hust-hub-proxy.hust-hub.workers.dev'; // Cloudflare Worker 代理地址
 const API_BASE = USE_WORKER ? WORKER_URL : 'https://api.github.com';
 
 const REPO = 'XY5167/hust-helper-backend';
-// GitHub Token 已移到 Cloudflare Worker 环境变量 GITHUB_TOKEN，前端不再需要
-const GITHUB_TOKEN = ''; // 占位，真实 Token 由 Worker 后端持有
+// GitHub Token 仍需在前端（拼接形式防爬虫），由 Worker 代理时使用
+const GITHUB_TOKEN = ''; // Token managed by Worker env var
 
 const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all' }, taskTab: 'task', myTab: 'all', goodsSubTab: 'all', goodsCategory: 'all' };
 
@@ -637,12 +1000,9 @@ function checkSensitive(text) {
 
 // ============ GITHUB API ============
 // 通过 Worker 代理（缓存读 + 透传写 + WebSocket 通知）
-// Token 在 Worker 端管理，前端不需要传
+// Token 通过请求头传给 Worker
 function ghApi(path, method, body) {
-  const opts = {
-    method,
-    headers: { 'Content-Type': 'application/json' }
-  };
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   return fetch(API_BASE + path, opts);
 }
@@ -659,8 +1019,8 @@ async function ghIssues(label, state) {
   let allIssues = [];
   let page = 1;
   while (true) {
-    const url = 'https://api.github.com/repos/' + REPO + '/issues?labels=' + encodeURIComponent(label) + '&state=' + s + '&per_page=100&page=' + page;
-    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN } });
+    const url = API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues?labels=' + encodeURIComponent(label) + '&state=' + s + '&per_page=100&page=' + page;
+    const res = await fetch(url);
     if (!res.ok) throw new Error('API error ' + res.status);
     const issues = await res.json();
     if (!issues || issues.length === 0) break;
@@ -680,9 +1040,9 @@ async function ghCreateIssue(title, body, labels) {
     }
     return res.json();
   }
-  const res = await fetch('https://api.github.com/repos/' + REPO + '/issues', {
+  const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues', {
     method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, body, labels })
   });
   if (!res.ok) {
@@ -703,9 +1063,9 @@ async function ghUpdateIssue(number, body) {
     if (!res.ok) throw new Error('Update failed ' + res.status);
     return res.json();
   }
-  const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + number, {
+  const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + number, {
     method: 'PATCH',
-    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ body })
   });
   if (!res.ok) throw new Error('Update failed ' + res.status);
@@ -718,9 +1078,9 @@ async function ghCloseIssue(number) {
     if (!res.ok) throw new Error('Close failed ' + res.status);
     return res.json();
   }
-  const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + number, {
+  const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + number, {
     method: 'PATCH',
-    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ state: 'closed' })
   });
   if (!res.ok) throw new Error('Close failed ' + res.status);
@@ -734,7 +1094,6 @@ function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   const el = document.getElementById('page-' + page);
-  if (el) el.style.display = 'block';
   const nl = document.querySelector('[data-page="' + page + '"]');
   if (nl) nl.classList.add('active');
   if (page === 'home') loadStats();
@@ -746,18 +1105,17 @@ function navigate(page) {
 async function loadStats() {
   try {
     const [users, orders] = await Promise.all([
-      ghIssues('user'),
+      ghIssues('user', 'open'),
       ghIssues('order', 'all')
     ]);
     const orderList = orders.map(i => {
       try { return JSON.parse(i.body); } catch(e) { return null; }
     }).filter(Boolean);
-    document.getElementById('statOrders').textContent = orderList.filter(o => o.type !== 'chat' && o.status !== 'completed' && o.status !== 'cancelled').length;
+    document.getElementById('statOrders').textContent = orderList.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length;
     document.getElementById('statUsers').textContent = users.length;
   } catch(e) {
     console.error(e);
     document.getElementById('statOrders').textContent = '?';
-    document.getElementById('statUsers').textContent = '?';
   }
 }
 
@@ -793,6 +1151,24 @@ async function loadOrders(type, cat) {
         return o;
       } catch(e) { return null; }
     }).filter(o => o && o.status === 'open');
+
+    // 自动过期检查：截止时间已过且无人接单的，自动关闭
+    const now = new Date();
+    for (const o of orders) {
+      if (o.deadline && !o.taker_id) {
+        const dl = new Date(o.deadline);
+        if (!isNaN(dl.getTime()) && dl < now) {
+          // 已过期，自动关闭
+          o.status = 'expired';
+          try {
+            await ghUpdateIssue(o._issue_number, JSON.stringify(o));
+            await ghCloseIssue(o._issue_number);
+          } catch(e) { /* 静默处理 */ }
+        }
+      }
+    }
+    // 过滤掉已过期的
+    orders = orders.filter(o => o.status === 'open');
 
     // 根据类型筛选
     if (type === 'qa') {
@@ -832,7 +1208,7 @@ function renderOrders(orders) {
   grid.innerHTML = orders.map(o => {
     const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答', borrow:'借物', goods:'物品流转'};
     const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
-    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
+    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
     const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
     // 缩略图预览
@@ -853,7 +1229,7 @@ function renderOrders(orders) {
       + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
       + '</div>'
       + '<div class="order-card-footer">'
-      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
+      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
       + '<span>' + timeAgo(o.created_at) + '</span>'
       + '</div></div>';
   }).join('');
@@ -1016,8 +1392,8 @@ async function showDetail(issueNum) {
   ct.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
 
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum, {
+      
     });
     if (!res.ok) { ct.innerHTML = '<p>订单不存在</p>'; return; }
     const issue = await res.json();
@@ -1025,7 +1401,7 @@ async function showDetail(issueNum) {
     o._issue_number = issueNum;
 
     const tl = {errand:'跑腿代办', secondhand:'出售转让', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答', borrow:'短期租借', chat:'私信对话'};
-    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
+    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const isQA = o.type === 'qa';
     const isChat = o.type === 'chat';
 
@@ -1153,7 +1529,7 @@ async function showDetail(issueNum) {
       + (isQA ? '' : '<div class="detail-price">¥' + o.price.toFixed(2) + '</div>')
       + '<div class="detail-meta">'
       + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
-      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
+      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
       + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_name) + '</a>' + (o.taker_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>' : ''))
       + '<span>🕐 ' + timeAgo(o.created_at) + '</span>'
       + (isQA ? '' : urgencyHTML + deadlineHTML)
@@ -1203,8 +1579,8 @@ async function loadComments(issueNum) {
       // 直连模式：分页拉取
       let page = 1;
       while (true) {
-        const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum + '/comments?per_page=100&page=' + page, {
-          headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+        const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum + '/comments?per_page=100&page=' + page, {
+          
         });
         if (!res.ok) break;
         const comments = await res.json();
@@ -1220,8 +1596,8 @@ async function loadComments(issueNum) {
     // 获取订单信息用于私密过滤
     let order = null;
     try {
-      const issueRes = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum, {
-        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+      const issueRes = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum, {
+        
       });
       if (issueRes.ok) {
         const issue = await issueRes.json();
@@ -1329,9 +1705,9 @@ async function sendComment(issueNum) {
     if (USE_WORKER) {
       await ghApi('/api/comments/' + issueNum, 'POST', { body });
     } else {
-      await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum + '/comments', {
+      await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum + '/comments', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body })
       });
     }
@@ -1363,8 +1739,8 @@ function showReportModal(issueNum) {
   if (!S.user) { showAuthModal(); return; }
   _reportIssueNum = issueNum;
   // 先获取订单信息
-  fetch('https://api.github.com/repos/' + REPO + '/issues/' + issueNum, {
-    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+  fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum, {
+    
   }).then(r => r.json()).then(issue => {
     const o = JSON.parse(issue.body);
     const isPublisher = (o.publisher_id == (S.user._issue_number || S.user.student_id));
@@ -1389,8 +1765,8 @@ async function submitReport() {
 
   // 获取订单信息以确定投诉对象
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + _reportIssueNum, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + _reportIssueNum, {
+      
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
@@ -1492,8 +1868,8 @@ async function rateOrder(inum) {
   if (isNaN(score) || score < 1 || score > 5) { toast('请输入 1-5 之间的数字', 'error'); return; }
 
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+      
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
@@ -1635,7 +2011,6 @@ async function createChatOrder(targetSid, targetName, targetIssueNum, sourceOrde
       title: (sourceOrderTitle ? '询问：' + sourceOrderTitle : '对话 ' + targetName),
       description: S.user.name + ' 向 ' + targetName + '（' + targetSid + '）发起的私信对话' + (sourceOrderTitle ? '，关于订单「' + sourceOrderTitle + '」' : ''),
       price: 0,
-      fee: 0,
       location: '',
       urgency: 'normal',
       deadline: '',
@@ -1675,13 +2050,14 @@ let _adminTab = 'users'; // 'users' | 'runners' | 'manage' | 'reports'
 function switchAdminTab(tab) {
   _adminTab = tab;
   document.querySelectorAll('#adminModal .modal-tab').forEach(t => t.classList.remove('active'));
-  const tabMap = { users: 'Users', runners: 'Runners', manage: 'Manage', reports: 'Reports' };
+  const tabMap = { users: 'Users', runners: 'Runners', manage: 'Manage', reports: 'Reports', vip: 'Vip' };
   const activeTab = document.getElementById('adminTab' + tabMap[tab]);
   if (activeTab) activeTab.classList.add('active');
   if (tab === 'users') loadAdminPanel();
   else if (tab === 'runners') loadRunnerReviews();
   else if (tab === 'manage') loadUserManagement();
   else if (tab === 'reports') loadReportManagement();
+  else if (tab === 'vip') loadVipManagement();
 }
 
 async function showAdminPanel() {
@@ -1746,8 +2122,8 @@ async function loadAdminPanel() {
 
 async function approveUser(inum) {
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+      
     });
     const issue = await res.json();
     const u = JSON.parse(issue.body);
@@ -1766,8 +2142,8 @@ async function approveUser(inum) {
 
 async function rejectUser(inum) {
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+      
     });
     const issue = await res.json();
     const u = JSON.parse(issue.body);
@@ -1833,8 +2209,8 @@ async function loadRunnerReviews() {
 async function approveRunner(anum, sid) {
   try {
     // 1. 更新跑腿申请状态
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + anum, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + anum, {
+      
     });
     const issue = await res.json();
     const a = JSON.parse(issue.body);
@@ -1869,8 +2245,8 @@ async function approveRunner(anum, sid) {
 
 async function rejectRunner(anum, sid) {
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + anum, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + anum, {
+      
     });
     const issue = await res.json();
     const a = JSON.parse(issue.body);
@@ -1942,17 +2318,23 @@ async function loadUserManagement() {
       const runnerBadge = u.runner_verified
         ? '<span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:99px;font-size:.7rem;margin-left:4px">🛵 跑腿</span>'
         : '';
+      const vipActive = u.vip_expire && new Date(u.vip_expire) > new Date();
+      const vipBadge = vipActive
+        ? '<span style="color:#f59e0b;font-size:.85rem;margin-left:2px" title="VIP 到期：' + new Date(u.vip_expire).toLocaleDateString('zh-CN') + '">⭐</span>'
+        : '';
 
       html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
         + '<div style="min-width:0;flex:1">'
         + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
         + '<strong>' + esc(u.name || '?') + '</strong>'
+        + vipBadge
         + runnerBadge
         + stateBadge
         + '</div>'
         + '<div style="font-size:.8rem;color:var(--text-secondary)">' + esc(u.student_id || '?')
         + (u.phone ? ' · 📱 ' + esc(u.phone) : '')
         + (u.dorm ? ' · 📍 ' + esc(u.dorm) : '')
+        + (vipActive ? ' · ⭐ 会员到期：' + new Date(u.vip_expire).toLocaleDateString('zh-CN') : '')
         + '</div>'
         + '<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">' + statusBadge + ' · ' + timeAgo(u.created_at) + ' 注册' + '</div>'
         + '</div>'
@@ -1984,14 +2366,180 @@ async function kickUser(inum, name) {
 async function reactivateUser(inum, name) {
   if (!confirm('确定要恢复用户「' + name + '」吗？')) return;
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
       method: 'PATCH',
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state: 'open' })
     });
     if (!res.ok) throw new Error('恢复失败');
     toast('已恢复用户「' + name + '」', 'success');
     await loadUserManagement();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+// ============ VIP 会员管理（管理员） ============
+async function loadVipManagement() {
+  const ct = document.getElementById('adminContent');
+  ct.innerHTML = '<p>加载中...</p>';
+  try {
+    // 加载待处理的 VIP 申请
+    let vipApplies = [];
+    try {
+      const applyIssues = await ghIssues('vip_apply', 'open');
+      vipApplies = applyIssues.map(i => {
+        try { const a = JSON.parse(i.body); a._num = i.number; return a; } catch(e) { return null; }
+      }).filter(a => a && a.status === 'pending');
+    } catch(e) { /* vip_apply label 可能还不存在 */ }
+
+    const issues = await ghIssues('user', 'all');
+    const users = issues.map(i => {
+      try { const u = JSON.parse(i.body); u._issue_number = i.number; u._state = i.state; return u; }
+      catch(e) { return null; }
+    }).filter(u => u && u._state === 'open' && u.status === 'approved');
+
+    const now = new Date();
+    const vipUsers = users.filter(u => u.vip_expire && new Date(u.vip_expire) > now);
+    const normalUsers = users.filter(u => !u.vip_expire || new Date(u.vip_expire) <= now);
+
+    let html = '';
+
+    // 待处理申请
+    if (vipApplies.length > 0) {
+      html += '<h4 style="margin-bottom:12px;color:#f59e0b">⏳ 待确认申请（' + vipApplies.length + '）</h4>';
+      html += '<div style="max-height:200px;overflow-y:auto;margin-bottom:20px">';
+      for (const a of vipApplies) {
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fffbeb;border-radius:8px;margin-bottom:8px;border:1px solid #fde68a">'
+          + '<div><strong>' + esc(a.name) + '</strong> <span style="color:var(--text-muted)">' + esc(a.student_id) + '</span>'
+          + '<br><span style="font-size:.75rem;color:var(--text-secondary)">' + timeAgo(a.created_at) + ' 提交申请</span></div>'
+          + '<div style="display:flex;gap:6px">'
+          + '<button class="btn btn-sm btn-primary" onclick="approveVipApply(' + a._num + ',\'' + esc(a.student_id) + '\',\'' + esc(a.name) + '\')">✅ 确认开通</button>'
+          + '<button class="btn btn-sm btn-outline" onclick="rejectVipApply(' + a._num + ')" style="color:var(--danger)">✕ 拒绝</button>'
+          + '</div></div>';
+      }
+      html += '</div>';
+    }
+
+    html += '<h4 style="margin-bottom:12px">⭐ 当前会员（' + vipUsers.length + ' 人）</h4>';
+    if (vipUsers.length === 0) {
+      html += '<p style="color:var(--text-secondary);margin-bottom:20px">暂无会员用户</p>';
+    } else {
+      html += '<div style="max-height:250px;overflow-y:auto;margin-bottom:20px">';
+      for (const u of vipUsers) {
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fffbeb;border-radius:8px;margin-bottom:8px;border:1px solid #fde68a">'
+          + '<div><strong>' + esc(u.name) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span>'
+          + '<br><span style="font-size:.8rem;color:var(--text-secondary)">到期：' + new Date(u.vip_expire).toLocaleDateString('zh-CN') + '</span></div>'
+          + '<div style="display:flex;gap:6px">'
+          + '<button class="btn btn-sm btn-outline" onclick="extendVip(' + u._issue_number + ',\'' + esc(u.name) + '\')">续费 1 个月</button>'
+          + '<button class="btn btn-sm btn-outline" onclick="cancelVip(' + u._issue_number + ',\'' + esc(u.name) + '\')" style="color:var(--danger);border-color:var(--danger)">取消会员</button>'
+          + '</div></div>';
+      }
+      html += '</div>';
+    }
+
+    html += '<h4 style="margin-bottom:12px">普通用户（' + normalUsers.length + ' 人）</h4>';
+    html += '<p style="color:var(--text-secondary);margin-bottom:12px;font-size:.85rem">选择用户开通会员（¥1/月）</p>';
+    html += '<div style="max-height:300px;overflow-y:auto;margin-bottom:16px">';
+    if (normalUsers.length === 0) {
+      html += '<p style="color:var(--text-secondary)">所有用户已是会员</p>';
+    }
+    for (const u of normalUsers) {
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
+        + '<div><strong>' + esc(u.name) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span></div>'
+        + '<button class="btn btn-sm btn-primary" onclick="activateVip(' + u._issue_number + ',\'' + esc(u.name) + '\')">⭐ 开通会员</button>'
+        + '</div>';
+    }
+    html += '</div>';
+
+    ct.innerHTML = html;
+  } catch(e) {
+    ct.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
+  }
+}
+
+async function activateVip(inum, name) {
+  if (!confirm('确认为「' + name + '」开通 1 个月会员（¥1）？')) return;
+  try {
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+      
+    });
+    const issue = await res.json();
+    const u = JSON.parse(issue.body);
+    const now = new Date();
+    // 如果已有有效会员，从到期日开始续；否则从今天开始
+    const startFrom = (u.vip_expire && new Date(u.vip_expire) > now) ? new Date(u.vip_expire) : now;
+    startFrom.setMonth(startFrom.getMonth() + 1);
+    u.vip_expire = startFrom.toISOString();
+    await ghUpdateIssue(inum, JSON.stringify(u));
+    // 如果当前登录用户就是被操作人，更新本地状态
+    if (S.user && (S.user._issue_number === inum || S.user.student_id === u.student_id)) {
+      S.user.vip_expire = u.vip_expire;
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      updateUI();
+    }
+    toast('⭐ 已为「' + name + '」开通会员，到期：' + startFrom.toLocaleDateString('zh-CN'), 'success');
+    await loadVipManagement();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+async function extendVip(inum, name) {
+  await activateVip(inum, name);
+}
+
+async function cancelVip(inum, name) {
+  if (!confirm('确定取消「' + name + '」的会员资格？')) return;
+  try {
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+      
+    });
+    const issue = await res.json();
+    const u = JSON.parse(issue.body);
+    u.vip_expire = null;
+    await ghUpdateIssue(inum, JSON.stringify(u));
+    if (S.user && (S.user._issue_number === inum || S.user.student_id === u.student_id)) {
+      S.user.vip_expire = null;
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      updateUI();
+    }
+    toast('已取消「' + name + '」的会员', 'info');
+    await loadVipManagement();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+// 确认 VIP 申请（管理员）
+async function approveVipApply(applyNum, studentId, name) {
+  if (!confirm('确认为「' + name + '」开通 1 个月会员（¥1）？')) return;
+  try {
+    // 1. 关闭申请 Issue
+    await ghCloseIssue(applyNum);
+    // 2. 找到对应用户并开通会员
+    const issues = await ghIssues('user', 'all');
+    const userIssue = issues.find(i => {
+      try { return JSON.parse(i.body).student_id === studentId; } catch(e) { return false; }
+    });
+    if (!userIssue) { toast('未找到用户', 'error'); return; }
+    const u = JSON.parse(userIssue.body);
+    const now = new Date();
+    const startFrom = (u.vip_expire && new Date(u.vip_expire) > now) ? new Date(u.vip_expire) : now;
+    startFrom.setMonth(startFrom.getMonth() + 1);
+    u.vip_expire = startFrom.toISOString();
+    await ghUpdateIssue(userIssue.number, JSON.stringify(u));
+    // 更新本地状态
+    if (S.user && S.user.student_id === studentId) {
+      S.user.vip_expire = u.vip_expire;
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      updateUI();
+    }
+    toast('⭐ 已为「' + name + '」开通会员，到期：' + startFrom.toLocaleDateString('zh-CN'), 'success');
+    await loadVipManagement();
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+async function rejectVipApply(applyNum) {
+  if (!confirm('确定拒绝此申请？')) return;
+  try {
+    await ghCloseIssue(applyNum);
+    toast('已拒绝申请', 'info');
+    await loadVipManagement();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
 }
 
@@ -2072,8 +2620,8 @@ async function handleReport(num, action) {
   if (note === null) return;
 
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + num, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + num, {
+      
     });
     if (!res.ok) throw new Error('获取投诉失败');
     const issue = await res.json();
@@ -2123,9 +2671,8 @@ async function cleanClosedUsers() {
   let cleaned = 0, failed = 0;
   for (const issue of closed) {
     try {
-      const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issue.number, {
-        method: 'DELETE',
-        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+      const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issue.number, {
+        method: 'DELETE'
       });
       if (res.ok) cleaned++;
       else failed++;
@@ -2140,9 +2687,103 @@ async function cleanClosedUsers() {
   await loadUserManagement();
 }
 
+// ============ VIP 会员系统 ============
+function isVIP() {
+  if (!S.user) return false;
+  if (!S.user.vip_expire) return false;
+  return new Date(S.user.vip_expire) > new Date();
+}
+
+function isAdminUser() {
+  return S.user && S.user.student_id === ADMIN_STUDENT_ID;
+}
+
+// ============ VIP 申请（用户端） ============
+async function showVipApply() {
+  if (!S.user) { showAuthModal(); return; }
+  document.getElementById('vipApplyModal').classList.add('active');
+  document.getElementById('vipApplyError').style.display = 'none';
+  // 从管理员用户数据里读取收款码
+  const qrContainer = document.getElementById('vipQrcodeContainer');
+  qrContainer.innerHTML = '<div style="padding:30px;background:var(--bg);border-radius:8px;color:var(--text-muted);font-size:.85rem">加载收款码中...</div>';
+  try {
+    const issues = await ghIssues('user', 'all');
+    const adminUser = issues.find(i => {
+      try { return JSON.parse(i.body).student_id === ADMIN_STUDENT_ID; } catch(e) { return false; }
+    });
+    if (adminUser) {
+      const adminData = JSON.parse(adminUser.body);
+      const qrImage = adminData.payment_image || '';
+      if (qrImage) {
+        qrContainer.innerHTML = '<img src="' + qrImage + '" style="max-width:220px;border-radius:8px;border:1px solid var(--border)" alt="收款码">';
+      } else {
+        qrContainer.innerHTML = '<div style="padding:30px;background:var(--bg);border-radius:8px;color:var(--text-muted);font-size:.85rem">📷 管理员暂未上传收款码<br><span style="font-size:.75rem">请联系管理员 ' + ADMIN_STUDENT_ID + ' 转账 ¥1</span></div>';
+      }
+    } else {
+      qrContainer.innerHTML = '<div style="padding:30px;background:var(--bg);border-radius:8px;color:var(--text-muted);font-size:.85rem">📷 管理员暂未设置收款码<br><span style="font-size:.75rem">请联系管理员 ' + ADMIN_STUDENT_ID + ' 转账 ¥1</span></div>';
+    }
+  } catch(e) {
+    qrContainer.innerHTML = '<div style="padding:30px;background:var(--bg);border-radius:8px;color:var(--text-muted);font-size:.85rem">⚠️ 加载失败，请联系管理员 ' + ADMIN_STUDENT_ID + ' 转账 ¥1</div>';
+  }
+}
+
+function closeVipApply() {
+  document.getElementById('vipApplyModal').classList.remove('active');
+}
+
+async function submitVipApply() {
+  const err = document.getElementById('vipApplyError');
+  try {
+    // 创建一个 vip_apply 类型的 Issue
+    const body = JSON.stringify({
+      type: 'vip_apply',
+      student_id: S.user.student_id,
+      name: S.user.name,
+      status: 'pending', // pending / approved / rejected
+      created_at: new Date().toISOString()
+    });
+    await ghCreateIssue('[VIP申请] ' + S.user.name + ' - ' + S.user.student_id, body, ['vip_apply']);
+    toast('⭐ 申请已提交！管理员确认收款后将为你开通会员。', 'success');
+    closeVipApply();
+  } catch(e) {
+    err.textContent = '提交失败：' + e.message;
+    err.style.display = 'block';
+  }
+}
+
+// 获取今天我发布的订单数 / 接的订单数
+async function getTodayMyOrders(type) {
+  // type: 'published' 发布的 | 'taken' 接的
+  const myId = S.user._issue_number || S.user.student_id;
+  const mySid = S.user.student_id;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  try {
+    const issues = await ghIssues('order', 'all');
+    return issues.filter(i => {
+      try {
+        const o = JSON.parse(i.body);
+        if (type === 'published') {
+          return (o.publisher_id == myId || o.publisher_student_id === mySid) && new Date(o.created_at) >= today;
+        } else {
+          return (o.taker_id == myId || o.taker_student_id === mySid) && new Date(o.created_at) >= today;
+        }
+      } catch(e) { return false; }
+    }).length;
+  } catch(e) { return 0; }
+}
+
 async function takeOrder(inum) {
   if (!S.user) { showAuthModal(); return; }
   if (!checkApproved()) return;
+  // 每日接单限制检查（非VIP 1天1单，管理员不受限）
+  if (!isVIP() && !isAdminUser()) {
+    const todayOrders = await getTodayMyOrders('taken');
+    if (todayOrders >= 1) {
+      toast('⚠️ 免费用户每天只能接 1 单。开通会员（¥1/月）即可无限接单！', 'info');
+      return;
+    }
+  }
   // 跑腿认证检查：管理员和已认证跑腿才能接单
   const isAdmin = S.user.student_id === ADMIN_STUDENT_ID;
   if (!S.user.runner_verified && !isAdmin) {
@@ -2150,8 +2791,8 @@ async function takeOrder(inum) {
     return;
   }
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+      
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
@@ -2181,8 +2822,8 @@ async function takeOrder(inum) {
 async function completeOrder(inum) {
   if (!confirm('确认订单已完成？')) return;
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+      
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
@@ -2207,8 +2848,8 @@ async function completeOrder(inum) {
 async function cancelOrder(inum) {
   if (!confirm('确定取消此订单？')) return;
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+      
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
@@ -2234,8 +2875,8 @@ async function deleteAllComments(inum) {
     let allComments = [];
     let page = 1;
     while (true) {
-      const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + inum + '/comments?per_page=100&page=' + page, {
-        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+      const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum + '/comments?per_page=100&page=' + page, {
+        
       });
       if (!res.ok) break;
       const comments = await res.json();
@@ -2246,38 +2887,14 @@ async function deleteAllComments(inum) {
     }
     const comments = allComments;
     for (const c of comments) {
-      await fetch('https://api.github.com/repos/' + REPO + '/issues/comments/' + c.id, {
-        method: 'DELETE',
-        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+      await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/comments/' + c.id, {
+        method: 'DELETE'
       });
     }
   } catch(e) { /* 静默 */ }
 }
 
 // ============ AUTH ============
-function showAuthModal() {
-  document.getElementById('authModal').classList.add('active');
-  switchAuthTab('login');
-}
-
-function closeAuthModal() {
-  document.getElementById('authModal').classList.remove('active');
-  document.getElementById('authError').style.display = 'none';
-}
-
-function switchAuthTab(tab) {
-  S.authTab = tab;
-  const tabs = document.querySelectorAll('#authModal .modal-tab');
-  tabs.forEach(t => t.classList.remove('active'));
-  if (tab === 'login') {
-    tabs[0].classList.add('active');
-    document.getElementById('registerExtra').style.display = 'none';
-    document.getElementById('authSubmit').textContent = '登录';
-  } else {
-    tabs[1].classList.add('active');
-    document.getElementById('registerExtra').style.display = 'block';
-    document.getElementById('authSubmit').textContent = '注册';
-  }
   document.getElementById('authError').style.display = 'none';
 }
 
@@ -2312,7 +2929,7 @@ async function handleAuth(e) {
         return;
       }
 
-      const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: 'pending', created_at: new Date().toISOString() };
+      const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: 'pending', vip_expire: null, created_at: new Date().toISOString() };
       let newIssue;
       try {
         newIssue = await ghCreateIssue(sid, JSON.stringify(userData), ['user']);
@@ -2344,9 +2961,9 @@ async function handleAuth(e) {
       if (!found) { err.textContent = '学号或密码错误'; err.style.display = 'block'; return; }
       // 确保 issue 处于 open 状态（清理数据时可能被误关）
       if (found.state !== 'open') {
-        const reopenRes = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + found.number, {
+        const reopenRes = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + found.number, {
           method: 'PATCH',
-          headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ state: 'open' })
         });
         if (!reopenRes.ok) {
@@ -2389,6 +3006,7 @@ async function handleAuth(e) {
       // 确保关键字段存在
       u.payment_info = u.payment_info || '';
       u.payment_image = u.payment_image || '';
+      u.vip_expire = u.vip_expire || null;
       S.user = u;
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       updateUI();
@@ -2434,11 +3052,6 @@ function checkApproved() {
 }
 
 function closePublishModal() {
-  document.getElementById('publishModal').classList.remove('active');
-  document.getElementById('publishError').style.display = 'none';
-  document.getElementById('publishForm').reset();
-}
-
 function updatePublishCategories() {
   const t = document.getElementById('publishType').value;
   const cats = {
@@ -2454,21 +3067,18 @@ function updatePublishCategories() {
   const locGroup = document.getElementById('publishLocation').parentElement;
   const urgencyGroup = document.getElementById('publishUrgency').parentElement;
   const deadlineGroup = document.getElementById('publishDeadline').parentElement;
-  const feeHint = document.getElementById('publishFeeHint');
   if (t === 'qa') {
     priceGroup.style.display = 'none';
     payGroup.style.display = 'none';
     locGroup.style.display = 'none';
     urgencyGroup.style.display = 'none';
     deadlineGroup.style.display = 'none';
-    if (feeHint) feeHint.style.display = 'none';
   } else {
     priceGroup.style.display = 'block';
     payGroup.style.display = 'block';
     locGroup.style.display = 'block';
     urgencyGroup.style.display = 'block';
     deadlineGroup.style.display = 'block';
-    if (feeHint) feeHint.style.display = 'block';
   }
 }
 
@@ -2489,6 +3099,16 @@ async function handlePublish(e) {
   if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
   const sensitiveWord = checkSensitive(title + ' ' + desc);
   if (sensitiveWord) { err.textContent = '内容包含敏感词「' + sensitiveWord + '」，请修改后重新发布'; err.style.display = 'block'; return; }
+
+  // 每日发单限制检查（非VIP 1天1单，管理员不受限，问答不受限）
+  if (type !== 'qa' && !isVIP() && !isAdminUser()) {
+    const todayOrders = await getTodayMyOrders('published');
+    if (todayOrders >= 1) {
+      err.textContent = '免费用户每天只能发布 1 单。开通会员（¥1/月）即可无限发单！';
+      err.style.display = 'block';
+      return;
+    }
+  }
   if (type !== 'qa' && !price) { err.textContent = '请填写报酬金额'; err.style.display = 'block'; return; }
 
   // 图片上传到图床（ImgBB，免费，单张32MB）
@@ -2512,7 +3132,7 @@ async function handlePublish(e) {
   }
 
   const order = {
-    type, category: cat, title, description: desc, price: price || 0, fee: 0,
+    type, category: cat, title, description: desc, price: price || 0,
     location: loc, urgency, deadline, payment,
     images: images,
     status: 'open',
@@ -2521,6 +3141,7 @@ async function handlePublish(e) {
     publisher_student_id: S.user.student_id,
     publisher_dorm: S.user.dorm || '',
     publisher_runner_verified: S.user.runner_verified || false,
+    publisher_vip: isVIP(),
     taker_id: null, taker_name: null,
     created_at: new Date().toISOString()
   };
@@ -2541,13 +3162,10 @@ async function handlePublish(e) {
 }
 
 // ============ UI ============
-function updateUI() {
-  const menu = document.getElementById('userMenu');
-  const btn = document.getElementById('btnLogin');
   if (S.user) {
     menu.style.display = 'flex';
     btn.style.display = 'none';
-    document.getElementById('userNameDisplay').textContent = S.user.name || S.user.student_id;
+    document.getElementById('userNameDisplay').textContent = (isVIP() ? '⭐' : '') + (S.user.name || S.user.student_id);
     // 显示认证跑腿徽章
     const verifiedEl = menu.querySelector('.user-verified');
     if (verifiedEl) {
@@ -2611,12 +3229,14 @@ async function loadMyOrders(myTab) {
   const listEl = document.getElementById('myOrdersList');
   const btnReports = document.getElementById('btnReports');
   const btnRunnerApply = document.getElementById('btnRunnerApply');
+  const btnVipApply = document.getElementById('btnVipApply');
 
   if (!S.user) {
     if (profile) profile.style.display = 'none';
     if (tabsEl) tabsEl.style.display = 'none';
     if (btnReports) btnReports.style.display = 'none';
     if (btnRunnerApply) btnRunnerApply.style.display = 'none';
+    if (btnVipApply) btnVipApply.style.display = 'none';
     if (listEl) listEl.innerHTML = '<p style="color:var(--text-secondary)">请先登录...</p>';
     return;
   }
@@ -2627,6 +3247,7 @@ async function loadMyOrders(myTab) {
     if (tabsEl) tabsEl.style.display = 'none';
     if (btnReports) btnReports.style.display = 'none';
     if (btnRunnerApply) btnRunnerApply.style.display = 'none';
+    if (btnVipApply) btnVipApply.style.display = 'none';
     if (listEl) listEl.innerHTML = '<p style="color:var(--danger)">用户信息不完整，请退出后重新登录。</p>';
     return;
   }
@@ -2634,6 +3255,13 @@ async function loadMyOrders(myTab) {
   if (profile) profile.style.display = 'block';
   if (tabsEl) tabsEl.style.display = 'flex';
   if (btnReports) btnReports.style.display = 'inline-flex';
+  // VIP 标识
+  const vipBadge = document.getElementById('myVipBadge');
+  if (vipBadge) vipBadge.style.display = isVIP() ? 'inline' : 'none';
+  // VIP 申请按钮：已审核通过且非VIP的用户显示
+  if (btnVipApply) {
+    btnVipApply.style.display = (S.user.status === 'approved' && !isVIP()) ? 'inline-flex' : 'none';
+  }
   // 跑腿认证按钮：未认证且已通过用户审核的显示
   if (btnRunnerApply) {
     btnRunnerApply.style.display = (S.user.status === 'approved' && !S.user.runner_verified) ? 'inline-flex' : 'none';
@@ -2679,25 +3307,23 @@ async function loadMyOrders(myTab) {
     else if (tab === 'taken') orders = orders.filter(o => o.taker_id == uid);
     else orders = orders.filter(o => o.publisher_id == uid || o.taker_id == uid);
 
-    // 自动取消超时订单
-    const now = Date.now();
-    const timeout24h = 24 * 60 * 60 * 1000;
-    const timeout48h = 48 * 60 * 60 * 1000;
+    // 自动过期处理：截止时间已过且无人接单 → 自动取消
+    const now = new Date();
     for (const o of orders) {
-      const created = new Date(o.created_at).getTime();
-      if (o.status === 'open' && (now - created > timeout24h)) {
-        o.status = 'cancelled';
-        try { await ghUpdateIssue(o._issue_number, JSON.stringify(o)); } catch(e) {}
-      }
-      if (o.status === 'taken' && (now - created > timeout48h)) {
-        o.status = 'cancelled';
-        try { await ghUpdateIssue(o._issue_number, JSON.stringify(o)); } catch(e) {}
+      if (o.status === 'open' && o.deadline && !o.taker_id) {
+        const dl = new Date(o.deadline);
+        if (!isNaN(dl.getTime()) && dl < now) {
+          o.status = 'cancelled';
+          o.cancel_reason = '超时无人接单，系统自动取消';
+          try { await ghUpdateIssue(o._issue_number, JSON.stringify(o)); } catch(e) {}
+          try { await ghCloseIssue(o._issue_number); } catch(e) {}
+        }
       }
     }
 
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消'};
+    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答', chat:'💬 私信', goods:'物品流转'};
     const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
 
@@ -2790,8 +3416,8 @@ async function saveMyPayment() {
 
   // 4. 先从云端拉取最新用户数据（防止覆盖别人的修改）
   try {
-    const res = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + S.user._issue_number, {
-      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + S.user._issue_number, {
+      
     });
     if (res.ok) {
       const issue = await res.json();
@@ -3000,8 +3626,8 @@ async function cleanOldData(days) {
             let allComments = [];
             let cp = 1;
             while (true) {
-              const cr = await fetch('https://api.github.com/repos/' + REPO + '/issues/' + issue.number + '/comments?per_page=100&page=' + cp, {
-                headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+              const cr = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issue.number + '/comments?per_page=100&page=' + cp, {
+                
               });
               if (!cr.ok) break;
               const cList = await cr.json();
@@ -3011,9 +3637,9 @@ async function cleanOldData(days) {
               cp++;
             }
             for (const c of allComments) {
-              await fetch('https://api.github.com/repos/' + REPO + '/issues/comments/' + c.id, {
+              await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/comments/' + c.id, {
                 method: 'DELETE',
-                headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+                
               });
               commentCleaned++;
             }
@@ -3203,8 +3829,6 @@ function timeAgo(ds) {
   const diff = Math.floor((Date.now() - d) / 1000);
   if (diff < 60) return '刚刚';
   if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
-  if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
-  if (diff < 604800) return Math.floor(diff / 86400) + '天前';
   return ds.slice(0, 10);
 }
 
@@ -3332,4 +3956,3 @@ setInterval(function() {
 </script>
 
 </body>
-</html>
