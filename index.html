@@ -1255,7 +1255,7 @@ async function loadComments(issueNum) {
       }
     }
     const comments = allComments;
-    if (comments.length === 0) { el.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:20px">暂无消息，发送第一条吧</p>'; return; }
+    // 注意：空评论时不要直接 return，否则无法显示输入框
 
     // 获取订单信息用于私密过滤
     let order = null;
@@ -1323,7 +1323,7 @@ async function loadComments(issueNum) {
     }
 
     if (visibleComments.length === 0) {
-      el.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:12px">暂无消息</p>';
+      el.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem;text-align:center;padding:20px">暂无消息，发送第一条吧</p>';
     } else {
       el.innerHTML = visibleComments.map(c => {
         try {
