@@ -1664,11 +1664,25 @@ function closeUserProfileModal() {
   document.getElementById('userProfileModal').classList.remove('active');
 }
 
-// ============ 通用：创建私信对话 ============
+// 通用：创建私信对话（带防重复：同一对参与者只保留一个未关闭对话）
+let _creatingChat = false;
 async function createChatOrder(targetSid, targetName, targetIssueNum, sourceOrderTitle) {
   if (!S.user) { showAuthModal(); return; }
+  if (_creatingChat) return;
+  _creatingChat = true;
 
   try {
+    const myId = S.user._issue_number || S.user.student_id;
+    const mySid = S.user.student_id;
+
+    // 先查找是否已有未关闭的相同对话
+    const existing = await findExistingChat(mySid, targetSid);
+    if (existing) {
+      toast('已存在对话，正在打开...', 'info');
+      showDetail(existing.number);
+      return;
+    }
+
     const chatOrder = {
       type: 'chat',
       category: 'other',
@@ -1696,7 +1710,33 @@ async function createChatOrder(targetSid, targetName, targetIssueNum, sourceOrde
     showDetail(newIssue.number);
   } catch(e) {
     toast('创建对话失败：' + e.message, 'error');
+  } finally {
+    _creatingChat = false;
   }
+}
+
+// 查找当前用户与目标用户之间未关闭的私信对话
+async function findExistingChat(mySid, targetSid) {
+  try {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues?state=open&labels=chat&per_page=100', {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    if (!res.ok) return null;
+    const issues = await res.json();
+    for (const issue of issues) {
+      try {
+        const o = JSON.parse(issue.body);
+        if (o.type !== 'chat') continue;
+        const pub = o.publisher_student_id || o.publisher_id;
+        const taker = o.taker_student_id || o.taker_id;
+        // 双向匹配：我发起 或 对方发起
+        if ((pub === mySid && taker === targetSid) || (pub === targetSid && taker === mySid)) {
+          return issue;
+        }
+      } catch(e) { continue; }
+    }
+  } catch(e) {}
+  return null;
 }
 
 // ============ 管理员发起私信 ============
