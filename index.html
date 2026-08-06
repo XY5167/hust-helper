@@ -747,16 +747,17 @@ async function loadStats() {
   try {
     const [users, orders] = await Promise.all([
       ghIssues('user'),
-      ghIssues('order')
+      ghIssues('order', 'all')
     ]);
     const orderList = orders.map(i => {
       try { return JSON.parse(i.body); } catch(e) { return null; }
     }).filter(Boolean);
-    document.getElementById('statOrders').textContent = orderList.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length;
+    document.getElementById('statOrders').textContent = orderList.filter(o => o.type !== 'chat' && o.status !== 'completed' && o.status !== 'cancelled').length;
     document.getElementById('statUsers').textContent = users.length;
   } catch(e) {
     console.error(e);
     document.getElementById('statOrders').textContent = '?';
+    document.getElementById('statUsers').textContent = '?';
   }
 }
 
