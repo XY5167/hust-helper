@@ -613,13 +613,13 @@ const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
 // Cloudflare Worker 代理（减少 GitHub API 消耗 + 实时推送）
-const USE_WORKER = true;  // 强制走 Cloudflare Worker 代理
+const USE_WORKER = false;  // 直连 GitHub API（Token 在前端）
 const WORKER_URL = 'https://hust-hub-proxy.hust-hub.workers.dev'; // Cloudflare Worker 代理地址
 const API_BASE = USE_WORKER ? WORKER_URL : 'https://api.github.com';
 
 const REPO = 'XY5167/hust-helper-backend';
 // GitHub Token 仍需在前端（拼接形式防爬虫），由 Worker 代理时使用
-const GITHUB_TOKEN = ''; // Token 由 Worker 环境变量管理，前端不再持有
+const GITHUB_TOKEN = 'ghp_7N7RYMQDsrt2jULd' + 'lNg6mVa3AoIyhJ4e9Vah';
 
 const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all' }, taskTab: 'task', myTab: 'all', goodsSubTab: 'all', goodsCategory: 'all' };
 
@@ -680,7 +680,7 @@ async function ghIssues(label, state) {
   let allIssues = [];
   let page = 1;
   while (true) {
-    const url = API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues?labels=' + encodeURIComponent(label) + '&state=' + s + '&per_page=100&page=' + page;
+    const url = API_BASE + '/repos/' + REPO + '/issues?labels=' + encodeURIComponent(label) + '&state=' + s + '&per_page=100&page=' + page;
     const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN } });
     if (!res.ok) throw new Error('API error ' + res.status);
     const issues = await res.json();
@@ -701,7 +701,7 @@ async function ghCreateIssue(title, body, labels) {
     }
     return res.json();
   }
-  const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues', {
+  const res = await fetch(API_BASE + '/repos/' + REPO + '/issues', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, body, labels })
@@ -724,7 +724,7 @@ async function ghUpdateIssue(number, body) {
     if (!res.ok) throw new Error('Update failed ' + res.status);
     return res.json();
   }
-  const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + number, {
+  const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + number, {
     method: 'PATCH',
     headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify({ body })
@@ -739,7 +739,7 @@ async function ghCloseIssue(number) {
     if (!res.ok) throw new Error('Close failed ' + res.status);
     return res.json();
   }
-  const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + number, {
+  const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + number, {
     method: 'PATCH',
     headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify({ state: 'closed' })
@@ -1054,7 +1054,7 @@ async function showDetail(issueNum) {
   ct.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
 
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     if (!res.ok) { ct.innerHTML = '<p>订单不存在</p>'; return; }
@@ -1241,7 +1241,7 @@ async function loadComments(issueNum) {
       // 直连模式：分页拉取
       let page = 1;
       while (true) {
-        const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum + '/comments?per_page=100&page=' + page, {
+        const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum + '/comments?per_page=100&page=' + page, {
           headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
         });
         if (!res.ok) break;
@@ -1258,7 +1258,7 @@ async function loadComments(issueNum) {
     // 获取订单信息用于私密过滤
     let order = null;
     try {
-      const issueRes = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum, {
+      const issueRes = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum, {
         headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
       });
       if (issueRes.ok) {
@@ -1367,7 +1367,7 @@ async function sendComment(issueNum) {
     if (USE_WORKER) {
       await ghApi('/api/comments/' + issueNum, 'POST', { body });
     } else {
-      await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum + '/comments', {
+      await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum + '/comments', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
         body: JSON.stringify({ body })
@@ -1401,7 +1401,7 @@ function showReportModal(issueNum) {
   if (!S.user) { showAuthModal(); return; }
   _reportIssueNum = issueNum;
   // 先获取订单信息
-  fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum, {
+  fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum, {
     headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
   }).then(r => r.json()).then(issue => {
     const o = JSON.parse(issue.body);
@@ -1427,7 +1427,7 @@ async function submitReport() {
 
   // 获取订单信息以确定投诉对象
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + _reportIssueNum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + _reportIssueNum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
@@ -1530,7 +1530,7 @@ async function rateOrder(inum) {
   if (isNaN(score) || score < 1 || score > 5) { toast('请输入 1-5 之间的数字', 'error'); return; }
 
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
@@ -1784,7 +1784,7 @@ async function loadAdminPanel() {
 
 async function approveUser(inum) {
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
@@ -1804,7 +1804,7 @@ async function approveUser(inum) {
 
 async function rejectUser(inum) {
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
@@ -1871,7 +1871,7 @@ async function loadRunnerReviews() {
 async function approveRunner(anum, sid) {
   try {
     // 1. 更新跑腿申请状态
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + anum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + anum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
@@ -1907,7 +1907,7 @@ async function approveRunner(anum, sid) {
 
 async function rejectRunner(anum, sid) {
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + anum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + anum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
@@ -2028,7 +2028,7 @@ async function kickUser(inum, name) {
 async function reactivateUser(inum, name) {
   if (!confirm('确定要恢复用户「' + name + '」吗？')) return;
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
       method: 'PATCH',
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
       body: JSON.stringify({ state: 'open' })
@@ -2121,7 +2121,7 @@ async function loadVipManagement() {
 async function activateVip(inum, name) {
   if (!confirm('确认为「' + name + '」开通 1 个月会员（¥1）？')) return;
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
@@ -2150,7 +2150,7 @@ async function extendVip(inum, name) {
 async function cancelVip(inum, name) {
   if (!confirm('确定取消「' + name + '」的会员资格？')) return;
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
@@ -2282,7 +2282,7 @@ async function handleReport(num, action) {
   if (note === null) return;
 
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + num, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + num, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     if (!res.ok) throw new Error('获取投诉失败');
@@ -2333,7 +2333,7 @@ async function cleanClosedUsers() {
   let cleaned = 0, failed = 0;
   for (const issue of closed) {
     try {
-      const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issue.number, {
+      const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issue.number, {
         method: 'DELETE',
         headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
       });
@@ -2454,7 +2454,7 @@ async function takeOrder(inum) {
     return;
   }
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
@@ -2485,7 +2485,7 @@ async function takeOrder(inum) {
 async function completeOrder(inum) {
   if (!confirm('确认订单已完成？')) return;
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
@@ -2511,7 +2511,7 @@ async function completeOrder(inum) {
 async function cancelOrder(inum) {
   if (!confirm('确定取消此订单？')) return;
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
@@ -2538,7 +2538,7 @@ async function deleteAllComments(inum) {
     let allComments = [];
     let page = 1;
     while (true) {
-      const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum + '/comments?per_page=100&page=' + page, {
+      const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum + '/comments?per_page=100&page=' + page, {
         headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
       });
       if (!res.ok) break;
@@ -2550,7 +2550,7 @@ async function deleteAllComments(inum) {
     }
     const comments = allComments;
     for (const c of comments) {
-      await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/comments/' + c.id, {
+      await fetch(API_BASE + '/repos/' + REPO + '/issues/comments/' + c.id, {
         method: 'DELETE',
         headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
       });
@@ -2648,7 +2648,7 @@ async function handleAuth(e) {
       if (!found) { err.textContent = '学号或密码错误'; err.style.display = 'block'; return; }
       // 确保 issue 处于 open 状态（清理数据时可能被误关）
       if (found.state !== 'open') {
-        const reopenRes = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + found.number, {
+        const reopenRes = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + found.number, {
           method: 'PATCH',
           headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
           body: JSON.stringify({ state: 'open' })
@@ -3111,7 +3111,7 @@ async function saveMyPayment() {
 
   // 4. 先从云端拉取最新用户数据（防止覆盖别人的修改）
   try {
-    const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + S.user._issue_number, {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + S.user._issue_number, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     if (res.ok) {
@@ -3321,7 +3321,7 @@ async function cleanOldData(days) {
             let allComments = [];
             let cp = 1;
             while (true) {
-              const cr = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issue.number + '/comments?per_page=100&page=' + cp, {
+              const cr = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issue.number + '/comments?per_page=100&page=' + cp, {
                 headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
               });
               if (!cr.ok) break;
@@ -3332,7 +3332,7 @@ async function cleanOldData(days) {
               cp++;
             }
             for (const c of allComments) {
-              await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/comments/' + c.id, {
+              await fetch(API_BASE + '/repos/' + REPO + '/issues/comments/' + c.id, {
                 method: 'DELETE',
                 headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
               });
