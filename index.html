@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="version" content="1.3.2">
+<meta name="version" content="1.3.3">
 <link rel="icon" type="image/png" href="favicon.png">
 <title>HUST 校园互助</title>
 <style>
@@ -656,7 +656,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.3.2';
+const APP_VERSION = '1.3.3';
 // 版本检测：后台检查 GitHub raw 上的版本号，有新版本则提醒刷新
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -671,7 +671,16 @@ const APP_VERSION = '1.3.2';
         const banner = document.createElement('div');
         banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#000;text-align:center;padding:8px;cursor:pointer;font-size:14px';
         banner.textContent = '🔄 有新版本可用，点击刷新';
-        banner.onclick = function() { localStorage.clear(); location.replace(location.pathname + '?v=' + Date.now()); };
+        banner.onclick = function() {
+          // 只清除缓存，保留用户登录状态
+          try {
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+              const k = localStorage.key(i);
+              if (k && k.startsWith('hust_c_')) localStorage.removeItem(k);
+            }
+          } catch(e) {}
+          location.replace(location.pathname + '?v=' + Date.now());
+        };
         document.body.prepend(banner);
       }
     }).catch(()=>{});
