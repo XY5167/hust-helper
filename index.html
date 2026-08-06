@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="version" content="1.1">
+<meta name="version" content="1.2">
 <link rel="icon" type="image/png" href="favicon.png">
 <title>HUST 校园互助</title>
 <style>
@@ -647,12 +647,57 @@ function checkSensitive(text) {
   return null;
 }
 
+// ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
+const APP_VERSION = '1.2';
+// 版本检测：后台检查 GitHub raw 上的版本号，有新版本则提醒刷新
+(function checkVersion() {
+  const v = localStorage.getItem('hust_ver_checked');
+  if (!v) { localStorage.setItem('hust_ver_checked', Date.now().toString()); return; }
+  // 每 5 分钟后台检查一次版本
+  if (Date.now() - parseInt(v) < 300000) return;
+  localStorage.setItem('hust_ver_checked', Date.now().toString());
+  fetch('https://raw.githubusercontent.com/XY5167/hust-helper/main/version.txt?_=' + Date.now())
+    .then(r => r.text()).then(remote => {
+      if (remote.trim() !== APP_VERSION) {
+        localStorage.setItem('hust_ver_checked', '0'); // 下次立即检查
+        const banner = document.createElement('div');
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#000;text-align:center;padding:8px;cursor:pointer;font-size:14px';
+        banner.textContent = '🔄 有新版本可用，点击刷新';
+        banner.onclick = function() { localStorage.clear(); location.replace(location.pathname + '?v=' + Date.now()); };
+        document.body.prepend(banner);
+      }
+    }).catch(()=>{});
+})();
+
+const CACHE_TTL = { orders: 15000, stats: 30000, users: 60000 };
+function cacheGet(key) {
+  try {
+    const item = localStorage.getItem('hust_c_' + key);
+    if (!item) return null;
+    const { ts, data } = JSON.parse(item);
+    if (Date.now() - ts > (CACHE_TTL[key] || 10000)) return null;
+    return data;
+  } catch(e) { return null; }
+}
+function cacheSet(key, data) {
+  try { localStorage.setItem('hust_c_' + key, JSON.stringify({ ts: Date.now(), data })); } catch(e) {}
+}
+function cacheBust(key) {
+  try { localStorage.removeItem('hust_c_' + key); } catch(e) {}
+}
+
 // 初始化
 (function() {
   const saved = localStorage.getItem('hust_current_user');
   if (saved) try { S.user = JSON.parse(saved); } catch(e) {}
   if (S.user && !S.user._issue_number) ensureUserIssueNumber().then(updateUI).catch(()=>{});
   updateUI();
+  // 优先显示缓存数据，后台拉最新
+  const cached = cacheGet('stats');
+  if (cached) {
+    document.getElementById('statOrders').textContent = cached.orders;
+    document.getElementById('statUsers').textContent = cached.users;
+  }
   loadStats();
 })();
 
@@ -775,8 +820,10 @@ async function loadStats() {
       .map(i => {
         try { return JSON.parse(i.body); } catch(e) { return null; }
       }).filter(Boolean);
-    document.getElementById('statOrders').textContent = orderList.filter(o => o.status !== 'completed' && o.status !== 'cancelled' && o.type !== 'chat').length;
+    const cnt = orderList.filter(o => o.status !== 'completed' && o.status !== 'cancelled' && o.type !== 'chat').length;
+    document.getElementById('statOrders').textContent = cnt;
     document.getElementById('statUsers').textContent = users.length;
+    cacheSet('stats', { orders: cnt, users: users.length });
   } catch(e) {
     console.error(e);
     document.getElementById('statOrders').textContent = '?';
@@ -790,13 +837,13 @@ let _cachedType = null;
 function refreshCurrentTab() {
   const tab = S.taskTab || 'task';
   const cat = tab === 'goods' ? (S.goodsCategory || 'all') : (S.filter[tab] || 'all');
+  cacheBust('orders_' + tab); // 强制刷新，不用缓存
   loadOrders(tab, cat);
 }
 
 async function loadOrders(type, cat) {
   const grid = document.getElementById('taskOrders');
   if (!grid) return;
-  grid.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
 
   // 清空搜索
   const searchInput = document.getElementById('taskSearchInput');
@@ -804,6 +851,19 @@ async function loadOrders(type, cat) {
   if (searchInput) searchInput.value = '';
   if (sortSelect) sortSelect.value = 'newest';
 
+  // 1. 先尝试显示缓存数据（瞬间加载）
+  const cacheKey = 'orders_' + type;
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    _cachedOrders = cached;
+    _cachedType = type;
+    renderOrders(cached);
+    return; // 有缓存就直接显示，不闪烁"加载中"
+  }
+
+  grid.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
+
+  // 2. 后台拉取最新数据
   try {
     const label = type === 'qa' ? 'qa' : 'order';
     const issues = await ghIssues(label);
@@ -816,13 +876,12 @@ async function loadOrders(type, cat) {
       } catch(e) { return null; }
     }).filter(o => o && o.status === 'open');
 
-    // 自动过期检查：截止时间已过且无人接单的，自动关闭
+    // 自动过期检查
     const now = new Date();
     for (const o of orders) {
       if (o.deadline && !o.taker_id) {
         const dl = new Date(o.deadline);
         if (!isNaN(dl.getTime()) && dl < now) {
-          // 已过期，自动关闭
           o.status = 'expired';
           try {
             await ghUpdateIssue(o._issue_number, JSON.stringify(o));
@@ -831,7 +890,6 @@ async function loadOrders(type, cat) {
         }
       }
     }
-    // 过滤掉已过期的
     orders = orders.filter(o => o.status === 'open');
 
     // 根据类型筛选
@@ -849,13 +907,13 @@ async function loadOrders(type, cat) {
     if (cat !== 'all') orders = orders.filter(o => o.category === cat);
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    // 缓存搜索结果
     _cachedOrders = orders;
     _cachedType = type;
-
+    cacheSet(cacheKey, orders);
     renderOrders(orders);
   } catch(e) {
-    grid.innerHTML = '<div class="empty-state"><p>加载失败：' + esc(e.message) + '</p></div>';
+    // 如果缓存也用完了，显示错误
+    if (!cached) grid.innerHTML = '<div class="empty-state"><p>加载失败：' + esc(e.message) + '</p></div>';
   }
 }
 
@@ -2494,6 +2552,7 @@ async function takeOrder(inum) {
     }
     if (S.page === 'my') loadMyOrders();
     else if (S.page === 'task') { /* 已通过缓存更新，但异步再拉一次确保数据一致 */ setTimeout(() => refreshCurrentTab(), 1500); }
+    cacheBust('stats'); loadStats();
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -2518,8 +2577,8 @@ async function completeOrder(inum) {
       renderOrders(_cachedOrders);
     }
     if (S.page === 'my') loadMyOrders();
-    else if (S.page === 'task') { setTimeout(() => refreshCurrentTab(), 1500); }
-    loadStats();
+    else if (S.page === 'task') { cacheBust('orders_' + (S.taskTab || 'task')); setTimeout(() => refreshCurrentTab(), 1500); }
+    cacheBust('stats'); loadStats();
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -2544,6 +2603,7 @@ async function cancelOrder(inum) {
     }
     if (S.page === 'my') loadMyOrders();
     else if (S.page === 'task') { setTimeout(() => refreshCurrentTab(), 1500); }
+    cacheBust('stats'); loadStats();
   } catch(e) { toast(e.message, 'error'); }
 }
 
