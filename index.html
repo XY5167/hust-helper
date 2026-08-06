@@ -36,6 +36,12 @@
 html{font-size:16px;-webkit-font-smoothing:antialiased}
 body{font-family:'Inter','Noto Sans SC',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
 a{color:inherit;text-decoration:none}
+button{cursor:pointer;font-family:inherit}
+input,select,textarea{font-family:inherit;font-size:1rem}
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+
+/* Header */
+.header{background:rgba(255,255,255,.85);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
 .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px;gap:20px}
 .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:1.15rem}
 .nav-links{display:flex;gap:2px}
@@ -53,6 +59,14 @@ a{color:inherit;text-decoration:none}
 
 /* Buttons */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border-radius:var(--radius-xs);font-size:.88rem;font-weight:500;border:none;transition:all .15s}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-dark);box-shadow:var(--shadow-md)}
+.btn-outline{background:transparent;color:var(--text);border:1.5px solid var(--border)}
+.btn-outline:hover{background:var(--bg-hover)}
+.btn-ghost{background:transparent;color:var(--text-secondary)}
+.btn-ghost:hover{color:var(--text);background:var(--bg-hover)}
+.btn-sm{padding:5px 12px;font-size:.8rem}
+.btn-lg{padding:13px 28px;font-size:1rem}
 .btn-block{width:100%}
 .btn-success{background:var(--success);color:#fff}
 .btn-danger{background:var(--danger);color:#fff}
@@ -61,6 +75,45 @@ a{color:inherit;text-decoration:none}
 
 /* Hero */
 .hero{padding:70px 0 50px;text-align:center;background:linear-gradient(180deg,#eff6ff 0%,var(--bg) 100%)}
+.hero-title{font-size:2.4rem;font-weight:800;margin-bottom:10px;letter-spacing:-.5px}
+.highlight{color:var(--primary)}
+.hero-subtitle{font-size:1.1rem;color:var(--text-secondary);margin-bottom:36px}
+.hero-stats{display:flex;justify-content:center;gap:44px;margin-bottom:36px}
+.stat-item{display:flex;flex-direction:column;align-items:center}
+.stat-num{font-size:1.8rem;font-weight:700;color:var(--primary)}
+.stat-label{font-size:.82rem;color:var(--text-muted);margin-top:4px}
+.hero-actions{display:flex;justify-content:center;gap:12px}
+
+/* Sections */
+.section{padding:56px 0}
+.section-title{font-size:1.4rem;font-weight:700;margin-bottom:28px;text-align:center}
+
+/* Service Cards */
+.card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.service-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:26px 22px;transition:all .2s;cursor:pointer;position:relative}
+.service-card:hover{border-color:var(--primary);box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.service-icon{font-size:2.2rem;margin-bottom:14px}
+.service-card h3{font-size:1.1rem;font-weight:600;margin-bottom:6px}
+.service-card p{font-size:.88rem;color:var(--text-secondary);line-height:1.6}
+.service-tag{position:absolute;top:14px;right:14px;background:var(--primary-light);color:var(--primary);padding:2px 9px;border-radius:99px;font-size:.72rem;font-weight:600}
+
+/* Page Header */
+.page-header{margin:28px 0 20px}
+.page-header h2{font-size:1.4rem;font-weight:700;margin-bottom:4px}
+.page-header p{color:var(--text-secondary);font-size:.9rem}
+
+/* Filter Bar */
+.filter-bar{display:flex;gap:6px;margin-bottom:22px;flex-wrap:wrap}
+.filter-btn{padding:7px 14px;border:1.5px solid var(--border);border-radius:99px;background:var(--bg-card);font-size:.83rem;font-weight:500;color:var(--text-secondary);transition:all .15s}
+.filter-btn:hover{border-color:var(--text-muted)}
+.filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* Order Grid */
+.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;margin-bottom:40px}
+.order-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px;transition:all .15s;cursor:pointer}
+.order-card:hover{border-color:var(--primary);box-shadow:var(--shadow-md)}
+.order-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.order-card-type{font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:99px}
 .type-errand{background:#fef3c7;color:#92400e}
 .type-secondhand{background:#dbeafe;color:#1e40af}
 .type-skill{background:#dcfce7;color:#166534}
@@ -78,9 +131,87 @@ a{color:inherit;text-decoration:none}
 .order-card-status{font-size:.72rem;padding:3px 9px;border-radius:99px}
 .status-open{background:#dcfce7;color:#166534}
 .status-taken{background:#fef3c7;color:#92400e}
+.status-completed{background:#f1f5f9;color:#64748b}
+.status-cancelled{background:#fee2e2;color:#991b1b}
+.order-card-title{font-size:.97rem;font-weight:600;margin-bottom:6px}
+.order-card-desc{font-size:.83rem;color:var(--text-secondary);margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.order-card-meta{display:flex;justify-content:space-between;align-items:center}
+.order-card-price{font-size:1.15rem;font-weight:700;color:var(--accent)}
+.order-card-location{font-size:.78rem;color:var(--text-muted)}
+.order-card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light);font-size:.78rem;color:var(--text-muted)}
+
+/* Modals */
+.modal-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:var(--bg-card);border-radius:var(--radius);padding:28px;width:90%;max-width:430px;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto;animation:modalIn .2s ease;position:relative}
+.modal-lg{max-width:550px}
+@keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:1.4rem;color:var(--text-muted);padding:4px;line-height:1}
+.modal-close:hover{color:var(--text)}
+.modal h3{font-size:1.15rem;font-weight:700;margin-bottom:22px}
+.modal-tabs{display:flex;margin-bottom:22px;border-bottom:2px solid var(--border)}
+.modal-tab{flex:1;padding:9px;text-align:center;background:none;border:none;font-size:.88rem;font-weight:500;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+.modal-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* Forms */
+.form-group{margin-bottom:15px}
+.form-group label{display:block;font-size:.83rem;font-weight:500;margin-bottom:5px;color:var(--text-secondary)}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 13px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg);transition:all .15s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-hint{font-size:.78rem;color:var(--text-muted);margin-bottom:10px}
+.form-error{font-size:.83rem;color:var(--danger);margin-bottom:10px;display:none}
+.verify-badge{display:inline-block;font-size:.68rem;font-weight:600;background:var(--success);color:#fff;padding:1px 7px;border-radius:99px;margin-left:5px;vertical-align:middle}
+
+/* Detail */
+.detail-header{margin-bottom:16px}
+.detail-type{display:inline-block;font-size:.73rem;font-weight:600;padding:3px 11px;border-radius:99px;margin-bottom:10px}
+.detail-title{font-size:1.2rem;font-weight:700;margin-bottom:6px}
+.detail-price{font-size:1.4rem;font-weight:700;color:var(--accent);margin-bottom:14px}
+.detail-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:.83rem;color:var(--text-secondary);margin-bottom:14px}
+.detail-desc{font-size:.88rem;line-height:1.7;margin-bottom:18px;white-space:pre-wrap}
+.detail-actions{display:flex;gap:8px;margin-bottom:18px}
+.detail-section{margin-top:18px;padding-top:18px;border-top:1px solid var(--border)}
+.detail-section h4{font-size:.9rem;font-weight:600;margin-bottom:10px}
+.chat-msg{padding:7px 11px;border-radius:var(--radius-xs);margin-bottom:6px;background:var(--bg);font-size:.83rem;line-height:1.5}
+.chat-msg strong{color:var(--primary)}
+.chat-input-row{display:flex;gap:8px;margin-top:10px}
+.chat-input-row input{flex:1}
+
+/* Toast */
+.toast-container{position:fixed;top:72px;right:20px;z-index:300;display:flex;flex-direction:column;gap:6px}
+.toast{padding:10px 18px;border-radius:var(--radius-xs);font-size:.87rem;font-weight:500;animation:slideIn .3s ease;box-shadow:var(--shadow-md);max-width:340px}
+.toast-success{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.toast-error{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+.toast-info{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* Empty */
+.empty-state{text-align:center;padding:56px 16px;color:var(--text-muted)}
+.empty-state-icon{font-size:2.8rem;margin-bottom:14px}
+.empty-state p{font-size:.9rem}
+
+/* Responsive */
+@media(max-width:768px){
+  .card-grid{grid-template-columns:1fr}
+  .hero-title{font-size:1.7rem}
+  .hero-stats{gap:22px}
+  .order-grid{grid-template-columns:1fr}
+  .nav-links{overflow-x:auto;gap:0}
+  .form-row{grid-template-columns:1fr}
+  .modal{padding:22px;width:95%}
+}
+@media(max-width:480px){
+  .container{padding:0 14px}
+  .hero{padding:44px 0 30px}
+  .hero-title{font-size:1.4rem}
+}
 </style>
 </head>
 <body>
+
+<header class="header">
+  <div class="container nav-inner">
     <a href="#" class="logo" onclick="navigate('home')">HUST互助</a>
     <nav class="nav-links" id="navLinks">
       <a href="#" class="nav-link active" data-page="home" onclick="navigate('home')">首页</a>
@@ -97,6 +228,10 @@ a{color:inherit;text-decoration:none}
         <button class="btn btn-ghost btn-sm" onclick="logout()">退出</button>
       </div>
     </div>
+  </div>
+</header>
+
+<section class="page" id="page-home">
   <div class="hero">
     <div class="container">
       <h1 class="hero-title">校园生活，<span class="highlight">互相帮忙</span></h1>
@@ -185,6 +320,23 @@ a{color:inherit;text-decoration:none}
 
 <!-- Auth Modal -->
 <div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAuthModal()">&times;</button>
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="switchAuthTab('login')">登录</button>
+      <button class="modal-tab" onclick="switchAuthTab('register')">注册</button>
+    </div>
+    <form id="authForm" onsubmit="handleAuth(event)">
+      <div class="form-group">
+        <label>学号</label>
+        <input type="text" id="authStudentId" required placeholder="如 U202312345">
+      </div>
+      <div id="registerExtra" style="display:none">
+        <div class="form-group">
+          <label>真实姓名 <span class="verify-badge">实名认证</span></label>
+          <input type="text" id="authName" placeholder="请输入真实姓名">
+        </div>
+        <div class="form-group">
           <label>手机号</label>
           <input type="text" id="authPhone" placeholder="方便联系（选填）">
         </div>
@@ -228,6 +380,20 @@ a{color:inherit;text-decoration:none}
       </div>
       <div class="form-group">
         <label>密码</label>
+        <input type="password" id="authPassword" required placeholder="输入密码" minlength="6">
+      </div>
+      <p class="form-error" id="authError"></p>
+      <button type="submit" class="btn btn-primary btn-block" id="authSubmit">登录</button>
+    </form>
+  </div>
+</div>
+
+<!-- Publish Modal -->
+<div class="modal-overlay" id="publishModal">
+  <div class="modal modal-lg">
+    <button class="modal-close" onclick="closePublishModal()">&times;</button>
+    <h3>发布需求</h3>
+    <form id="publishForm" onsubmit="handlePublish(event)">
       <div class="form-group">
         <label>类型</label>
         <select id="publishType" required onchange="updatePublishCategories()">
@@ -238,6 +404,24 @@ a{color:inherit;text-decoration:none}
         </select>
       </div>
       <div class="form-group">
+        <label>子分类</label>
+        <select id="publishCategory"></select>
+      </div>
+      <div class="form-group">
+        <label>标题</label>
+        <input type="text" id="publishTitle" required placeholder="简要描述你的需求">
+      </div>
+      <div class="form-group">
+        <label>详细描述</label>
+        <textarea id="publishDesc" rows="3" placeholder="详细说明需求、地点等"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>报酬 (¥)</label>
+          <input type="number" id="publishPrice" required placeholder="金额" step="0.01" min="1">
+        </div>
+        <div class="form-group">
+          <label>地点</label>
           <input type="text" id="publishLocation" placeholder="如：韵苑/紫菘/东校区">
         </div>
       </div>
@@ -429,13 +613,13 @@ const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
 // Cloudflare Worker 代理（减少 GitHub API 消耗 + 实时推送）
-const USE_WORKER = true; // 设为 false 可切回直连 GitHub（Worker 暂时无法访问）
+const USE_WORKER = true;  // 强制走 Cloudflare Worker 代理
 const WORKER_URL = 'https://hust-hub-proxy.hust-hub.workers.dev'; // Cloudflare Worker 代理地址
 const API_BASE = USE_WORKER ? WORKER_URL : 'https://api.github.com';
 
 const REPO = 'XY5167/hust-helper-backend';
 // GitHub Token 仍需在前端（拼接形式防爬虫），由 Worker 代理时使用
-const GITHUB_TOKEN = ''; // Token managed by Worker env var
+const GITHUB_TOKEN = ''; // Token 由 Worker 环境变量管理，前端不再持有
 
 const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all' }, taskTab: 'task', myTab: 'all', goodsSubTab: 'all', goodsCategory: 'all' };
 
@@ -476,7 +660,10 @@ function checkSensitive(text) {
 // 通过 Worker 代理（缓存读 + 透传写 + WebSocket 通知）
 // Token 通过请求头传给 Worker
 function ghApi(path, method, body) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' }
+  };
   if (body) opts.body = JSON.stringify(body);
   return fetch(API_BASE + path, opts);
 }
@@ -494,7 +681,7 @@ async function ghIssues(label, state) {
   let page = 1;
   while (true) {
     const url = API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues?labels=' + encodeURIComponent(label) + '&state=' + s + '&per_page=100&page=' + page;
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN } });
     if (!res.ok) throw new Error('API error ' + res.status);
     const issues = await res.json();
     if (!issues || issues.length === 0) break;
@@ -516,7 +703,7 @@ async function ghCreateIssue(title, body, labels) {
   }
   const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, body, labels })
   });
   if (!res.ok) {
@@ -539,7 +726,7 @@ async function ghUpdateIssue(number, body) {
   }
   const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + number, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify({ body })
   });
   if (!res.ok) throw new Error('Update failed ' + res.status);
@@ -554,7 +741,7 @@ async function ghCloseIssue(number) {
   }
   const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + number, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify({ state: 'closed' })
   });
   if (!res.ok) throw new Error('Close failed ' + res.status);
@@ -568,6 +755,7 @@ function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   const el = document.getElementById('page-' + page);
+  if (el) el.style.display = 'block';
   const nl = document.querySelector('[data-page="' + page + '"]');
   if (nl) nl.classList.add('active');
   if (page === 'home') loadStats();
@@ -579,13 +767,13 @@ function navigate(page) {
 async function loadStats() {
   try {
     const [users, orders] = await Promise.all([
-      ghIssues('user', 'open'),
+      ghIssues('user'),
       ghIssues('order', 'all')
     ]);
     const orderList = orders.map(i => {
       try { return JSON.parse(i.body); } catch(e) { return null; }
     }).filter(Boolean);
-    document.getElementById('statOrders').textContent = orderList.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length;
+    document.getElementById('statOrders').textContent = orderList.filter(o => o.status !== 'completed' && o.status !== 'cancelled' && o.type !== 'chat').length;
     document.getElementById('statUsers').textContent = users.length;
   } catch(e) {
     console.error(e);
@@ -867,7 +1055,7 @@ async function showDetail(issueNum) {
 
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     if (!res.ok) { ct.innerHTML = '<p>订单不存在</p>'; return; }
     const issue = await res.json();
@@ -1054,7 +1242,7 @@ async function loadComments(issueNum) {
       let page = 1;
       while (true) {
         const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum + '/comments?per_page=100&page=' + page, {
-          
+          headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
         });
         if (!res.ok) break;
         const comments = await res.json();
@@ -1071,7 +1259,7 @@ async function loadComments(issueNum) {
     let order = null;
     try {
       const issueRes = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum, {
-        
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
       });
       if (issueRes.ok) {
         const issue = await issueRes.json();
@@ -1181,7 +1369,7 @@ async function sendComment(issueNum) {
     } else {
       await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum + '/comments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
         body: JSON.stringify({ body })
       });
     }
@@ -1214,7 +1402,7 @@ function showReportModal(issueNum) {
   _reportIssueNum = issueNum;
   // 先获取订单信息
   fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issueNum, {
-    
+    headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
   }).then(r => r.json()).then(issue => {
     const o = JSON.parse(issue.body);
     const isPublisher = (o.publisher_id == (S.user._issue_number || S.user.student_id));
@@ -1240,7 +1428,7 @@ async function submitReport() {
   // 获取订单信息以确定投诉对象
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + _reportIssueNum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
@@ -1343,7 +1531,7 @@ async function rateOrder(inum) {
 
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
@@ -1597,7 +1785,7 @@ async function loadAdminPanel() {
 async function approveUser(inum) {
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
     const u = JSON.parse(issue.body);
@@ -1617,7 +1805,7 @@ async function approveUser(inum) {
 async function rejectUser(inum) {
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
     const u = JSON.parse(issue.body);
@@ -1684,7 +1872,7 @@ async function approveRunner(anum, sid) {
   try {
     // 1. 更新跑腿申请状态
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + anum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
     const a = JSON.parse(issue.body);
@@ -1720,7 +1908,7 @@ async function approveRunner(anum, sid) {
 async function rejectRunner(anum, sid) {
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + anum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
     const a = JSON.parse(issue.body);
@@ -1842,7 +2030,7 @@ async function reactivateUser(inum, name) {
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
       body: JSON.stringify({ state: 'open' })
     });
     if (!res.ok) throw new Error('恢复失败');
@@ -1934,7 +2122,7 @@ async function activateVip(inum, name) {
   if (!confirm('确认为「' + name + '」开通 1 个月会员（¥1）？')) return;
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
     const u = JSON.parse(issue.body);
@@ -1963,7 +2151,7 @@ async function cancelVip(inum, name) {
   if (!confirm('确定取消「' + name + '」的会员资格？')) return;
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
     const u = JSON.parse(issue.body);
@@ -2095,7 +2283,7 @@ async function handleReport(num, action) {
 
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + num, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     if (!res.ok) throw new Error('获取投诉失败');
     const issue = await res.json();
@@ -2146,7 +2334,8 @@ async function cleanClosedUsers() {
   for (const issue of closed) {
     try {
       const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issue.number, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
       });
       if (res.ok) cleaned++;
       else failed++;
@@ -2266,7 +2455,7 @@ async function takeOrder(inum) {
   }
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
@@ -2297,7 +2486,7 @@ async function completeOrder(inum) {
   if (!confirm('确认订单已完成？')) return;
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
@@ -2323,7 +2512,7 @@ async function cancelOrder(inum) {
   if (!confirm('确定取消此订单？')) return;
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
@@ -2350,7 +2539,7 @@ async function deleteAllComments(inum) {
     let page = 1;
     while (true) {
       const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + inum + '/comments?per_page=100&page=' + page, {
-        
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
       });
       if (!res.ok) break;
       const comments = await res.json();
@@ -2362,13 +2551,37 @@ async function deleteAllComments(inum) {
     const comments = allComments;
     for (const c of comments) {
       await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/comments/' + c.id, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
       });
     }
   } catch(e) { /* 静默 */ }
 }
 
 // ============ AUTH ============
+function showAuthModal() {
+  document.getElementById('authModal').classList.add('active');
+  switchAuthTab('login');
+}
+
+function closeAuthModal() {
+  document.getElementById('authModal').classList.remove('active');
+  document.getElementById('authError').style.display = 'none';
+}
+
+function switchAuthTab(tab) {
+  S.authTab = tab;
+  const tabs = document.querySelectorAll('#authModal .modal-tab');
+  tabs.forEach(t => t.classList.remove('active'));
+  if (tab === 'login') {
+    tabs[0].classList.add('active');
+    document.getElementById('registerExtra').style.display = 'none';
+    document.getElementById('authSubmit').textContent = '登录';
+  } else {
+    tabs[1].classList.add('active');
+    document.getElementById('registerExtra').style.display = 'block';
+    document.getElementById('authSubmit').textContent = '注册';
+  }
   document.getElementById('authError').style.display = 'none';
 }
 
@@ -2437,7 +2650,7 @@ async function handleAuth(e) {
       if (found.state !== 'open') {
         const reopenRes = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + found.number, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json' },
           body: JSON.stringify({ state: 'open' })
         });
         if (!reopenRes.ok) {
@@ -2526,6 +2739,11 @@ function checkApproved() {
 }
 
 function closePublishModal() {
+  document.getElementById('publishModal').classList.remove('active');
+  document.getElementById('publishError').style.display = 'none';
+  document.getElementById('publishForm').reset();
+}
+
 function updatePublishCategories() {
   const t = document.getElementById('publishType').value;
   const cats = {
@@ -2636,6 +2854,9 @@ async function handlePublish(e) {
 }
 
 // ============ UI ============
+function updateUI() {
+  const menu = document.getElementById('userMenu');
+  const btn = document.getElementById('btnLogin');
   if (S.user) {
     menu.style.display = 'flex';
     btn.style.display = 'none';
@@ -2891,7 +3112,7 @@ async function saveMyPayment() {
   // 4. 先从云端拉取最新用户数据（防止覆盖别人的修改）
   try {
     const res = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + S.user._issue_number, {
-      
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
     });
     if (res.ok) {
       const issue = await res.json();
@@ -3101,7 +3322,7 @@ async function cleanOldData(days) {
             let cp = 1;
             while (true) {
               const cr = await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/' + issue.number + '/comments?per_page=100&page=' + cp, {
-                
+                headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
               });
               if (!cr.ok) break;
               const cList = await cr.json();
@@ -3113,7 +3334,7 @@ async function cleanOldData(days) {
             for (const c of allComments) {
               await fetch(API_BASE + '/api/proxy?path=/repos/' + REPO + '/issues/comments/' + c.id, {
                 method: 'DELETE',
-                
+                headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
               });
               commentCleaned++;
             }
@@ -3303,6 +3524,8 @@ function timeAgo(ds) {
   const diff = Math.floor((Date.now() - d) / 1000);
   if (diff < 60) return '刚刚';
   if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+  if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+  if (diff < 604800) return Math.floor(diff / 86400) + '天前';
   return ds.slice(0, 10);
 }
 
@@ -3428,5 +3651,6 @@ setInterval(function() {
   if (S.user && !document.hidden) checkOrderNotifications();
 }, 15000);
 </script>
+
 </body>
 </html>
