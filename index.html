@@ -770,9 +770,11 @@ async function loadStats() {
       ghIssues('user'),
       ghIssues('order', 'all')
     ]);
-    const orderList = orders.map(i => {
-      try { return JSON.parse(i.body); } catch(e) { return null; }
-    }).filter(Boolean);
+    const orderList = orders
+      .filter(i => i.state === 'open')
+      .map(i => {
+        try { return JSON.parse(i.body); } catch(e) { return null; }
+      }).filter(Boolean);
     document.getElementById('statOrders').textContent = orderList.filter(o => o.status !== 'completed' && o.status !== 'cancelled' && o.type !== 'chat').length;
     document.getElementById('statUsers').textContent = users.length;
   } catch(e) {
