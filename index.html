@@ -2003,6 +2003,11 @@ async function loadUserManagement() {
         + '<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">' + statusBadge + ' · ' + timeAgo(u.created_at) + ' 注册' + '</div>'
         + '</div>'
         + '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:12px">';
+      // 私信按钮（不给管理员自己显示）
+      const isNotSelf = u.student_id !== ADMIN_STUDENT_ID;
+      if (isNotSelf && u._state === 'open' && u.status === 'approved') {
+        html += '<button class="btn btn-sm btn-primary" onclick="adminStartChat(\'' + esc(u.student_id) + '\',\'' + esc(u.name || '') + '\',\'' + (u._issue_number || '') + '\')" style="white-space:nowrap">💬 私信</button>';
+      }
       if (u._state === 'open') {
         html += '<button class="btn btn-sm btn-danger" onclick="kickUser(' + u._issue_number + ',\'' + esc(u.name || u.student_id) + '\')" style="white-space:nowrap">🚫 踢出</button>';
       } else {
