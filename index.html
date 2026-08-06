@@ -1949,7 +1949,7 @@ async function loadUserManagement() {
     const users = issues.map(i => {
       try { const u = JSON.parse(i.body); u._issue_number = i.number; u._state = i.state; return u; }
       catch(e) { return null; }
-    }).filter(u => u).sort((a, b) => (a.student_id || '').localeCompare(b.student_id || ''));
+    }).filter(u => u && !u.deleted).sort((a, b) => (a.student_id || '').localeCompare(b.student_id || ''));
 
     if (users.length === 0) {
       ct.innerHTML = '<div class="empty-state"><p>暂无用户</p></div>';
@@ -2330,17 +2330,15 @@ async function cleanClosedUsers() {
   const closed = issues.filter(i => i.state !== 'open');
   if (closed.length === 0) { toast('没有已关闭的账号需要清理', 'info'); return; }
 
-  if (!confirm('确定要永久清理 ' + closed.length + ' 个已关闭账号吗？\n\n⚠️ 这些账号将被删除且无法恢复！')) return;
+  if (!confirm('确定要清理 ' + closed.length + ' 个已关闭账号吗？\n\n这些账号将被标记为已清理并从列表中隐藏。')) return;
 
   let cleaned = 0, failed = 0;
   for (const issue of closed) {
     try {
-      const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issue.number, {
-        method: 'DELETE',
-        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
-      });
-      if (res.ok) cleaned++;
-      else failed++;
+      const u = JSON.parse(issue.body);
+      u.deleted = true;
+      await ghUpdateIssue(issue.number, JSON.stringify(u));
+      cleaned++;
     } catch(e) { failed++; }
   }
 
