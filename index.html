@@ -1959,14 +1959,9 @@ async function loadUserManagement() {
     const openCount = users.filter(u => u._state === 'open').length;
     const closedCount = users.filter(u => u._state !== 'open').length;
 
-    let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">'
-      + '<p style="font-size:.85rem;color:var(--text-secondary);margin:0">共 <strong style="color:var(--primary)">' + openCount + '</strong> 个正常用户'
+    let html = '<p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:14px">共 <strong style="color:var(--primary)">' + openCount + '</strong> 个正常用户'
       + (closedCount > 0 ? '，<strong style="color:var(--danger)">' + closedCount + '</strong> 个已关闭' : '')
       + '</p>';
-    if (closedCount > 0) {
-      html += '<button class="btn btn-sm btn-danger" onclick="cleanClosedUsers()" style="white-space:nowrap">🗑 清理已关闭（' + closedCount + '）</button>';
-    }
-    html += '</div>';
     html += '<div style="max-height:450px;overflow-y:auto">';
     for (const u of users) {
       const stateBadge = u._state === 'open'
@@ -2329,31 +2324,6 @@ async function handleReport(num, action) {
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
 }
 
-async function cleanClosedUsers() {
-  // 找出所有已关闭用户
-  const issues = await ghIssues('user', 'all');
-  const closed = issues.filter(i => i.state !== 'open');
-  if (closed.length === 0) { toast('没有已关闭的账号需要清理', 'info'); return; }
-
-  if (!confirm('确定要清理 ' + closed.length + ' 个已关闭账号吗？\n\n这些账号将被标记为已清理并从列表中隐藏。')) return;
-
-  let cleaned = 0, failed = 0;
-  for (const issue of closed) {
-    try {
-      const u = JSON.parse(issue.body);
-      u.deleted = true;
-      await ghUpdateIssue(issue.number, JSON.stringify(u));
-      cleaned++;
-    } catch(e) { failed++; }
-  }
-
-  if (failed > 0) {
-    toast('清理完成：' + cleaned + ' 个成功，' + failed + ' 个失败', cleaned > 0 ? 'info' : 'error');
-  } else {
-    toast('🗑 已清理 ' + cleaned + ' 个已关闭账号', 'success');
-  }
-  await loadUserManagement();
-}
 
 // ============ VIP 会员系统 ============
 function isVIP() {
