@@ -212,9 +212,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 
 <header class="header">
   <div class="container nav-inner">
-    <a href="#" class="logo" onclick="navigate('home')">HUST互助</a>
-    <nav class="nav-links" id="navLinks">
-      <a href="#" class="nav-link active" data-page="home" onclick="navigate('home')">首页</a>
+    <nav class="nav-links" id="navLinks" style="margin:0 auto">
       <a href="#" class="nav-link" data-page="task" onclick="navigate('task')">任务大厅</a>
       <a href="#" class="nav-link" data-page="my" onclick="navigate('my')">我的</a>
     </nav>
@@ -223,7 +221,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <div class="user-menu" id="userMenu" style="display:none">
         <span class="user-name" id="userNameDisplay"></span>
         <span class="user-verified" title="已实名">已实名</span>
-        <button class="btn btn-outline btn-sm" onclick="showPublishModal()">+ 发布</button>
         <button class="btn btn-outline btn-sm" id="btnAdmin" style="display:none;background:var(--accent);color:#fff;border-color:var(--accent)" onclick="showAdminPanel()">审核</button>
         <button class="btn btn-ghost btn-sm" onclick="logout()">退出</button>
       </div>
@@ -234,6 +231,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 <section class="page" id="page-home">
   <div class="hero">
     <div class="container">
+      <div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin-bottom:6px">HUST互助</div>
       <h1 class="hero-title">校园生活，<span class="highlight">互相帮忙</span></h1>
       <p class="hero-subtitle">代拿快递、代取外卖、二手交易、帮打印…华科学子的校园互助平台</p>
       <div class="hero-stats" id="heroStats">
@@ -241,7 +239,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <div class="stat-item"><span class="stat-num" id="statUsers">0</span><span class="stat-label">实名用户</span></div>
       </div>
       <div class="hero-actions">
-        <button class="btn btn-primary btn-lg" onclick="navigate('task')">发布任务</button>
+        <button class="btn btn-primary btn-lg" onclick="showPublishModal()">发布任务</button>
         <button class="btn btn-outline btn-lg" onclick="navigate('task')">我要接单</button>
       </div>
     </div>
