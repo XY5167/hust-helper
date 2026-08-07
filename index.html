@@ -2075,31 +2075,25 @@ async function loadUserManagement() {
     const users = issues.map(i => {
       try { const u = JSON.parse(i.body); u._issue_number = i.number; u._state = i.state; return u; }
       catch(e) { return null; }
-    }).filter(u => u && !u.deleted).sort((a, b) => (a.student_id || '').localeCompare(b.student_id || ''));
+    }).filter(u => u && !u.deleted && u.status === 'approved' && u._state === 'open');
 
-    if (users.length === 0) {
-      ct.innerHTML = '<div class="empty-state"><p>暂无用户</p></div>';
+    // 按 student_id 去重，只保留最新一条
+    const uniqueUsers = [];
+    for (const u of users.sort((a, b) => b._issue_number - a._issue_number)) {
+      if (!uniqueUsers.find(x => x.student_id === u.student_id)) {
+        uniqueUsers.push(u);
+      }
+    }
+    uniqueUsers.sort((a, b) => (a.student_id || '').localeCompare(b.student_id || ''));
+
+    if (uniqueUsers.length === 0) {
+      ct.innerHTML = '<div class="empty-state"><p>暂无已通过用户</p></div>';
       return;
     }
 
-    const openCount = users.filter(u => u._state === 'open').length;
-    const closedCount = users.filter(u => u._state !== 'open').length;
-
-    let html = '<p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:14px">共 <strong style="color:var(--primary)">' + openCount + '</strong> 个正常用户'
-      + (closedCount > 0 ? '，<strong style="color:var(--danger)">' + closedCount + '</strong> 个已关闭' : '')
-      + '</p>';
+    let html = '<p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:14px">共 <strong style="color:var(--primary)">' + uniqueUsers.length + '</strong> 个用户</p>';
     html += '<div style="max-height:450px;overflow-y:auto">';
-    for (const u of users) {
-      const stateBadge = u._state === 'open'
-        ? '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:99px;font-size:.72rem">正常</span>'
-        : '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:99px;font-size:.72rem">已关闭</span>';
-      const statusBadge = u.status === 'approved'
-        ? '<span style="color:#16a34a;font-size:.75rem">✅ 已审核</span>'
-        : u.status === 'pending'
-        ? '<span style="color:#f59e0b;font-size:.75rem">⏳ 待审核</span>'
-        : u.status === 'rejected'
-        ? '<span style="color:#dc2626;font-size:.75rem">❌ 已拒绝</span>'
-        : '<span style="color:#94a3b8;font-size:.75rem">⚠️ 状态未知</span>';
+    for (const u of uniqueUsers) {
       const runnerBadge = u.runner_verified
         ? '<span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:99px;font-size:.7rem;margin-left:4px">🛵 跑腿</span>'
         : '';
@@ -2114,14 +2108,13 @@ async function loadUserManagement() {
         + '<strong>' + esc(u.name || '?') + '</strong>'
         + vipBadge
         + runnerBadge
-        + stateBadge
         + '</div>'
         + '<div style="font-size:.8rem;color:var(--text-secondary)">' + esc(u.student_id || '?')
         + (u.phone ? ' · 📱 ' + esc(u.phone) : '')
         + (u.dorm ? ' · 📍 ' + esc(u.dorm) : '')
         + (vipActive ? ' · ⭐ 会员到期：' + new Date(u.vip_expire).toLocaleDateString('zh-CN') : '')
         + '</div>'
-        + '<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">' + statusBadge + ' · ' + timeAgo(u.created_at) + ' 注册' + '</div>'
+        + '<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">' + timeAgo(u.created_at) + ' 注册' + '</div>'
         + '</div>'
         + '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:12px">';
       // 私信按钮（不给管理员自己显示）
