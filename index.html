@@ -1866,16 +1866,28 @@ async function loadAdminPanel() {
     }).filter(u => u);
 
     const pending = users.filter(u => u.status === 'pending');
+    // 按 student_id 去重，只保留最新一条（_issue_number 最大的）
+    const pendingDeduped = [];
+    for (const u of pending) {
+      const existing = pendingDeduped.findIndex(x => x.student_id === u.student_id);
+      if (existing >= 0) {
+        if (u._issue_number > pendingDeduped[existing]._issue_number) {
+          pendingDeduped[existing] = u;
+        }
+      } else {
+        pendingDeduped.push(u);
+      }
+    }
     const approved = users.filter(u => u.status !== 'pending' && u.status !== 'rejected' && u._state === 'open');
     const rejected = users.filter(u => u.status === 'rejected');
 
     let html = '';
-    html += '<h4 style="margin-bottom:10px">⏳ 待审核 (' + pending.length + ')</h4>';
-    if (pending.length === 0) {
+    html += '<h4 style="margin-bottom:10px">⏳ 待审核 (' + pendingDeduped.length + ')</h4>';
+    if (pendingDeduped.length === 0) {
       html += '<p style="color:var(--text-secondary);margin-bottom:16px">暂无待审核用户</p>';
     } else {
       html += '<div style="max-height:300px;overflow-y:auto;margin-bottom:16px">';
-      for (const u of pending) {
+      for (const u of pendingDeduped) {
         html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
           + '<div><strong>' + esc(u.name) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span>'
           + (u.email ? '<br><span style="font-size:.8rem;color:var(--text-secondary)">📧 ' + esc(u.email) + '</span>' : '')
@@ -2723,8 +2735,16 @@ function switchAuthTab(tab) {
   document.getElementById('authError').style.display = 'none';
 }
 
+let _authLock = false;
+
 async function handleAuth(e) {
   e.preventDefault();
+  if (_authLock) return;
+  _authLock = true;
+  const btn = document.getElementById('authSubmit');
+  btn.disabled = true;
+  btn.textContent = '提交中...';
+
   const sid = document.getElementById('authStudentId').value.trim().toUpperCase();
   const pw = document.getElementById('authPassword').value.trim();
   const name = document.getElementById('authName').value.trim();
@@ -2734,6 +2754,8 @@ async function handleAuth(e) {
 
   if (!sid || !pw) { err.textContent = '请填写学号和密码'; err.style.display = 'block'; return; }
   if (!/^U[0-9]{9,}$/.test(sid)) { err.textContent = '请输入有效的华科学号（如 U202312345）'; err.style.display = 'block'; return; }
+
+  try {
 
   if (S.authTab === 'register') {
     if (!name) { err.textContent = '请输入真实姓名完成实名认证'; err.style.display = 'block'; return; }
@@ -2845,6 +2867,11 @@ async function handleAuth(e) {
   if (S.page === 'task') refreshCurrentTab();
   else if (S.page !== 'home' && S.page !== 'my') {
     loadOrders(S.page, S.filter[S.page] || 'all');
+  }
+  } finally {
+    _authLock = false;
+    const btn2 = document.getElementById('authSubmit');
+    if (btn2) { btn2.disabled = false; btn2.textContent = S.authTab === 'register' ? '注册' : '登录'; }
   }
 }
 
