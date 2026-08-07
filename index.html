@@ -652,7 +652,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.3.4';
+const APP_VERSION = '1.3.5';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -901,17 +901,20 @@ async function loadOrders(type, cat) {
       } catch(e) { return null; }
     }).filter(o => o && o.status === 'open');
 
-    // 自动过期检查
+    // 自动过期检查（增加2小时缓冲期，避免订单一发布就消失）
     const now = new Date();
     for (const o of orders) {
       if (o.deadline && !o.taker_id) {
         const dl = new Date(o.deadline);
-        if (!isNaN(dl.getTime()) && dl < now) {
-          o.status = 'expired';
-          try {
-            await ghUpdateIssue(o._issue_number, JSON.stringify(o));
-            await ghCloseIssue(o._issue_number);
-          } catch(e) { /* 静默处理 */ }
+        if (!isNaN(dl.getTime())) {
+          const buffer = new Date(dl.getTime() + 2 * 60 * 60 * 1000); // 2小时缓冲
+          if (buffer < now) {
+            o.status = 'expired';
+            try {
+              await ghUpdateIssue(o._issue_number, JSON.stringify(o));
+              await ghCloseIssue(o._issue_number);
+            } catch(e) { /* 静默处理 */ }
+          }
         }
       }
     }
@@ -2907,6 +2910,10 @@ function showPublishModal() {
   if (!checkApproved()) return;
   document.getElementById('publishModal').classList.add('active');
   updatePublishCategories();
+  // 默认截止时间为明天同一时间
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  tomorrow.setMinutes(tomorrow.getMinutes() - tomorrow.getTimezoneOffset());
+  document.getElementById('publishDeadline').value = tomorrow.toISOString().slice(0, 16);
 }
 
 function checkApproved() {
@@ -2987,6 +2994,15 @@ async function handlePublish(e) {
     }
   }
   if (type !== 'qa' && !price) { err.textContent = '请填写报酬金额'; err.style.display = 'block'; return; }
+  // 校验截止时间必须大于当前时间
+  if (deadline) {
+    const dl = new Date(deadline);
+    if (!isNaN(dl.getTime()) && dl <= new Date()) {
+      err.textContent = '截止时间必须大于当前时间，请重新选择';
+      err.style.display = 'block';
+      return;
+    }
+  }
 
   // 图片上传到图床（ImgBB，免费，单张32MB）
   let images = [];
