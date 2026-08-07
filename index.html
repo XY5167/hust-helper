@@ -2745,16 +2745,27 @@ async function handleAuth(e) {
   const dorm = document.getElementById('authDorm') ? document.getElementById('authDorm').value.trim() : '';
   const err = document.getElementById('authError');
 
+  try {
   if (!sid || !pw) { err.textContent = '请填写学号和密码'; err.style.display = 'block'; return; }
   if (!/^U[0-9]{9,}$/.test(sid)) { err.textContent = '请输入有效的华科学号（如 U202312345）'; err.style.display = 'block'; return; }
 
-  try {
+  // sessionStorage 防跨页面重复提交（刷新页面后锁丢失的场景）
+  const regKey = 'hust_reg_' + sid;
+  if (S.authTab === 'register') {
+    if (sessionStorage.getItem(regKey)) {
+      err.textContent = '正在处理中，请勿重复提交。如长时间无响应请刷新页面后重试。';
+      err.style.display = 'block';
+      return;
+    }
+    sessionStorage.setItem(regKey, '1');
+  }
 
   if (S.authTab === 'register') {
     if (!name) { err.textContent = '请输入真实姓名完成实名认证'; err.style.display = 'block'; return; }
 
     try {
       // 查所有状态（open + closed），防止学号重复注册
+      btn.textContent = '检查中...';
       const issues = await ghIssues('user', 'all');
       const dup = issues.find(i => {
         try { const u = JSON.parse(i.body); return u.student_id === sid; } catch(e) { return false; }
@@ -2772,6 +2783,7 @@ async function handleAuth(e) {
       // 管理员自动审核通过
       const initialStatus = (sid === ADMIN_STUDENT_ID) ? 'approved' : 'pending';
       const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: initialStatus, vip_expire: null, created_at: new Date().toISOString() };
+      btn.textContent = '创建中...';
       let newIssue;
       try {
         newIssue = await ghCreateIssue(sid, JSON.stringify(userData), ['user']);
@@ -2863,6 +2875,8 @@ async function handleAuth(e) {
   }
   } finally {
     _authLock = false;
+    // 清理注册防重复标记
+    if (sid) { try { sessionStorage.removeItem('hust_reg_' + sid); } catch(e) {} }
     const btn2 = document.getElementById('authSubmit');
     if (btn2) { btn2.disabled = false; btn2.textContent = S.authTab === 'register' ? '注册' : '登录'; }
   }
