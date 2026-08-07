@@ -653,29 +653,43 @@ function checkSensitive(text) {
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
 const APP_VERSION = '1.3.4';
-// 版本检测：后台检查 GitHub raw 上的版本号，有新版本则提醒刷新
+// 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
   if (!v) { localStorage.setItem('hust_ver_checked', Date.now().toString()); return; }
   // 每 5 分钟后台检查一次版本
   if (Date.now() - parseInt(v) < 300000) return;
   localStorage.setItem('hust_ver_checked', Date.now().toString());
-  fetch('https://raw.githubusercontent.com/XY5167/hust-helper/main/version.txt?_=' + Date.now())
+  // 用同域 + no-store 确保拿到最新版本，和网站同步部署
+  fetch('https://xy5167.github.io/hust-helper/version.txt?_=' + Date.now(), { cache: 'no-store' })
     .then(r => r.text()).then(remote => {
       if (remote.trim() !== APP_VERSION) {
         localStorage.setItem('hust_ver_checked', '0'); // 下次立即检查
         const banner = document.createElement('div');
+        banner.id = 'updateBanner';
         banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#000;text-align:center;padding:8px;cursor:pointer;font-size:14px';
         banner.textContent = '🔄 有新版本可用，点击刷新';
         banner.onclick = function() {
-          // 只清除缓存，保留用户登录状态
-          try {
-            for (let i = localStorage.length - 1; i >= 0; i--) {
-              const k = localStorage.key(i);
-              if (k && k.startsWith('hust_c_')) localStorage.removeItem(k);
-            }
-          } catch(e) {}
-          location.replace(location.pathname + '?v=' + Date.now());
+          // 先强制拉最新版本确认，避免 CDN 缓存导致反复提示
+          fetch('https://xy5167.github.io/hust-helper/version.txt?_=' + Date.now(), { cache: 'no-store' })
+            .then(r => r.text()).then(latest => {
+              if (latest.trim() === APP_VERSION) {
+                // 实际已是最新版，只是缓存误报，直接隐藏提示条
+                banner.remove();
+                return;
+              }
+              // 确实需要刷新：清除缓存数据并强制绕过浏览器缓存重载
+              try {
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                  const k = localStorage.key(i);
+                  if (k && k.startsWith('hust_c_')) localStorage.removeItem(k);
+                }
+              } catch(e) {}
+              location.replace(location.pathname + '?reload=' + Date.now());
+            }).catch(() => {
+              // 网络异常，直接刷新
+              location.replace(location.pathname + '?reload=' + Date.now());
+            });
         };
         document.body.prepend(banner);
       }
