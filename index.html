@@ -3195,6 +3195,7 @@ async function loadMyOrders(myTab) {
   try {
     const issues = await ghIssues('order');
     const uid = S.user._issue_number || S.user.student_id;
+    const sid = S.user.student_id;
     let orders = issues.map(i => {
       try { const o = JSON.parse(i.body); o._issue_number = i.number; return o; }
       catch(e) { return null; }
@@ -3202,13 +3203,13 @@ async function loadMyOrders(myTab) {
 
     // 按 tab 筛选
     if (tab === 'published') {
-      orders = orders.filter(o => o.publisher_id == uid);
+      orders = orders.filter(o => o.publisher_id == uid || o.publisher_student_id == sid);
       // 二级子标签：普通订单 vs 私信对话
       if (subTab === 'order') orders = orders.filter(o => o.type !== 'chat');
       else if (subTab === 'chat') orders = orders.filter(o => o.type === 'chat');
     }
-    else if (tab === 'taken') orders = orders.filter(o => o.taker_id == uid);
-    else orders = orders.filter(o => o.publisher_id == uid || o.taker_id == uid);
+    else if (tab === 'taken') orders = orders.filter(o => o.taker_id == uid || o.taker_student_id == sid);
+    else orders = orders.filter(o => o.publisher_id == uid || o.taker_id == uid || o.publisher_student_id == sid || o.taker_student_id == sid);
 
     // 自动过期处理：截止时间已过且无人接单 → 自动取消
     const now = new Date();
@@ -3236,18 +3237,20 @@ async function loadMyOrders(myTab) {
     }
 
     listEl.innerHTML = orders.map(o => {
-      const role = o.publisher_id == uid ? '<span style="color:var(--primary);font-size:.75rem">我发起的</span>' : '<span style="color:var(--success);font-size:.75rem">我参与的</span>';
+      const isMyPub = o.publisher_id == uid || o.publisher_student_id == sid;
+      const isMyTake = o.taker_id == uid || o.taker_student_id == sid;
+      const role = isMyPub ? '<span style="color:var(--primary);font-size:.75rem">我发起的</span>' : '<span style="color:var(--success);font-size:.75rem">我参与的</span>';
       const isChat = o.type === 'chat';
       // 对方信息（点击可查看主页）
       let counterpartLink = '';
-      if (o.publisher_id == uid && o.taker_name) {
+      if (isMyPub && o.taker_name) {
         counterpartLink = '<span style="margin-left:auto;font-size:.78rem">🤝 <a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_name) + '</a></span>';
-      } else if (o.taker_id == uid) {
+      } else if (isMyTake) {
         counterpartLink = '<span style="margin-left:auto;font-size:.78rem">👤 <a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || '未知') + '</a></span>';
       }
       let rateBtn = '';
       if (o.status === 'completed' && !isChat) {
-        const isPublisher = o.publisher_id == uid;
+        const isPublisher = isMyPub;
         const hasRated = isPublisher ? o.publisher_rated : o.taker_rated;
         if (!hasRated) {
           rateBtn = '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();rateOrder(' + o._issue_number + ')" style="margin-top:4px">⭐ 评价</button>';
