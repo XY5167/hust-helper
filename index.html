@@ -652,7 +652,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1197,8 +1197,11 @@ async function showDetail(issueNum) {
     }
 
     let actions = '';
+    const currentUid = S.user ? (S.user._issue_number || S.user.student_id) : null;
+    const isPublisher = currentUid && (o.publisher_id === currentUid || o.publisher_student_id === currentUid);
+    const isOverdue = o.deadline && new Date(new Date(o.deadline).getTime() + 2 * 60 * 60 * 1000) < new Date();
     if (!isQA) {
-      if (S.user && o.status === 'open' && o.publisher_id !== (S.user._issue_number || S.user.student_id)) {
+      if (S.user && o.status === 'open' && o.publisher_id !== currentUid) {
         actions += '<button class="btn btn-primary" onclick="takeOrder(' + issueNum + ')">接单</button>';
         // 接单前询问：非发布者的任何人都可以向发布者发起私聊确认
         const pubSid = o.publisher_student_id || '';
@@ -1206,15 +1209,19 @@ async function showDetail(issueNum) {
         const pubIssueNum = o.publisher_id || '';
         actions += '<button class="btn btn-outline" onclick="createChatOrder(\'' + esc(pubSid) + '\',\'' + esc(pubName) + '\',\'' + esc(pubIssueNum) + '\',\'' + esc(o.title) + '\')">💬 询问发布者</button>';
       }
-      if (S.user && o.status === 'taken' && o.taker_id === (S.user._issue_number || S.user.student_id)) {
+      if (S.user && o.status === 'taken' && o.taker_id === currentUid) {
         actions += '<button class="btn btn-success" onclick="completeOrder(' + issueNum + ')">确认完成</button>';
       }
-      if (S.user && (o.publisher_id === (S.user._issue_number || S.user.student_id) || o.taker_id === (S.user._issue_number || S.user.student_id))) {
+      if (S.user && (o.publisher_id === currentUid || o.taker_id === currentUid)) {
         if (o.status === 'open' || o.status === 'taken') {
           actions += '<button class="btn btn-danger" onclick="cancelOrder(' + issueNum + ')">取消订单</button>';
         }
         if (o.status === 'taken' || o.status === 'completed') {
           actions += '<button class="btn btn-warning" onclick="showReportModal(' + issueNum + ')">投诉</button>';
+        }
+        // 发布者手动标记：已接单且逾期未完成 → 差评
+        if (o.status === 'taken' && isPublisher && isOverdue) {
+          actions += '<button class="btn btn-danger" onclick="markOrderIncomplete(' + issueNum + ')" style="background:#7f1d1d;border-color:#7f1d1d">❌ 逾期未处理，给差评</button>';
         }
       }
     }
@@ -1642,6 +1649,38 @@ async function rateOrder(inum) {
   } catch(e) { toast('评价失败：' + e.message, 'error'); }
 }
 
+// 发布者手动标记已接单订单逾期未完成的差评
+async function markOrderIncomplete(inum) {
+  if (!S.user) { showAuthModal(); return; }
+  if (!confirm('确认该订单未完成？\n接单人将被自动记 1 星差评，订单状态将变为"已过期"。')) return;
+
+  try {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    const issue = await res.json();
+    const o = JSON.parse(issue.body);
+
+    const uid = S.user._issue_number || S.user.student_id;
+    if (o.publisher_id != uid && o.publisher_student_id != uid) {
+      toast('只有发布者可以操作', 'error'); return;
+    }
+    if (o.status !== 'taken') { toast('只能标记已接单的订单', 'error'); return; }
+    if (o.publisher_rated) { toast('你已经评价过了', 'error'); return; }
+
+    o.status = 'expired';
+    o.cancel_reason = '接单人逾期未完成任务，发布者手动差评';
+    o.publisher_rated = 1;
+    o.bad_review = true;
+
+    await ghUpdateIssue(inum, JSON.stringify(o));
+    await ghCloseIssue(inum);
+    toast('已标记为未完成并给出差评', 'success');
+    closeDetailModal();
+    if (S.page === 'my') loadMyOrders(S.myTab);
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
 // ============ USER PROFILE ============
 async function showUserProfile(studentId) {
   if (!studentId) return;
@@ -1689,6 +1728,17 @@ async function showUserProfile(studentId) {
     const avgScore = scoreCount > 0 ? (totalScore / scoreCount).toFixed(1) : '暂无';
     const stars = scoreCount > 0 ? '⭐'.repeat(Math.round(totalScore / scoreCount)) : '—';
 
+    // 统计接单履约情况 & 差评
+    const userId = user._issue_number || user.student_id;
+    const takenOrders = orders.map(i => {
+      try { const o = JSON.parse(i.body); o._num = i.number; return o; }
+      catch(e) { return null; }
+    }).filter(o => o && (o.taker_id == userId || o.taker_student_id == userId));
+    const takenCompleted = takenOrders.filter(o => o.status === 'completed').length;
+    const takenExpiredBad = takenOrders.filter(o => o.status === 'expired' && o.bad_review).length;
+    const takenTotal = takenOrders.length;
+    const completionRate = takenTotal > 0 ? Math.round((takenCompleted / takenTotal) * 100) + '%' : '—';
+
     // 查看投诉记录
     let reportCount = 0;
     try {
@@ -1732,6 +1782,8 @@ async function showUserProfile(studentId) {
       + '<div style="display:flex;gap:12px;justify-content:center;margin-bottom:20px;flex-wrap:wrap">'
       + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + avgScore + '</div><div style="font-size:.75rem;color:var(--text-secondary)">平均评分</div></div>'
       + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + stars + '</div><div style="font-size:.75rem;color:var(--text-secondary)">' + scoreCount + '条评价</div></div>'
+      + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + completionRate + '</div><div style="font-size:.75rem;color:var(--text-secondary)">接单完成率</div></div>'
+      + (takenExpiredBad > 0 ? '<div style="text-align:center;padding:12px 18px;background:#fef2f2;border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#dc2626">' + takenExpiredBad + '</div><div style="font-size:.75rem;color:#dc2626">差评</div></div>' : '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#16a34a">0</div><div style="font-size:.75rem;color:var(--text-secondary)">差评</div></div>')
       + (reportCount > 0 ? '<div style="text-align:center;padding:12px 18px;background:#fef2f2;border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#dc2626">' + reportCount + '</div><div style="font-size:.75rem;color:#dc2626">被投诉</div></div>' : '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700;color:#16a34a">0</div><div style="font-size:.75rem;color:var(--text-secondary)">被投诉</div></div>')
       + '</div>'
       + (recentOrders.length > 0 ? '<h4 style="font-size:.95rem;margin-bottom:10px">最近订单</h4>' + recentOrders.slice(0, 2).map(o => {
@@ -3233,18 +3285,20 @@ async function loadMyOrders(myTab) {
     else if (tab === 'taken') orders = orders.filter(o => o.taker_id == uid || o.taker_student_id == sid);
     else orders = orders.filter(o => o.publisher_id == uid || o.taker_id == uid || o.publisher_student_id == sid || o.taker_student_id == sid);
 
-    // 自动过期处理：截止时间已过且无人接单 → 自动取消
+    // 自动过期处理：截止时间已过 → 自动取消
     const now = new Date();
     for (const o of orders) {
-      if (o.status === 'open' && o.deadline && !o.taker_id) {
-        const dl = new Date(o.deadline);
-        if (!isNaN(dl.getTime()) && dl < now) {
-          o.status = 'cancelled';
-          o.cancel_reason = '超时无人接单，系统自动取消';
-          try { await ghUpdateIssue(o._issue_number, JSON.stringify(o)); } catch(e) {}
-          try { await ghCloseIssue(o._issue_number); } catch(e) {}
-        }
+      if (!o.deadline) continue;
+      const dl = new Date(o.deadline);
+      if (isNaN(dl.getTime())) continue;
+      const buffer = new Date(dl.getTime() + 2 * 60 * 60 * 1000); // 2小时缓冲
+      if (buffer < now && o.status === 'open' && !o.taker_id) {
+        o.status = 'cancelled';
+        o.cancel_reason = '超时无人接单，系统自动取消';
+        try { await ghUpdateIssue(o._issue_number, JSON.stringify(o)); } catch(e) {}
+        try { await ghCloseIssue(o._issue_number); } catch(e) {}
       }
+      // 已接单订单逾期不自动差评，防止骑手只是忘记点"完成"；由发布者手动处理
     }
 
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
