@@ -652,7 +652,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.3.5';
+const APP_VERSION = '1.4.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1930,14 +1930,20 @@ async function approveUser(inum) {
     const issue = await res.json();
     const u = JSON.parse(issue.body);
     u.status = 'approved';
+    // 赠送7天免费会员试用
+    const trialExpire = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    u.vip_expire = trialExpire;
+    u.vip_trial = true;
     await ghUpdateIssue(inum, JSON.stringify(u));
     // 如果当前登录用户就是被审核人，更新本地状态
     if (S.user && (S.user._issue_number === inum || S.user.student_id === u.student_id)) {
       S.user.status = 'approved';
+      S.user.vip_expire = trialExpire;
+      S.user.vip_trial = true;
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       updateUI();
     }
-    toast('已通过审核', 'success');
+    toast('已通过审核，已赠送7天免费会员试用', 'success');
     await loadAdminPanel();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
 }
