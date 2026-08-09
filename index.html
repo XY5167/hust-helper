@@ -219,6 +219,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <div class="user-menu" id="userMenu" style="display:none">
         <span class="user-name" id="userNameDisplay"></span>
         <span class="user-verified" title="已实名">已实名</span>
+        <span class="user-verified user-credit" title="信用分" style="display:none;font-size:.7rem;padding:2px 7px;border-radius:99px"></span>
         <button class="btn btn-outline btn-sm" id="btnAdmin" style="display:none;background:var(--accent);color:#fff;border-color:var(--accent)" onclick="showAdminPanel()">审核</button>
         <button class="btn btn-ghost btn-sm" onclick="logout()">退出</button>
       </div>
@@ -652,7 +653,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1570,6 +1571,43 @@ async function getUserReportCount(targetId) {
   } catch(e) { return 0; }
 }
 
+// ============ 信用分系统 (v1.6.0) ============
+// 信用等级：85+优秀(无限制) 70-84良好 45-69一般(限制接单) 25-44较差(限制接单) <25危险(限制发单+接单)
+function getCreditLevel(score) {
+  if (score >= 85) return { text: '优秀', color: '#16a34a', bg: '#f0fdf4' };
+  if (score >= 70) return { text: '良好', color: '#2563eb', bg: '#eff6ff' };
+  if (score >= 45) return { text: '一般', color: '#f59e0b', bg: '#fffbeb' };
+  if (score >= 25) return { text: '较差', color: '#ea580c', bg: '#fff7ed' };
+  return { text: '危险', color: '#dc2626', bg: '#fef2f2' };
+}
+
+// 更新用户信用分（delta: 正数加分，负数扣分）
+async function updateCreditScore(userIssueNum, delta, reason) {
+  try {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + userIssueNum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    if (!res.ok) return null;
+    const issue = await res.json();
+    const u = JSON.parse(issue.body);
+    const oldScore = u.credit_score != null ? u.credit_score : 100;
+    const newScore = Math.max(0, Math.min(100, oldScore + delta));
+    u.credit_score = newScore;
+    if (!u.credit_history) u.credit_history = [];
+    u.credit_history.unshift({ score: delta, reason: reason, time: new Date().toISOString(), before: oldScore, after: newScore });
+    if (u.credit_history.length > 50) u.credit_history = u.credit_history.slice(0, 50);
+    await ghUpdateIssue(userIssueNum, JSON.stringify(u));
+    // 如果是当前登录用户，同步本地状态
+    if (S.user && (S.user._issue_number == userIssueNum || S.user.student_id == u.student_id)) {
+      S.user.credit_score = newScore;
+      S.user.credit_history = u.credit_history;
+      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      updateUI();
+    }
+    return newScore;
+  } catch(e) { console.error('updateCreditScore error:', e); return null; }
+}
+
 // 反馈中心
 async function showReportsView() {
   document.getElementById('reportsViewModal').classList.add('active');
@@ -1644,7 +1682,18 @@ async function rateOrder(inum) {
     }
 
     await ghUpdateIssue(inum, JSON.stringify(o));
-    toast('评价成功！感谢你的反馈 ⭐', 'success');
+
+    // 根据评分增减被评价方信用分
+    const ratedUserId = isPublisher ? o.taker_id : o.publisher_id;
+    const creditMap = { 5: 2, 4: 1, 3: 0, 2: -3, 1: -5 };
+    const delta = creditMap[score] || 0;
+    let creditMsg = '';
+    if (delta !== 0 && ratedUserId) {
+      const newScore = await updateCreditScore(ratedUserId, delta, '获得' + score + '星评价');
+      if (newScore != null) creditMsg = '（对方信用分 ' + (delta > 0 ? '+' : '') + delta + '）';
+    }
+
+    toast('评价成功！感谢你的反馈 ⭐' + creditMsg, 'success');
     if (S.page === 'my') loadMyOrders(S.myTab);
   } catch(e) { toast('评价失败：' + e.message, 'error'); }
 }
@@ -1675,7 +1724,13 @@ async function markOrderIncomplete(inum) {
 
     await ghUpdateIssue(inum, JSON.stringify(o));
     await ghCloseIssue(inum);
-    toast('已标记为未完成并给出差评', 'success');
+    // 接单人逾期未完成 -15 信用分
+    let creditMsg = '';
+    if (o.taker_id) {
+      const newScore = await updateCreditScore(o.taker_id, -15, '逾期未完成订单，被发布者差评');
+      if (newScore != null) creditMsg = '（对方信用分 -15，当前 ' + newScore + '）';
+    }
+    toast('已标记为未完成并给出差评' + creditMsg, 'success');
     closeDetailModal();
     if (S.page === 'my') loadMyOrders(S.myTab);
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
@@ -1772,6 +1827,11 @@ async function showUserProfile(studentId) {
       }
     }
 
+    // 信用分
+    const creditScore = user.credit_score != null ? user.credit_score : 100;
+    const creditLevel = getCreditLevel(creditScore);
+    const creditHistory = user.credit_history || [];
+
     ct.innerHTML = ''
       + '<div style="text-align:center;margin-bottom:16px">'
       + '<div style="width:64px;height:64px;border-radius:50%;background:var(--primary-light);color:var(--primary);font-size:1.5rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-bottom:8px">' + (user.name || '?').charAt(0).toUpperCase() + '</div>'
@@ -1779,6 +1839,17 @@ async function showUserProfile(studentId) {
       + '<p style="color:var(--text-secondary);font-size:.85rem;margin:4px 0">' + esc(user.student_id) + '</p>'
       + '</div>'
       + chatBtnHtml
+      // 信用分卡片
+      + '<div style="background:' + creditLevel.bg + ';border:1px solid ' + creditLevel.color + '33;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">'
+      + '<div>'
+      + '<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:2px">信用分</div>'
+      + '<div style="font-size:1.8rem;font-weight:700;color:' + creditLevel.color + '">' + creditScore + '</div>'
+      + '</div>'
+      + '<div style="text-align:right">'
+      + '<div style="display:inline-block;padding:4px 12px;border-radius:20px;background:' + creditLevel.color + ';color:#fff;font-size:.8rem;font-weight:600">' + creditLevel.text + '</div>'
+      + (creditScore < 100 ? '<div style="font-size:.7rem;color:var(--text-muted);margin-top:4px">完成订单可恢复信用分</div>' : '<div style="font-size:.7rem;color:var(--text-muted);margin-top:4px">信用良好</div>')
+      + '</div>'
+      + '</div>'
       + '<div style="display:flex;gap:12px;justify-content:center;margin-bottom:20px;flex-wrap:wrap">'
       + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + avgScore + '</div><div style="font-size:.75rem;color:var(--text-secondary)">平均评分</div></div>'
       + '<div style="text-align:center;padding:12px 18px;background:var(--bg);border-radius:8px"><div style="font-size:1.2rem;font-weight:700">' + stars + '</div><div style="font-size:.75rem;color:var(--text-secondary)">' + scoreCount + '条评价</div></div>'
@@ -1792,7 +1863,16 @@ async function showUserProfile(studentId) {
           + '<span style="font-size:.85rem">' + esc(o.title) + ' <span style="color:var(--text-muted);font-size:.75rem">(' + o.role + ')</span></span>'
           + '<span style="font-size:.85rem;color:var(--text-muted)">¥' + o.price.toFixed(2) + ' ' + (o.score ? '⭐' + o.score : '') + '</span>'
           + '</div>';
-      }).join('') : '<p style="color:var(--text-secondary);text-align:center">暂无订单记录</p>');
+      }).join('') : '<p style="color:var(--text-secondary);text-align:center">暂无订单记录</p>')
+      // 信用分变动记录
+      + (creditHistory.length > 0 ? '<h4 style="font-size:.95rem;margin:16px 0 10px">信用分变动</h4>' + creditHistory.slice(0, 5).map(h => {
+        const dt = h.score > 0 ? '+' + h.score : h.score;
+        const clr = h.score > 0 ? '#16a34a' : '#dc2626';
+        return '<div style="background:var(--bg);border-radius:6px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">'
+          + '<span style="font-size:.8rem">' + esc(h.reason || '调整') + '</span>'
+          + '<span style="font-size:.85rem;font-weight:600;color:' + clr + '">' + dt + '</span>'
+          + '</div>';
+      }).join('') : '');
   } catch(e) {
     ct.innerHTML = '<p style="color:var(--danger)">加载失败</p>';
   }
@@ -2534,9 +2614,14 @@ async function handleReport(num, action) {
     await ghUpdateIssue(num, JSON.stringify(r));
 
     if (action === 'resolved') {
-      const count = await getUserReportCount(r.target_id);
-      if (count >= 5) {
-        toast('⚠️ 该用户累计 ' + count + ' 次投诉成立，已达封停阈值！请到「用户管理」中处理。', 'info');
+      // 投诉成立：被投诉方 -10 信用分
+      if (r.target_id) {
+        const newScore = await updateCreditScore(r.target_id, -10, '投诉成立：' + (r.reason || ''));
+        if (newScore != null && newScore < 25) {
+          toast('⚠️ 被投诉方信用分已降至 ' + newScore + ' 分，账号将受到限制。', 'info');
+        } else if (newScore != null) {
+          toast('被投诉方信用分 -10，当前 ' + newScore + ' 分', 'info');
+        }
       }
     }
     if (action === 'malicious') {
@@ -2650,6 +2735,15 @@ async function getTodayMyOrders(type) {
 async function takeOrder(inum) {
   if (!S.user) { showAuthModal(); return; }
   if (!checkApproved()) return;
+  // 信用分检查：低于45禁止接单
+  if (!isAdminUser()) {
+    const cs = S.user.credit_score != null ? S.user.credit_score : 100;
+    if (cs < 45) {
+      const level = getCreditLevel(cs);
+      toast('⚠️ 您的信用分为 ' + cs + '（' + level.text + '），低于45分无法接单。请通过良好完成订单提升信用分。', 'error');
+      return;
+    }
+  }
   // 每日接单限制检查（非VIP 1天1单，管理员不受限）
   if (!isVIP() && !isAdminUser()) {
     const todayOrders = await getTodayMyOrders('taken');
@@ -2677,6 +2771,7 @@ async function takeOrder(inum) {
     o.taker_name = S.user.name;
     o.taker_student_id = S.user.student_id;
     o.taker_runner_verified = S.user.runner_verified || false;
+    o.taken_at = new Date().toISOString();
     // 接单时自动把接单人的收款码写入订单
     o.taker_payment_info = S.user.payment_info || '';
     o.taker_payment_image = S.user.payment_image || '';
@@ -2707,6 +2802,10 @@ async function completeOrder(inum) {
     await ghUpdateIssue(inum, JSON.stringify(o));
     // 自动清除对话评论
     await deleteAllComments(inum);
+    // 接单人完成订单 +1 信用分
+    if (o.taker_id && !isAdminUser()) {
+      await updateCreditScore(o.taker_id, 1, '完成订单：' + (o.title || ''));
+    }
     toast('订单完成！', 'success');
     closeDetailModal();
     // 乐观更新：直接从缓存中移除已完成订单
@@ -2728,11 +2827,37 @@ async function cancelOrder(inum) {
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
+
+    // 信用分扣分逻辑
+    const uid = S.user._issue_number || S.user.student_id;
+    const isTaker = o.taker_id == uid;
+    const isPublisher = o.publisher_id == uid;
+    let deductMsg = '';
+
+    if (o.status === 'taken' && !isAdminUser()) {
+      if (isTaker) {
+        // 接单人取消：检查接单时间，5分钟内免费取消
+        const takenTime = o.taken_at ? new Date(o.taken_at).getTime() : 0;
+        const elapsed = Date.now() - takenTime;
+        if (elapsed > 5 * 60 * 1000) {
+          // 超过5分钟扣5分
+          const newScore = await updateCreditScore(S.user._issue_number, -5, '接单后取消订单');
+          deductMsg = newScore != null ? '（信用分 -5，当前 ' + newScore + '）' : '';
+        } else {
+          deductMsg = '（5分钟内免费取消，不扣分）';
+        }
+      } else if (isPublisher) {
+        // 发布者取消已接单的订单：扣3分
+        const newScore = await updateCreditScore(S.user._issue_number, -3, '取消已被接单的订单');
+        deductMsg = newScore != null ? '（信用分 -3，当前 ' + newScore + '）' : '';
+      }
+    }
+
     o.status = 'cancelled';
     await ghUpdateIssue(inum, JSON.stringify(o));
     // 自动清除对话评论
     await deleteAllComments(inum);
-    toast('订单已取消', 'info');
+    toast('订单已取消' + deductMsg, 'info');
     closeDetailModal();
     // 乐观更新：直接从缓存中移除已取消订单
     if (_cachedOrders) {
@@ -2852,7 +2977,7 @@ async function handleAuth(e) {
 
       // 管理员自动审核通过
       const initialStatus = (sid === ADMIN_STUDENT_ID) ? 'approved' : 'pending';
-      const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: initialStatus, vip_expire: null, created_at: new Date().toISOString() };
+      const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
       btn.textContent = '创建中...';
       let newIssue;
       try {
@@ -2919,10 +3044,12 @@ async function handleAuth(e) {
         err.style.display = 'block';
         return;
       }
-      // 检查投诉次数（仅统计管理员裁定为"投诉成立"的）
-      const reportCount = await getUserReportCount(u._issue_number || u.student_id);
-      if (reportCount >= 5) {
-        err.textContent = '该账号已被累计投诉 ' + reportCount + ' 次且均裁定成立，已自动封停。如需申诉请联系管理员。';
+      // 确保信用分字段存在（兼容老用户）
+      if (u.credit_score == null) { u.credit_score = 100; u.credit_history = []; }
+      // 信用分过低限制登录
+      if (u.credit_score < 25 && sid !== ADMIN_STUDENT_ID) {
+        const level = getCreditLevel(u.credit_score);
+        err.textContent = '您的信用分仅为 ' + u.credit_score + ' 分（' + level.text + '），账号已被限制使用。良好完成订单可逐步恢复信用分，如需申诉请联系管理员。';
         err.style.display = 'block';
         return;
       }
@@ -3027,6 +3154,16 @@ function updatePublishCategories() {
 async function handlePublish(e) {
   e.preventDefault();
   const err = document.getElementById('publishError');
+  // 信用分检查：低于25禁止发单
+  if (!isAdminUser()) {
+    const cs = S.user.credit_score != null ? S.user.credit_score : 100;
+    if (cs < 25) {
+      const level = getCreditLevel(cs);
+      err.textContent = '您的信用分为 ' + cs + '（' + level.text + '），低于25分无法发布订单。如需申诉请联系管理员。';
+      err.style.display = 'block';
+      return;
+    }
+  }
   const type = document.getElementById('publishType').value;
   const cat = document.getElementById('publishCategory').value;
   const title = document.getElementById('publishTitle').value.trim();
@@ -3120,6 +3257,19 @@ function updateUI() {
     menu.style.display = 'flex';
     btn.style.display = 'none';
     document.getElementById('userNameDisplay').textContent = (isVIP() ? '⭐' : '') + (S.user.name || S.user.student_id);
+    // 信用分徽章
+    const cs = S.user.credit_score != null ? S.user.credit_score : 100;
+    const cl = getCreditLevel(cs);
+    const creditEl = menu.querySelector('.user-credit');
+    if (creditEl) {
+      if (cs < 85 && S.user.student_id !== ADMIN_STUDENT_ID) {
+        creditEl.textContent = '信用 ' + cs;
+        creditEl.style.background = cl.color;
+        creditEl.style.display = 'inline-block';
+      } else {
+        creditEl.style.display = 'none';
+      }
+    }
     // 显示认证跑腿徽章
     const verifiedEl = menu.querySelector('.user-verified');
     if (verifiedEl) {
