@@ -427,9 +427,9 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <!-- 邮箱验证区域 -->
         <div id="emailVerifySection">
           <div class="form-group">
-            <label>校园邮箱</label>
-            <input type="text" id="authEmail" readonly placeholder="输入学号后自动生成">
-            <p class="form-hint">验证码将发送到此邮箱，验证后可立即使用</p>
+            <label>接收验证码的邮箱</label>
+            <input type="text" id="authEmail" placeholder="默认 学号@hust.edu.cn，可改为任意邮箱" oninput="onEmailInput()">
+            <p class="form-hint">验证码将发送到此邮箱，验证通过后即可立即使用。可填写任意能收到邮件的邮箱。</p>
           </div>
           <div class="form-group verify-code-row">
             <input type="text" id="authVerifyCode" placeholder="6位验证码" maxlength="6" oninput="checkVerifyCode()">
@@ -726,7 +726,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.8.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1925,7 +1925,7 @@ async function showUserProfile(studentId) {
       + '<div style="width:64px;height:64px;border-radius:50%;background:var(--primary-light);color:var(--primary);font-size:1.5rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-bottom:8px">' + (user.name || '?').charAt(0).toUpperCase() + '</div>'
       + '<h3 style="margin:0">' + esc(user.name || '未知') + '</h3>'
       + '<p style="color:var(--text-secondary);font-size:.85rem;margin:4px 0">' + esc(user.student_id) + '</p>'
-      + (user.email_verified ? '<span style="display:inline-block;margin-top:2px;font-size:.72rem;color:#15803d;background:#dcfce7;padding:2px 8px;border-radius:99px">📧 校园邮箱已验证</span>' : '')
+      + (user.email_verified ? '<span style="display:inline-block;margin-top:2px;font-size:.72rem;color:#15803d;background:#dcfce7;padding:2px 8px;border-radius:99px">📧 邮箱已验证</span>' : '')
       + '</div>'
       + chatBtnHtml
       // 信用分卡片
@@ -3020,19 +3020,22 @@ let _emailCode = null;        // 当前生成的验证码
 let _emailCodeExpire = 0;     // 验证码过期时间戳
 let _emailVerified = false;   // 邮箱是否已通过验证
 let _lastSendAt = 0;          // 上次发送时间（60秒间隔）
+let _emailManuallyEdited = false; // 用户是否手动改过邮箱框
 
 function deriveEmail(sid) {
   return sid.toLowerCase() + '@hust.edu.cn';
 }
 
 function updateDerivedEmail() {
+  if (_emailManuallyEdited) return;
   const sid = (document.getElementById('authStudentId').value || '').trim().toUpperCase();
   const emailInput = document.getElementById('authEmail');
-  if (sid && /^U[0-9]{9,}$/.test(sid)) {
-    emailInput.value = deriveEmail(sid);
-  } else {
-    emailInput.value = '';
-  }
+  emailInput.value = (sid && /^U[0-9]{9,}$/.test(sid)) ? deriveEmail(sid) : '';
+}
+
+function onEmailInput() {
+  _emailManuallyEdited = true;
+  resetEmailVerify();
 }
 
 function resetEmailVerify() {
@@ -3040,10 +3043,13 @@ function resetEmailVerify() {
   _emailCodeExpire = 0;
   _emailVerified = false;
   _lastSendAt = 0;
+  _emailManuallyEdited = false;
   const codeInput = document.getElementById('authVerifyCode');
   const sendBtn = document.getElementById('sendCodeBtn');
+  const emailInput = document.getElementById('authEmail');
   if (codeInput) codeInput.value = '';
   if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '发送验证码'; }
+  if (emailInput && !emailInput.value) updateDerivedEmail();
 }
 
 function switchVerifyMethod(method) {
@@ -3068,13 +3074,17 @@ async function sendVerifyCode() {
     toast('请先在上方填写有效的学号', 'error');
     return;
   }
+  const toEmail = (document.getElementById('authEmail').value || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) {
+    toast('请填写有效的邮箱地址', 'error');
+    return;
+  }
   const now = Date.now();
   if (now - _lastSendAt < 60000) {
     const wait = Math.ceil((60000 - (now - _lastSendAt)) / 1000);
     toast('发送过于频繁，请 ' + wait + ' 秒后再试', 'error');
     return;
   }
-  const toEmail = deriveEmail(sid);
   const code = String(Math.floor(100000 + Math.random() * 900000));
   _emailCode = code;
   _emailCodeExpire = now + 10 * 60 * 1000; // 10分钟有效
@@ -3203,7 +3213,7 @@ async function handleAuth(e) {
       let initialStatus = (sid === ADMIN_STUDENT_ID) ? 'approved' : 'pending';
       if (verifyMethod === 'email') initialStatus = 'approved'; // 邮箱验证通过即放行
       const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
-      if (verifyMethod === 'email') { userData.email = deriveEmail(sid); userData.email_verified = true; }
+      if (verifyMethod === 'email') { userData.email = (document.getElementById('authEmail').value || '').trim().toLowerCase(); userData.email_verified = true; }
       else { userData.email_verified = false; }
       btn.textContent = '创建中...';
       let newIssue;
