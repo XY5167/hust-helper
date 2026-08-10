@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="version" content="1.3.4">
 <link rel="icon" type="image/png" href="favicon.png">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <title>HUST 校园互助</title>
 <style>
 :root {
@@ -219,6 +220,16 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .notify-item-title{font-weight:600;font-size:.88rem;margin-bottom:2px}
 .notify-item-desc{font-size:.8rem;color:var(--text-secondary);line-height:1.4}
 .notify-item-time{font-size:.7rem;color:var(--text-muted);margin-top:4px}
+/* 邮箱验证方式选择 */
+.verify-method-toggle{display:flex;gap:8px}
+.verify-method-option{flex:1;display:flex;align-items:center;gap:6px;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:.85rem;transition:all .2s}
+.verify-method-option:has(input:checked){border-color:var(--primary);background:rgba(26,115,232,.06)}
+.verify-method-option input{margin:0}
+.verify-code-row{display:flex;gap:8px;align-items:center}
+.verify-code-row input{flex:1}
+#sendCodeBtn{white-space:nowrap;min-width:100px}
+#sendCodeBtn:disabled{opacity:.6;cursor:not-allowed}
+.email-verified-badge{color:var(--success);font-size:.8rem;font-weight:600}
 </style>
 </head>
 <body>
@@ -351,7 +362,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     <form id="authForm" onsubmit="handleAuth(event)">
       <div class="form-group">
         <label>学号</label>
-        <input type="text" id="authStudentId" required placeholder="如 U202312345">
+        <input type="text" id="authStudentId" required placeholder="如 U202312345" oninput="updateDerivedEmail()">
       </div>
       <div id="registerExtra" style="display:none">
         <div class="form-group">
@@ -398,6 +409,38 @@ input,select,textarea{font-family:inherit;font-size:1rem}
               <option value="其他">其他</option>
             </optgroup>
           </select>
+        </div>
+        <!-- 验证方式选择 -->
+        <div class="form-group">
+          <label>身份验证方式</label>
+          <div class="verify-method-toggle">
+            <label class="verify-method-option">
+              <input type="radio" name="verifyMethod" value="email" checked onchange="switchVerifyMethod('email')">
+              <span>📧 邮箱验证（快速通过）</span>
+            </label>
+            <label class="verify-method-option">
+              <input type="radio" name="verifyMethod" value="manual" onchange="switchVerifyMethod('manual')">
+              <span>👤 人工验证（等待审核）</span>
+            </label>
+          </div>
+        </div>
+        <!-- 邮箱验证区域 -->
+        <div id="emailVerifySection">
+          <div class="form-group">
+            <label>校园邮箱</label>
+            <input type="text" id="authEmail" readonly placeholder="输入学号后自动生成">
+            <p class="form-hint">验证码将发送到此邮箱，验证后可立即使用</p>
+          </div>
+          <div class="form-group verify-code-row">
+            <input type="text" id="authVerifyCode" placeholder="6位验证码" maxlength="6" oninput="checkVerifyCode()">
+            <button type="button" class="btn btn-outline btn-sm" id="sendCodeBtn" onclick="sendVerifyCode()">发送验证码</button>
+          </div>
+        </div>
+        <!-- 人工验证提示 -->
+        <div id="manualVerifySection" style="display:none">
+          <p class="form-hint" style="padding:10px;background:var(--bg);border-radius:8px">
+            提交注册后需等待管理员人工审核，审核通过后方可使用。若无法收到校园邮件，请选择此方式。
+          </p>
         </div>
       </div>
       <div class="form-group">
@@ -651,6 +694,11 @@ const GITHUB_TOKEN = 'ghp_Eqf32ZmAqZxBAhY9nli' + 'cpxCYaHkl9G4HWyZv';
 // 如果提示上传失败/400，请去 https://api.imgbb.com/ 注册一个自己的 key 替换下面这行
 const IMGBB_API_KEY = '4d3ae82aeea4a3585cbb8a08c2f16d13';
 
+// EmailJS 邮箱验证码服务配置
+const EMAILJS_SERVICE_ID = 'service_2x1fq6s';
+const EMAILJS_TEMPLATE_ID = 'template_qfwrpts';
+const EMAILJS_PUBLIC_KEY = 'Qi_-O5OdtoznNnzjw';
+
 const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all' }, taskTab: 'task', myTab: 'all', myPublishedSubTab: 'order', goodsSubTab: 'all', goodsCategory: 'all' };
 
 // ============ 敏感词过滤 ============
@@ -678,7 +726,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.8.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -745,6 +793,8 @@ function cacheBust(key) {
   if (saved) try { S.user = JSON.parse(saved); } catch(e) {}
   if (S.user && !S.user._issue_number) ensureUserIssueNumber().then(updateUI).catch(()=>{});
   updateUI();
+  // 初始化 EmailJS
+  try { emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY }); } catch(e) { console.warn('EmailJS init failed:', e); }
   // 优先显示缓存数据，后台拉最新
   const cached = cacheGet('stats');
   if (cached) {
@@ -1875,6 +1925,7 @@ async function showUserProfile(studentId) {
       + '<div style="width:64px;height:64px;border-radius:50%;background:var(--primary-light);color:var(--primary);font-size:1.5rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-bottom:8px">' + (user.name || '?').charAt(0).toUpperCase() + '</div>'
       + '<h3 style="margin:0">' + esc(user.name || '未知') + '</h3>'
       + '<p style="color:var(--text-secondary);font-size:.85rem;margin:4px 0">' + esc(user.student_id) + '</p>'
+      + (user.email_verified ? '<span style="display:inline-block;margin-top:2px;font-size:.72rem;color:#15803d;background:#dcfce7;padding:2px 8px;border-radius:99px">📧 校园邮箱已验证</span>' : '')
       + '</div>'
       + chatBtnHtml
       // 信用分卡片
@@ -2072,6 +2123,7 @@ async function loadAdminPanel() {
       for (const u of pendingDeduped) {
         html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
           + '<div><strong>' + esc(u.name) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span>'
+          + (u.email_verified ? ' <span style="font-size:.72rem;color:#15803d;background:#dcfce7;padding:1px 6px;border-radius:99px">📧邮箱已验证</span>' : (u.status === 'pending' ? ' <span style="font-size:.72rem;color:#b45309;background:#fef3c7;padding:1px 6px;border-radius:99px">👤人工待核</span>' : ''))
           + (u.email ? '<br><span style="font-size:.8rem;color:var(--text-secondary)">📧 ' + esc(u.email) + '</span>' : '')
           + (u.phone ? ' <span style="font-size:.8rem;color:var(--text-secondary)">📱 ' + esc(u.phone) + '</span>' : '')
           + (u.dorm ? ' <span style="font-size:.8rem;color:var(--text-secondary)">📍 ' + esc(u.dorm) + '</span>' : '')
@@ -2963,6 +3015,115 @@ function closeAuthModal() {
   document.getElementById('authError').style.display = 'none';
 }
 
+// ===== 校园邮箱验证码验证（EmailJS，无需后端）=====
+let _emailCode = null;        // 当前生成的验证码
+let _emailCodeExpire = 0;     // 验证码过期时间戳
+let _emailVerified = false;   // 邮箱是否已通过验证
+let _lastSendAt = 0;          // 上次发送时间（60秒间隔）
+
+function deriveEmail(sid) {
+  return sid.toLowerCase() + '@hust.edu.cn';
+}
+
+function updateDerivedEmail() {
+  const sid = (document.getElementById('authStudentId').value || '').trim().toUpperCase();
+  const emailInput = document.getElementById('authEmail');
+  if (sid && /^U[0-9]{9,}$/.test(sid)) {
+    emailInput.value = deriveEmail(sid);
+  } else {
+    emailInput.value = '';
+  }
+}
+
+function resetEmailVerify() {
+  _emailCode = null;
+  _emailCodeExpire = 0;
+  _emailVerified = false;
+  _lastSendAt = 0;
+  const codeInput = document.getElementById('authVerifyCode');
+  const sendBtn = document.getElementById('sendCodeBtn');
+  if (codeInput) codeInput.value = '';
+  if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '发送验证码'; }
+}
+
+function switchVerifyMethod(method) {
+  const emailSec = document.getElementById('emailVerifySection');
+  const manualSec = document.getElementById('manualVerifySection');
+  if (method === 'email') {
+    emailSec.style.display = 'block';
+    manualSec.style.display = 'none';
+    updateDerivedEmail();
+  } else {
+    emailSec.style.display = 'none';
+    manualSec.style.display = 'block';
+  }
+  resetEmailVerify();
+}
+
+async function sendVerifyCode() {
+  const sid = (document.getElementById('authStudentId').value || '').trim().toUpperCase();
+  const btn = document.getElementById('sendCodeBtn');
+  const name = (document.getElementById('authName').value || '').trim();
+  if (!sid || !/^U[0-9]{9,}$/.test(sid)) {
+    toast('请先在上方填写有效的学号', 'error');
+    return;
+  }
+  const now = Date.now();
+  if (now - _lastSendAt < 60000) {
+    const wait = Math.ceil((60000 - (now - _lastSendAt)) / 1000);
+    toast('发送过于频繁，请 ' + wait + ' 秒后再试', 'error');
+    return;
+  }
+  const toEmail = deriveEmail(sid);
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  _emailCode = code;
+  _emailCodeExpire = now + 10 * 60 * 1000; // 10分钟有效
+  _emailVerified = false;
+  _lastSendAt = now;
+  btn.disabled = true;
+  try {
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email: toEmail,
+      verification_code: code,
+      student_name: name || '同学'
+    });
+    toast('验证码已发送至 ' + toEmail + '（若未收到请检查垃圾箱）', 'success');
+    let left = 60;
+    btn.textContent = left + 's';
+    const timer = setInterval(() => {
+      left--;
+      if (left <= 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '重新发送'; }
+      else btn.textContent = left + 's';
+    }, 1000);
+  } catch (ex) {
+    console.error(ex);
+    btn.disabled = false;
+    _emailCode = null;
+    toast('验证码发送失败：' + (ex && ex.text ? ex.text : (ex && ex.message ? ex.message : '请稍后重试')), 'error');
+  }
+}
+
+function checkVerifyCode() {
+  const input = document.getElementById('authVerifyCode');
+  const code = (input.value || '').trim();
+  if (!_emailCode) return;
+  if (Date.now() > _emailCodeExpire) {
+    _emailVerified = false;
+    _emailCode = null;
+    toast('验证码已过期，请重新发送', 'error');
+    return;
+  }
+  if (code.length === 6 && code === _emailCode) {
+    _emailVerified = true;
+    toast('邮箱验证通过 ✓', 'success');
+  }
+}
+
+function getVerifyMethod() {
+  const el = document.querySelector('input[name="verifyMethod"]:checked');
+  return (el && el.value) || 'email';
+}
+
 function switchAuthTab(tab) {
   S.authTab = tab;
   const tabs = document.querySelectorAll('#authModal .modal-tab');
@@ -3014,6 +3175,13 @@ async function handleAuth(e) {
   if (S.authTab === 'register') {
     if (!name) { err.textContent = '请输入真实姓名完成实名认证'; err.style.display = 'block'; return; }
 
+    const verifyMethod = getVerifyMethod();
+    if (verifyMethod === 'email' && !_emailVerified) {
+      err.textContent = '请先完成邮箱验证：点击"发送验证码"并填写收到的6位验证码。';
+      err.style.display = 'block';
+      return;
+    }
+
     try {
       // 查所有状态（open + closed），防止学号重复注册
       btn.textContent = '检查中...';
@@ -3032,8 +3200,11 @@ async function handleAuth(e) {
       }
 
       // 管理员自动审核通过
-      const initialStatus = (sid === ADMIN_STUDENT_ID) ? 'approved' : 'pending';
+      let initialStatus = (sid === ADMIN_STUDENT_ID) ? 'approved' : 'pending';
+      if (verifyMethod === 'email') initialStatus = 'approved'; // 邮箱验证通过即放行
       const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
+      if (verifyMethod === 'email') { userData.email = deriveEmail(sid); userData.email_verified = true; }
+      else { userData.email_verified = false; }
       btn.textContent = '创建中...';
       let newIssue;
       try {
@@ -3049,9 +3220,14 @@ async function handleAuth(e) {
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       updateUI();
       closeAuthModal();
-      toast('注册成功！请等待管理员审核通过后即可使用。', 'success');
-      // 注册后不自动登录，提示用户等待审核
-      S.user = null;
+      resetEmailVerify();
+      if (userData.status === 'approved') {
+        toast('注册成功！邮箱已验证，现在即可使用。', 'success');
+      } else {
+        toast('注册成功！请等待管理员审核通过后即可使用。', 'success');
+        // 注册后不自动登录，提示用户等待审核
+        S.user = null;
+      }
     } catch(ex) { console.error(ex); err.textContent = '注册失败：' + ex.message; err.style.display = 'block'; return; }
   } else {
     try {
