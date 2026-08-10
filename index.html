@@ -3393,12 +3393,14 @@ function updatePublishCategories() {
     locGroup.style.display = 'none';
     urgencyGroup.style.display = 'none';
     deadlineGroup.style.display = 'none';
+    document.getElementById('publishPrice').required = false; // 问答无报酬，移除必填，否则隐藏的 required 字段会静默拦截提交
   } else {
     priceGroup.style.display = 'block';
     payGroup.style.display = 'block';
     locGroup.style.display = 'block';
     urgencyGroup.style.display = 'block';
     deadlineGroup.style.display = 'block';
+    document.getElementById('publishPrice').required = true;
   }
 }
 
