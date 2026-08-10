@@ -734,7 +734,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1055,7 +1055,7 @@ function renderOrders(orders) {
     return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
       + '<div class="order-card-header">'
       + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>'
-      + '<span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span>'
+      + '<span class="order-card-status status-' + o.status + '">' + (o.type === 'qa' ? (o.solved ? '✅ 已解决' : '💬 待解答') : sl[o.status]) + '</span>'
       + '</div>'
       + thumbHTML
       + '<div class="order-card-title">' + esc(o.title) + urgencyBadge + '</div>'
@@ -1367,9 +1367,34 @@ async function showDetail(issueNum) {
       }
     }
 
+    // 问答悬赏收款信息（仿跑腿：发布者收款方式展示给答主）
+    let qaBountyHTML = '';
+    if (isQA && o.solved) {
+      const answererSid = o.best_comment_author;
+      const mySid = S.user ? S.user.student_id : null;
+      const isPub = S.user && (o.publisher_id == (S.user._issue_number || S.user.student_id) || o.publisher_student_id == mySid);
+      const isAnswerer = S.user && answererSid === mySid;
+      const isAdmin = S.user && S.user.student_id === ADMIN_STUDENT_ID;
+      if (o.bounty > 0) {
+        if (isAnswerer || isAdmin) {
+          qaBountyHTML = '<div style="margin-top:12px;padding:16px;background:#dcfce7;border-radius:8px;border:2px solid #16a34a"><strong>🎉 你的答案被采纳！赏金 ¥' + o.bounty.toFixed(2) + '（请向发布者收款）</strong><div style="margin-top:8px;font-size:.9rem">' + (o.payment ? esc(o.payment) : '发布者未填写收款方式，请直接联系：' + esc(o.publisher_name || '') + '（' + esc(o.publisher_student_id || '') + '）') + '</div></div>';
+        } else if (isPub) {
+          const ap = o.best_comment_payment_info;
+          const api = o.best_comment_payment_image;
+          qaBountyHTML = '<div style="margin-top:12px;padding:16px;background:#fef3c7;border-radius:8px;border:2px solid #d97706"><strong>✅ 已采纳最佳答案</strong><div style="margin-top:8px;font-size:.9rem">赏金 ¥' + o.bounty.toFixed(2) + ' 请通过以下收款方式支付给答主 ' + esc(o.best_comment_name || '') + '：' + (ap ? esc(ap) : '答主未设置收款信息，请直接联系 ' + esc(o.best_comment_name || '') + '（' + esc(answererSid || '') + '）') + '</div>'
+            + (api ? '<img src="' + esc(api) + '" style="max-width:200px;border-radius:8px;margin-top:8px;display:block">' : '')
+            + '</div>';
+        }
+      } else {
+        if (isAnswerer || isPub || isAdmin) {
+          qaBountyHTML = '<div style="margin-top:12px;padding:12px;background:#f0fdf4;border-radius:8px;font-size:.85rem">✅ 该问题已采纳最佳答案' + (isAnswerer ? '（你的答案）' : '') + '。</div>';
+        }
+      }
+    }
+
     ct.innerHTML = ''
       + '<div class="detail-header"><span class="detail-type type-' + (o.category || 'other') + '">' + tl[o.type] + '</span>'
-      + '<span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">' + sl[o.status] + '</span></div>'
+      + '<span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">' + (isQA ? (o.solved ? '✅ 已解决' : '💬 待解答') : sl[o.status]) + '</span></div>'
       + '<h3 class="detail-title">' + esc(o.title) + '</h3>'
       + (isQA ? (o.bounty > 0 ? '<div class="detail-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '（采纳最佳答案后线下支付）</div>' : '') : '<div class="detail-price">¥' + o.price.toFixed(2) + '</div>')
       + '<div class="detail-meta">'
@@ -1381,7 +1406,7 @@ async function showDetail(issueNum) {
       + '</div>'
       + imageHTML
       + '<div class="detail-desc">' + esc(o.description || '无详细描述') + '</div>'
-      + (isQA ? '' : paymentHTML + takerPayHTML)
+      + (isQA ? '' : paymentHTML + takerPayHTML) + qaBountyHTML
       + '<div class="detail-actions">' + actions + '</div>';
     // 加载评论区
     await loadComments(issueNum);
@@ -1458,15 +1483,18 @@ async function loadComments(issueNum) {
     const takerId = order ? order.taker_id : null;
     const pubSid = order ? order.publisher_student_id : null;
     const takerSid = order ? order.taker_student_id : null;
+    const isQA = !!(order && order.type === 'qa');
+    const isPublisher = (myId && pubId && myId == pubId) || (mySid && pubSid && mySid == pubSid);
 
     // 判断我是否是该订单的参与者
     const isParticipant = isAdmin
       || (myId && (myId == pubId || myId == takerId))
       || (mySid && (mySid == pubSid || mySid == takerSid));
 
-    // 私密过滤：只显示发布者、接单人、管理员发的评论
+    // 私密过滤：只显示发布者、接单人、管理员发的评论；问答(qa)公开，所有回答可见
     const visibleComments = comments.filter(c => {
       if (isAdmin) return true;
+      if (isQA) return true;
       try {
         const u = JSON.parse(c.body);
         const cId = u.student_id || '';
@@ -1478,7 +1506,11 @@ async function loadComments(issueNum) {
     let canSend = false;
     let sendHint = '';
     if (!S.user) {
-      sendHint = '请登录后发送消息';
+      sendHint = '请登录后回答';
+    } else if (isQA) {
+      // 问答公开回答：已登录即可回答（已解决仍可补充）
+      canSend = true;
+      if (order && order.solved) sendHint = '问题已解决，仍可补充回答';
     } else if (!isParticipant) {
       sendHint = '仅订单参与者可以发送消息';
     } else if (!order || order.status === 'open') {
@@ -1511,14 +1543,25 @@ async function loadComments(issueNum) {
           const u = JSON.parse(c.body);
           const name = u.name || '用户';
           const text = u.text || '';
+          const cId = u.student_id || '';
           const time = new Date(c.created_at).toLocaleString('zh-CN');
           const isMe = S.user && (u.student_id === S.user.student_id);
           const isAdminMsg = u.student_id === ADMIN_STUDENT_ID;
-          return '<div style="padding:8px 12px;margin-bottom:8px;background:' + (isMe ? '#eff6ff' : isAdminMsg ? '#fef3c7' : 'var(--bg)') + ';border-radius:8px">'
+          const isBest = order && order.solved && order.best_comment_id === c.id;
+          // 问答未解决 + (发布者或管理员) + 非发布者本人评论 → 显示采纳按钮
+          let acceptBtn = '';
+          if (isQA && order && !order.solved && (isPublisher || isAdmin) && cId !== pubSid && cId !== pubId) {
+            acceptBtn = '<button class="btn btn-sm btn-success" style="margin-top:8px" onclick="acceptAnswer(' + issueNum + ',' + c.id + ')">✅ 采纳为最佳答案</button>';
+          }
+          const boxStyle = 'padding:8px 12px;margin-bottom:8px;background:' + (isMe ? '#eff6ff' : isAdminMsg ? '#fef3c7' : (isBest ? '#f0fdf4' : 'var(--bg)')) + ';border-radius:8px' + (isBest ? ';border:2px solid #16a34a' : '');
+          return '<div style="' + boxStyle + '">'
+            + (isBest ? '<div style="font-size:.75rem;color:#16a34a;font-weight:600;margin-bottom:4px">✅ 最佳答案</div>' : '')
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
             + '<strong style="font-size:.82rem;color:' + (isMe ? 'var(--primary)' : isAdminMsg ? '#92400e' : 'var(--text)') + '">' + esc(name) + (isMe ? ' (我)' : '') + (isAdminMsg ? ' [管理员]' : '') + '</strong>'
             + '<span style="font-size:.7rem;color:var(--text-muted)">' + time + '</span></div>'
-            + '<div style="font-size:.88rem">' + esc(text) + '</div></div>';
+            + '<div style="font-size:.88rem">' + esc(text) + '</div>'
+            + acceptBtn
+            + '</div>';
         } catch(e) { return ''; }
       }).join('');
     }
@@ -1560,6 +1603,64 @@ async function sendComment(issueNum) {
     await loadComments(issueNum);
   } catch(e) { toast('发送失败：' + e.message, 'error'); }
   input.disabled = false;
+}
+
+// 问答：发布者采纳某条评论为最佳答案（悬赏线下支付给答主，仿跑腿收款）
+async function acceptAnswer(issueNum, commentId) {
+  try {
+    // 取订单，确认未采纳过
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    if (!res.ok) { toast('加载失败', 'error'); return; }
+    const issue = await res.json();
+    const o = JSON.parse(issue.body);
+    if (o.type !== 'qa') { toast('仅问答可采纳答案', 'error'); return; }
+    if (o.solved) { toast('该问题已采纳过最佳答案', 'error'); return; }
+
+    const bountyText = o.bounty > 0 ? ('赏金 ¥' + o.bounty.toFixed(2) + ' 将通过你的收款方式线下支付给对方。\n') : '';
+    if (!confirm('确认采纳该同学的答案为最佳答案？\n' + bountyText + '（采纳后答主可在问题页查看你的收款方式）')) return;
+
+    // 反查被采纳评论的作者与内容（评论 body 为 JSON {name,student_id,text}）
+    let bestName = '';
+    let bestText = '';
+    let bestSid = '';
+    try {
+      const cres = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum + '/comments?per_page=100', {
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+      });
+      if (cres.ok) {
+        const clist = await cres.json();
+        const c = clist.find(x => x.id === commentId);
+        if (c) { const u = JSON.parse(c.body); bestName = u.name || '同学'; bestText = u.text || ''; bestSid = u.student_id || ''; }
+      }
+    } catch(e) {}
+
+    o.solved = true;
+    o.best_comment_id = commentId;
+    o.best_comment_author = bestSid;
+    o.best_comment_name = bestName;
+    o.best_comment_text = bestText;
+    await ghUpdateIssue(issueNum, JSON.stringify(o));
+
+    // 给答主 +2 信用分，并复制答主收款信息到订单（仿跑腿接单时写入 taker_payment_info）
+    if (bestSid) {
+      try {
+        const allUsers = await ghIssues('user', 'all');
+        const answerer = allUsers.find(i => { try { const u = JSON.parse(i.body); return u.student_id === bestSid; } catch(e) { return false; } });
+        if (answerer && answerer.number) {
+          const au = JSON.parse(answerer.body);
+          o.best_comment_payment_info = au.payment_info || '';
+          o.best_comment_payment_image = au.payment_image || '';
+          await updateCreditScore(answerer.number, 2, '有问必答被采纳为最佳答案：' + (o.title || ''));
+        }
+      } catch(e) {}
+    }
+
+    toast('已采纳最佳答案！', 'success');
+    closeDetailModal();
+    showDetail(issueNum);
+  } catch(e) { toast('操作失败：' + e.message, 'error'); }
 }
 
 function startCommentPolling(issueNum) {
@@ -3667,7 +3768,7 @@ function renderMyOrders(orders, tab, subTab) {
       ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList2.slice(0, 3).map(img => '<img src="' + img + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList2.length > 3 ? '<div style="width:80px;height:80px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList2.length - 3) + '</div>' : '') + '</div>'
       : '';
     return '<div class="order-card" style="margin-bottom:12px' + (isChat ? ';border-left:3px solid #8b5cf6' : '') + '" onclick="showDetail(' + o._issue_number + ')">'
-      + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span><span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span></div>'
+      + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span><span class="order-card-status status-' + o.status + '">' + (o.type === 'qa' ? (o.solved ? '✅ 已解决' : '💬 待解答') : sl[o.status]) + '</span></div>'
       + thumbHTML2
       + '<div class="order-card-title">' + esc(o.title) + ' ' + role + '</div>'
       + metaHTML
