@@ -480,6 +480,14 @@ input,select,textarea{font-family:inherit;font-size:1rem}
         <label>详细描述</label>
         <textarea id="publishDesc" rows="3" placeholder="详细说明需求、地点等"></textarea>
       </div>
+      <div class="form-group" id="bountyGroup" style="display:none">
+        <label>🏆 悬赏费用（有问必答可选）</label>
+        <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:.85rem;cursor:pointer;margin-bottom:6px">
+          <input type="checkbox" id="bountyEnable" onchange="toggleBountyInput()"> 设置悬赏，吸引更多同学回答
+        </label>
+        <input type="number" id="publishBounty" placeholder="悬赏金额 ¥" step="0.01" min="0.01" style="display:none">
+        <p class="form-hint">悬赏金额会展示在问题卡片上。采纳最佳答案后，赏金通过站内收款信息线下支付（与跑腿收款方式一致）。</p>
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label>报酬 (¥)</label>
@@ -726,7 +734,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.10.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1053,7 +1061,9 @@ function renderOrders(orders) {
       + '<div class="order-card-title">' + esc(o.title) + urgencyBadge + '</div>'
       + (o.description ? '<div class="order-card-desc">' + esc(o.description) + '</div>' : '')
       + '<div class="order-card-meta">'
-      + '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>'
+      + (o.type === 'qa'
+          ? (o.bounty > 0 ? '<span class="order-card-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '</span>' : '<span style="color:var(--text-muted);font-size:.85rem">免费问答</span>')
+          : '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>')
       + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
       + '</div>'
       + '<div class="order-card-footer">'
@@ -1361,7 +1371,7 @@ async function showDetail(issueNum) {
       + '<div class="detail-header"><span class="detail-type type-' + (o.category || 'other') + '">' + tl[o.type] + '</span>'
       + '<span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">' + sl[o.status] + '</span></div>'
       + '<h3 class="detail-title">' + esc(o.title) + '</h3>'
-      + (isQA ? '' : '<div class="detail-price">¥' + o.price.toFixed(2) + '</div>')
+      + (isQA ? (o.bounty > 0 ? '<div class="detail-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '（采纳最佳答案后线下支付）</div>' : '') : '<div class="detail-price">¥' + o.price.toFixed(2) + '</div>')
       + '<div class="detail-meta">'
       + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
       + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
@@ -3387,6 +3397,9 @@ function updatePublishCategories() {
   const locGroup = document.getElementById('publishLocation').parentElement;
   const urgencyGroup = document.getElementById('publishUrgency').parentElement;
   const deadlineGroup = document.getElementById('publishDeadline').parentElement;
+  const bountyGroup = document.getElementById('bountyGroup');
+  const bountyEnable = document.getElementById('bountyEnable');
+  const bountyInput = document.getElementById('publishBounty');
   if (t === 'qa') {
     priceGroup.style.display = 'none';
     payGroup.style.display = 'none';
@@ -3394,6 +3407,11 @@ function updatePublishCategories() {
     urgencyGroup.style.display = 'none';
     deadlineGroup.style.display = 'none';
     document.getElementById('publishPrice').required = false; // 问答无报酬，移除必填，否则隐藏的 required 字段会静默拦截提交
+    bountyGroup.style.display = 'block';
+    bountyEnable.checked = false;
+    bountyInput.style.display = 'none';
+    bountyInput.value = '';
+    bountyInput.required = false;
   } else {
     priceGroup.style.display = 'block';
     payGroup.style.display = 'block';
@@ -3401,7 +3419,21 @@ function updatePublishCategories() {
     urgencyGroup.style.display = 'block';
     deadlineGroup.style.display = 'block';
     document.getElementById('publishPrice').required = true;
+    bountyGroup.style.display = 'none';
+    bountyEnable.checked = false;
+    bountyInput.style.display = 'none';
+    bountyInput.value = '';
+    bountyInput.required = false;
   }
+}
+
+// 问答悬赏开关：勾选后显示金额输入框
+function toggleBountyInput() {
+  const enable = document.getElementById('bountyEnable').checked;
+  const input = document.getElementById('publishBounty');
+  input.style.display = enable ? 'block' : 'none';
+  input.required = enable;
+  if (!enable) input.value = '';
 }
 
 async function handlePublish(e) {
@@ -3426,6 +3458,14 @@ async function handlePublish(e) {
   const urgency = document.getElementById('publishUrgency').value;
   const deadline = document.getElementById('publishDeadline').value.trim();
   const payment = document.getElementById('publishPayment').value.trim();
+  // 问答悬赏（可选）：仅 qa 且勾选了悬赏时读取金额
+  const bountyEnableEl = document.getElementById('bountyEnable');
+  const bountyVal = document.getElementById('publishBounty').value.trim();
+  let bounty = 0;
+  if (type === 'qa' && bountyEnableEl && bountyEnableEl.checked && bountyVal) {
+    bounty = parseFloat(bountyVal);
+    if (isNaN(bounty) || bounty <= 0) { err.textContent = '悬赏金额需大于 0'; err.style.display = 'block'; return; }
+  }
   const imgFiles = document.getElementById('publishImage').files;
 
   if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
@@ -3474,6 +3514,7 @@ async function handlePublish(e) {
 
   const order = {
     type, category: cat, title, description: desc, price: price || 0,
+    bounty: bounty || 0,
     location: loc, urgency, deadline, payment,
     images: images,
     status: 'open',
@@ -3617,7 +3658,9 @@ function renderMyOrders(orders, tab, subTab) {
     }
     const metaHTML = isChat
       ? '<div class="order-card-meta"><span style="color:var(--text-muted);font-size:.8rem">💬 私信对话</span></div>'
-      : '<div class="order-card-meta"><span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>';
+      : '<div class="order-card-meta">' + (o.type === 'qa'
+          ? (o.bounty > 0 ? '<span class="order-card-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '</span>' : '<span style="color:var(--text-muted);font-size:.85rem">免费问答</span>')
+          : '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>') + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>';
     // 缩略图
     const imgList2 = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     const thumbHTML2 = imgList2.length > 0
