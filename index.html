@@ -734,7 +734,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1001,6 +1001,12 @@ async function loadOrders(type, cat) {
               await ghCloseIssue(o._issue_number);
             } catch(e) { /* 静默处理 */ }
           }
+        }
+      } else if (o.type === 'qa' && o.bounty > 0 && !o.solved && o.first_answer_sid) {
+        // 有悬赏问答超时未采纳 → 自动结算（fire-and-forget，不阻塞列表渲染）
+        const created = new Date(o.created_at).getTime();
+        if (!isNaN(created) && Date.now() - created > AUTO_SETTLE_DAYS * 24 * 60 * 60 * 1000) {
+          autoSettleQa(o._issue_number).catch(() => {});
         }
       }
     }
@@ -1377,12 +1383,13 @@ async function showDetail(issueNum) {
       const isAdmin = S.user && S.user.student_id === ADMIN_STUDENT_ID;
       if (o.bounty > 0) {
         if (isAnswerer || isAdmin) {
-          qaBountyHTML = '<div style="margin-top:12px;padding:16px;background:#dcfce7;border-radius:8px;border:2px solid #16a34a"><strong>🎉 你的答案被采纳！赏金 ¥' + o.bounty.toFixed(2) + '（请向发布者收款）</strong><div style="margin-top:8px;font-size:.9rem">' + (o.payment ? esc(o.payment) : '发布者未填写收款方式，请直接联系：' + esc(o.publisher_name || '') + '（' + esc(o.publisher_student_id || '') + '）') + '</div></div>';
+          qaBountyHTML = '<div style="margin-top:12px;padding:16px;background:#dcfce7;border-radius:8px;border:2px solid #16a34a"><strong>🎉 你的答案被采纳！赏金 ¥' + o.bounty.toFixed(2) + '（请向发布者收款）</strong><div style="margin-top:8px;font-size:.9rem">' + (o.payment ? esc(o.payment) : '发布者未填写收款方式，请直接联系：' + esc(o.publisher_name || '') + '（' + esc(o.publisher_student_id || '') + '）') + '</div>' + (o.auto_settled ? '<div style="margin-top:6px;font-size:.78rem;color:#15803d">⏰ 系统已超时自动结算（发布者未主动采纳）</div>' : '') + '</div>';
         } else if (isPub) {
           const ap = o.best_comment_payment_info;
           const api = o.best_comment_payment_image;
           qaBountyHTML = '<div style="margin-top:12px;padding:16px;background:#fef3c7;border-radius:8px;border:2px solid #d97706"><strong>✅ 已采纳最佳答案</strong><div style="margin-top:8px;font-size:.9rem">赏金 ¥' + o.bounty.toFixed(2) + ' 请通过以下收款方式支付给答主 ' + esc(o.best_comment_name || '') + '：' + (ap ? esc(ap) : '答主未设置收款信息，请直接联系 ' + esc(o.best_comment_name || '') + '（' + esc(answererSid || '') + '）') + '</div>'
             + (api ? '<img src="' + esc(api) + '" style="max-width:200px;border-radius:8px;margin-top:8px;display:block">' : '')
+            + (o.auto_settled ? '<div style="margin-top:6px;font-size:.78rem;color:#92400e">⏰ 该问题已超时自动结算（你未主动采纳，信用分已扣减）</div>' : '')
             + '</div>';
         }
       } else {
@@ -1599,6 +1606,24 @@ async function sendComment(issueNum) {
         body: JSON.stringify({ body })
       });
     }
+    // 问答：记录回答数，供超时自动结算挑选最佳答案
+    try {
+      const ores = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum, {
+        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+      });
+      if (ores.ok) {
+        const oi = await ores.json();
+        const od = JSON.parse(oi.body);
+        if (od.type === 'qa' && !od.solved) {
+          od.qa_answer_count = (od.qa_answer_count || 0) + 1;
+          if (!od.first_answer_sid) {
+            od.first_answer_sid = S.user.student_id;
+            od.first_answer_name = S.user.name;
+          }
+          await ghUpdateIssue(issueNum, JSON.stringify(od));
+        }
+      }
+    } catch(e) { /* 静默处理，不影响发消息 */ }
     input.value = '';
     await loadComments(issueNum);
   } catch(e) { toast('发送失败：' + e.message, 'error'); }
@@ -1661,6 +1686,48 @@ async function acceptAnswer(issueNum, commentId) {
     closeDetailModal();
     showDetail(issueNum);
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+// 问答超时自动结算：有悬赏且已有回答的问答，超过 AUTO_SETTLE_DAYS 天未主动采纳 → 自动采纳首个答案
+// （仿跑腿收款：暴露发布者收款信息给答主，答主+2信用；penalizePublisher=false 时由调用方另行扣分，避免重复惩罚）
+const AUTO_SETTLE_DAYS = 7;
+async function autoSettleQa(issueNum, penalizePublisher = true) {
+  try {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+    });
+    if (!res.ok) return;
+    const issue = await res.json();
+    const o = JSON.parse(issue.body);
+    if (o.type !== 'qa' || !o.bounty || o.bounty <= 0 || o.solved) return;
+    if (!o.first_answer_sid) return; // 无回答不结算
+    const created = new Date(o.created_at).getTime();
+    if (isNaN(created) || Date.now() - created < AUTO_SETTLE_DAYS * 24 * 60 * 60 * 1000) return;
+
+    o.solved = true;
+    o.auto_settled = true;
+    o.best_comment_author = o.first_answer_sid;
+    o.best_comment_name = o.first_answer_name || '同学';
+    o.best_comment_text = '';
+
+    // 复制答主收款信息 + 答主+2信用 + （可选）发布者-3信用（挂赏长期不结算惩罚）
+    try {
+      const allUsers = await ghIssues('user', 'all');
+      const answerer = allUsers.find(i => { try { const u = JSON.parse(i.body); return u.student_id === o.first_answer_sid; } catch(e) { return false; } });
+      if (answerer && answerer.number) {
+        const au = JSON.parse(answerer.body);
+        o.best_comment_payment_info = au.payment_info || '';
+        o.best_comment_payment_image = au.payment_image || '';
+        await updateCreditScore(answerer.number, 2, '有问必答超时自动结算（首个答案被采纳）：' + (o.title || ''));
+      }
+      if (penalizePublisher && (o.publisher_id || o.publisher_student_id)) {
+        const pubId = o.publisher_id || o.publisher_student_id;
+        await updateCreditScore(pubId, -3, '有问必答悬赏超时未主动采纳（自动结算）：' + (o.title || ''));
+      }
+    } catch(e) {}
+
+    await ghUpdateIssue(issueNum, JSON.stringify(o));
+  } catch(e) { /* 静默处理 */ }
 }
 
 function startCommentPolling(issueNum) {
@@ -2831,6 +2898,22 @@ async function handleReport(num, action) {
           toast('被投诉方信用分 -10，当前 ' + newScore + ' 分', 'info');
         }
       }
+      // 投诉仲裁：若关联的是悬赏问答且仍未结算 → 自动结算（暴露收款信息给答主、答主+2信用）
+      // 发布者已由投诉成立扣 -10，此处不再重复扣分
+      if (r.order_issue_number) {
+        try {
+          const ores = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + r.order_issue_number, {
+            headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+          });
+          if (ores.ok) {
+            const od = JSON.parse((await ores.json()).body);
+            if (od.type === 'qa' && od.bounty > 0 && !od.solved) {
+              await autoSettleQa(r.order_issue_number, false);
+              toast('该悬赏问答已自动结算，答主可查看到你的收款方式', 'info');
+            }
+          }
+        } catch(e) {}
+      }
     }
     if (action === 'malicious') {
       try {
@@ -3566,6 +3649,15 @@ async function handlePublish(e) {
   if (type === 'qa' && bountyEnableEl && bountyEnableEl.checked && bountyVal) {
     bounty = parseFloat(bountyVal);
     if (isNaN(bounty) || bounty <= 0) { err.textContent = '悬赏金额需大于 0'; err.style.display = 'block'; return; }
+    // 信用约束：信用分过低禁止发布悬赏问答（阈值与接单限制一致，避免赖账风险）
+    if (!isAdminUser()) {
+      const cs = S.user.credit_score != null ? S.user.credit_score : 100;
+      if (cs < 45) {
+        err.textContent = '信用分过低（当前 ' + cs + '），暂不能发布悬赏问答。请先完成订单恢复信用。';
+        err.style.display = 'block';
+        return;
+      }
+    }
   }
   const imgFiles = document.getElementById('publishImage').files;
 
