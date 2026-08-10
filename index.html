@@ -726,7 +726,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.8.5';
+const APP_VERSION = '1.9.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -2144,6 +2144,15 @@ async function loadAdminPanel() {
   }
 }
 
+// ============ 赠送 7 天免费会员试用 ============
+function grantTrialVip(userData) {
+  if (userData.vip_expire && new Date(userData.vip_expire) > new Date()) return userData.vip_expire; // 已有效则跳过，避免重复赠送
+  const trialExpire = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  userData.vip_expire = trialExpire;
+  userData.vip_trial = true;
+  return trialExpire;
+}
+
 async function approveUser(inum) {
   try {
     const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
@@ -2153,9 +2162,7 @@ async function approveUser(inum) {
     const u = JSON.parse(issue.body);
     u.status = 'approved';
     // 赠送7天免费会员试用
-    const trialExpire = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    u.vip_expire = trialExpire;
-    u.vip_trial = true;
+    const trialExpire = grantTrialVip(u);
     await ghUpdateIssue(inum, JSON.stringify(u));
     // 如果当前登录用户就是被审核人，更新本地状态
     if (S.user && (S.user._issue_number === inum || S.user.student_id === u.student_id)) {
@@ -3216,6 +3223,7 @@ async function handleAuth(e) {
       const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
       if (verifyMethod === 'email') { userData.email = (document.getElementById('authEmail').value || '').trim().toLowerCase(); userData.email_verified = true; }
       else { userData.email_verified = false; }
+      grantTrialVip(userData); // 新注册用户统一赠送 7 天试用会员
       btn.textContent = '创建中...';
       let newIssue;
       try {
