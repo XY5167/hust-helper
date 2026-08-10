@@ -203,6 +203,22 @@ input,select,textarea{font-family:inherit;font-size:1rem}
   .hero{padding:44px 0 30px}
   .hero-title{font-size:1.4rem}
 }
+/* 通知铃铛与面板 */
+.nav-notify-btn{position:relative;background:none;border:none;cursor:pointer;font-size:1.15rem;padding:4px 8px;border-radius:50%;color:var(--text);transition:background .15s;line-height:1}
+.nav-notify-btn:hover{background:var(--bg)}
+.notify-badge{position:absolute;top:-2px;right:0;background:#dc2626;color:#fff;font-size:.65rem;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 4px;font-weight:700}
+.notify-panel{display:none;position:fixed;top:56px;right:16px;width:340px;max-height:480px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:1000;overflow:hidden;flex-direction:column}
+.notify-panel.active{display:flex}
+.notify-panel-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border)}
+.notify-list{overflow-y:auto;flex:1;max-height:420px}
+.notify-item{display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.notify-item:hover{background:var(--bg)}
+.notify-item.unread{background:rgba(59,130,246,.06)}
+.notify-item-icon{font-size:1.2rem;flex-shrink:0}
+.notify-item-body{flex:1;min-width:0}
+.notify-item-title{font-weight:600;font-size:.88rem;margin-bottom:2px}
+.notify-item-desc{font-size:.8rem;color:var(--text-secondary);line-height:1.4}
+.notify-item-time{font-size:.7rem;color:var(--text-muted);margin-top:4px}
 </style>
 </head>
 <body>
@@ -217,6 +233,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     <div class="header-actions" id="headerActions">
       <button class="btn btn-outline btn-sm" onclick="showAuthModal()" id="btnLogin">登录</button>
       <div class="user-menu" id="userMenu" style="display:none">
+        <button class="nav-notify-btn" id="navNotifyBtn" onclick="toggleNotifyPanel()" title="消息通知">🔔</button>
         <span class="user-name" id="userNameDisplay"></span>
         <span class="user-verified" title="已实名">已实名</span>
         <span class="user-verified user-credit" title="信用分" style="display:none;font-size:.7rem;padding:2px 7px;border-radius:99px"></span>
@@ -226,6 +243,14 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     </div>
   </div>
 </header>
+
+<div class="notify-panel" id="notifyPanel">
+  <div class="notify-panel-header">
+    <span style="font-weight:600">消息通知</span>
+    <button class="btn btn-sm btn-ghost" onclick="markAllNotificationsRead()">全部已读</button>
+  </div>
+  <div class="notify-list"></div>
+</div>
 
 <section class="page" id="page-home">
   <div class="hero">
@@ -653,7 +678,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -697,7 +722,7 @@ const APP_VERSION = '1.6.0';
     }).catch(()=>{});
 })();
 
-const CACHE_TTL = { orders: 60000, stats: 120000, users: 120000 };
+const CACHE_TTL = { orders: 60000, stats: 120000, users: 120000, myorders: 60000 };
 function cacheGet(key) {
   try {
     const item = localStorage.getItem('hust_c_' + key);
@@ -861,6 +886,8 @@ async function loadStats() {
 // ============ ORDERS ============
 let _cachedOrders = null;
 let _cachedType = null;
+let _cachedMyOrders = null;
+let _cachedMyTab = null;
 
 function refreshCurrentTab() {
   const tab = S.taskTab || 'task';
@@ -1603,6 +1630,13 @@ async function updateCreditScore(userIssueNum, delta, reason) {
       S.user.credit_history = u.credit_history;
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       updateUI();
+      // 信用分跌破阈值时通知（仅在跨越阈值那一刻，避免重复）
+      if (delta < 0) {
+        if (oldScore >= 45 && newScore < 45)
+          sendNotify('⚠️ 信用分下降', '你的信用分降至 ' + newScore + '，已限制接单。请按时完成订单恢复信用。', {icon:'⚠️', link:'my'});
+        if (oldScore >= 25 && newScore < 25)
+          sendNotify('🚫 信用分过低', '你的信用分仅为 ' + newScore + '，已限制发布和接单。请联系管理员申诉。', {icon:'🚫', link:'my'});
+      }
     }
     return newScore;
   } catch(e) { console.error('updateCreditScore error:', e); return null; }
@@ -1724,15 +1758,19 @@ async function markOrderIncomplete(inum) {
 
     await ghUpdateIssue(inum, JSON.stringify(o));
     await ghCloseIssue(inum);
-    // 接单人逾期未完成 -15 信用分
+    // 接单人逾期未完成 -15 信用分（同步等待以显示结果）
     let creditMsg = '';
     if (o.taker_id) {
       const newScore = await updateCreditScore(o.taker_id, -15, '逾期未完成订单，被发布者差评');
       if (newScore != null) creditMsg = '（对方信用分 -15，当前 ' + newScore + '）';
     }
+    // === 本地优先：立即反馈界面 ===
     toast('已标记为未完成并给出差评' + creditMsg, 'success');
     closeDetailModal();
-    if (S.page === 'my') loadMyOrders(S.myTab);
+    optimisticUpdateMyOrder(inum, 'expired');
+    cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+    cacheBust('orders_' + (S.taskTab || 'task'));
+    cacheBust('stats'); loadStats();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
 }
 
@@ -2789,6 +2827,27 @@ async function takeOrder(inum) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+// 乐观更新我的订单缓存并立即重渲染（点击即响应，不等后台同步）
+function optimisticUpdateMyOrder(inum, newStatus) {
+  if (_cachedMyOrders) {
+    const idx = _cachedMyOrders.findIndex(x => x._issue_number === inum);
+    if (idx >= 0) {
+      if (newStatus) _cachedMyOrders[idx].status = newStatus;
+      else _cachedMyOrders.splice(idx, 1);
+      renderMyOrders(_cachedMyOrders, S.myTab, S.myPublishedSubTab);
+    }
+  }
+  if (_cachedOrders) {
+    if (newStatus) {
+      const i2 = _cachedOrders.findIndex(x => x._issue_number === inum);
+      if (i2 >= 0) { _cachedOrders[i2].status = newStatus; renderOrders(_cachedOrders); }
+    } else {
+      _cachedOrders = _cachedOrders.filter(x => x._issue_number !== inum);
+      renderOrders(_cachedOrders);
+    }
+  }
+}
+
 async function completeOrder(inum) {
   if (!confirm('确认订单已完成？')) return;
   try {
@@ -2800,22 +2859,17 @@ async function completeOrder(inum) {
     if (o.status !== 'taken') { toast('订单状态不正确', 'error'); return; }
     o.status = 'completed';
     await ghUpdateIssue(inum, JSON.stringify(o));
-    // 自动清除对话评论
-    await deleteAllComments(inum);
-    // 接单人完成订单 +1 信用分
-    if (o.taker_id && !isAdminUser()) {
-      await updateCreditScore(o.taker_id, 1, '完成订单：' + (o.title || ''));
-    }
+    // === 本地优先：状态已存，立即反馈界面 ===
     toast('订单完成！', 'success');
     closeDetailModal();
-    // 乐观更新：直接从缓存中移除已完成订单
-    if (_cachedOrders) {
-      _cachedOrders = _cachedOrders.filter(x => x._issue_number !== inum);
-      renderOrders(_cachedOrders);
-    }
-    if (S.page === 'my') loadMyOrders();
-    else if (S.page === 'task') { cacheBust('orders_' + (S.taskTab || 'task')); setTimeout(() => refreshCurrentTab(), 1500); }
+    optimisticUpdateMyOrder(inum, 'completed');
+    cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+    cacheBust('orders_' + (S.taskTab || 'task'));
     cacheBust('stats'); loadStats();
+    // === 后台静默同步，不阻塞界面 ===
+    deleteAllComments(inum).catch(()=>{});
+    if (o.taker_id && !isAdminUser()) updateCreditScore(o.taker_id, 1, '完成订单：' + (o.title || '')).catch(()=>{});
+    if (S.page === 'task') setTimeout(() => refreshCurrentTab(), 1500);
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -2855,18 +2909,16 @@ async function cancelOrder(inum) {
 
     o.status = 'cancelled';
     await ghUpdateIssue(inum, JSON.stringify(o));
-    // 自动清除对话评论
-    await deleteAllComments(inum);
+    // === 本地优先：状态已存，立即反馈界面 ===
     toast('订单已取消' + deductMsg, 'info');
     closeDetailModal();
-    // 乐观更新：直接从缓存中移除已取消订单
-    if (_cachedOrders) {
-      _cachedOrders = _cachedOrders.filter(x => x._issue_number !== inum);
-      renderOrders(_cachedOrders);
-    }
-    if (S.page === 'my') loadMyOrders();
-    else if (S.page === 'task') { setTimeout(() => refreshCurrentTab(), 1500); }
+    optimisticUpdateMyOrder(inum, 'cancelled');
+    cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+    cacheBust('orders_' + (S.taskTab || 'task'));
     cacheBust('stats'); loadStats();
+    // === 后台静默同步，不阻塞界面 ===
+    deleteAllComments(inum).catch(()=>{});
+    if (S.page === 'task') setTimeout(() => refreshCurrentTab(), 1500);
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -2886,12 +2938,16 @@ async function deleteAllComments(inum) {
       if (comments.length < 100) break;
       page++;
     }
-    const comments = allComments;
-    for (const c of comments) {
-      await fetch(API_BASE + '/repos/' + REPO + '/issues/comments/' + c.id, {
-        method: 'DELETE',
-        headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
-      });
+    // 并行删除，并发限制5，避免触发GitHub二级限流
+    const BATCH = 5;
+    for (let i = 0; i < allComments.length; i += BATCH) {
+      const batch = allComments.slice(i, i + BATCH);
+      await Promise.allSettled(batch.map(c =>
+        fetch(API_BASE + '/repos/' + REPO + '/issues/comments/' + c.id, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN }
+        })
+      ));
     }
   } catch(e) { /* 静默 */ }
 }
@@ -3327,6 +3383,58 @@ async function ensureUserIssueNumber() {
   return false;
 }
 
+function renderMyOrders(orders, tab, subTab) {
+  const listEl = document.getElementById('myOrdersList');
+  if (!listEl) return;
+  const uid = S.user ? (S.user._issue_number || S.user.student_id) : null;
+  const sid = S.user ? S.user.student_id : null;
+
+  const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
+  const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答', chat:'💬 私信', goods:'物品流转'};
+  const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
+
+  if (orders.length === 0) {
+    listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p></div>';
+    return;
+  }
+
+  listEl.innerHTML = orders.map(o => {
+    const isMyPub = o.publisher_id == uid || o.publisher_student_id == sid;
+    const isMyTake = o.taker_id == uid || o.taker_student_id == sid;
+    const role = isMyPub ? '<span style="color:var(--primary);font-size:.75rem">我发起的</span>' : '<span style="color:var(--success);font-size:.75rem">我参与的</span>';
+    const isChat = o.type === 'chat';
+    // 对方信息（点击可查看主页）
+    let counterpartLink = '';
+    if (isMyPub && o.taker_name) {
+      counterpartLink = '<span style="margin-left:auto;font-size:.78rem">🤝 <a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_name) + '</a></span>';
+    } else if (isMyTake) {
+      counterpartLink = '<span style="margin-left:auto;font-size:.78rem">👤 <a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || '未知') + '</a></span>';
+    }
+    let rateBtn = '';
+    if (o.status === 'completed' && !isChat) {
+      const isPublisher = isMyPub;
+      const hasRated = isPublisher ? o.publisher_rated : o.taker_rated;
+      if (!hasRated) {
+        rateBtn = '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();rateOrder(' + o._issue_number + ')" style="margin-top:4px">⭐ 评价</button>';
+      }
+    }
+    const metaHTML = isChat
+      ? '<div class="order-card-meta"><span style="color:var(--text-muted);font-size:.8rem">💬 私信对话</span></div>'
+      : '<div class="order-card-meta"><span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>';
+    // 缩略图
+    const imgList2 = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
+    const thumbHTML2 = imgList2.length > 0
+      ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList2.slice(0, 3).map(img => '<img src="' + img + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList2.length > 3 ? '<div style="width:80px;height:80px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList2.length - 3) + '</div>' : '') + '</div>'
+      : '';
+    return '<div class="order-card" style="margin-bottom:12px' + (isChat ? ';border-left:3px solid #8b5cf6' : '') + '" onclick="showDetail(' + o._issue_number + ')">'
+      + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span><span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span></div>'
+      + thumbHTML2
+      + '<div class="order-card-title">' + esc(o.title) + ' ' + role + '</div>'
+      + metaHTML
+      + '<div class="order-card-footer"><span>' + timeAgo(o.created_at) + '</span>' + counterpartLink + rateBtn + '</div></div>';
+  }).join('');
+}
+
 async function loadMyOrders(myTab) {
   const profile = document.getElementById('myProfile');
   const tabsEl = document.getElementById('myOrderTabs');
@@ -3414,10 +3522,25 @@ async function loadMyOrders(myTab) {
   }
 
   if (!listEl) return;
-  listEl.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
+
+  const cacheKey = 'myorders_' + tab + '_' + subTab;
+  const cached = cacheGet(cacheKey);
+  // 先秒开缓存，后台拉取最新
+  if (cached && cached.length > 0) {
+    _cachedMyOrders = cached;
+    _cachedMyTab = tab;
+    renderMyOrders(cached, tab, subTab);
+  }
+  if (!cached) {
+    // 无localStorage缓存：若内存有乐观更新缓存则先用，否则显示加载中
+    if (_cachedMyOrders) renderMyOrders(_cachedMyOrders, tab, subTab);
+    else listEl.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
+  }
 
   try {
     const issues = await ghIssues('order');
+    // 顺便检测订单状态变化和新私信（复用数据，不额外请求）
+    try { checkOrderNotifications(issues); checkChatNotifications(issues); } catch(e) {}
     const uid = S.user._issue_number || S.user.student_id;
     const sid = S.user.student_id;
     let orders = issues.map(i => {
@@ -3435,8 +3558,9 @@ async function loadMyOrders(myTab) {
     else if (tab === 'taken') orders = orders.filter(o => o.taker_id == uid || o.taker_student_id == sid);
     else orders = orders.filter(o => o.publisher_id == uid || o.taker_id == uid || o.publisher_student_id == sid || o.taker_student_id == sid);
 
-    // 自动过期处理：截止时间已过 → 自动取消
+    // 自动过期处理：截止时间已过 → 自动取消（后台静默处理，不阻塞渲染）
     const now = new Date();
+    const expiredToUpdate = [];
     for (const o of orders) {
       if (!o.deadline) continue;
       const dl = new Date(o.deadline);
@@ -3445,60 +3569,25 @@ async function loadMyOrders(myTab) {
       if (buffer < now && o.status === 'open' && !o.taker_id) {
         o.status = 'cancelled';
         o.cancel_reason = '超时无人接单，系统自动取消';
-        try { await ghUpdateIssue(o._issue_number, JSON.stringify(o)); } catch(e) {}
-        try { await ghCloseIssue(o._issue_number); } catch(e) {}
+        expiredToUpdate.push(o);
       }
       // 已接单订单逾期不自动差评，防止骑手只是忘记点"完成"；由发布者手动处理
+    }
+    // 过期订单批量异步同步到云端，不阻塞界面
+    if (expiredToUpdate.length > 0) {
+      Promise.allSettled(expiredToUpdate.map(o =>
+        ghUpdateIssue(o._issue_number, JSON.stringify(o)).then(() => ghCloseIssue(o._issue_number)).catch(() => {})
+      )).catch(() => {});
     }
 
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
-    const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答', chat:'💬 私信', goods:'物品流转'};
-    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
-
-    if (orders.length === 0) {
-      listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p></div>';
-      return;
-    }
-
-    listEl.innerHTML = orders.map(o => {
-      const isMyPub = o.publisher_id == uid || o.publisher_student_id == sid;
-      const isMyTake = o.taker_id == uid || o.taker_student_id == sid;
-      const role = isMyPub ? '<span style="color:var(--primary);font-size:.75rem">我发起的</span>' : '<span style="color:var(--success);font-size:.75rem">我参与的</span>';
-      const isChat = o.type === 'chat';
-      // 对方信息（点击可查看主页）
-      let counterpartLink = '';
-      if (isMyPub && o.taker_name) {
-        counterpartLink = '<span style="margin-left:auto;font-size:.78rem">🤝 <a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_name) + '</a></span>';
-      } else if (isMyTake) {
-        counterpartLink = '<span style="margin-left:auto;font-size:.78rem">👤 <a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || '未知') + '</a></span>';
-      }
-      let rateBtn = '';
-      if (o.status === 'completed' && !isChat) {
-        const isPublisher = isMyPub;
-        const hasRated = isPublisher ? o.publisher_rated : o.taker_rated;
-        if (!hasRated) {
-          rateBtn = '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();rateOrder(' + o._issue_number + ')" style="margin-top:4px">⭐ 评价</button>';
-        }
-      }
-      const metaHTML = isChat
-        ? '<div class="order-card-meta"><span style="color:var(--text-muted);font-size:.8rem">💬 私信对话</span></div>'
-        : '<div class="order-card-meta"><span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>';
-      // 缩略图
-      const imgList2 = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
-      const thumbHTML2 = imgList2.length > 0
-        ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList2.slice(0, 3).map(img => '<img src="' + img + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList2.length > 3 ? '<div style="width:80px;height:80px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList2.length - 3) + '</div>' : '') + '</div>'
-        : '';
-      return '<div class="order-card" style="margin-bottom:12px' + (isChat ? ';border-left:3px solid #8b5cf6' : '') + '" onclick="showDetail(' + o._issue_number + ')">'
-        + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span><span class="order-card-status status-' + o.status + '">' + sl[o.status] + '</span></div>'
-        + thumbHTML2
-        + '<div class="order-card-title">' + esc(o.title) + ' ' + role + '</div>'
-        + metaHTML
-        + '<div class="order-card-footer"><span>' + timeAgo(o.created_at) + '</span>' + counterpartLink + rateBtn + '</div></div>';
-    }).join('');
+    _cachedMyOrders = orders;
+    _cachedMyTab = tab;
+    cacheSet(cacheKey, orders);
+    renderMyOrders(orders, tab, subTab);
   } catch(e) {
-    listEl.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
+    if (!cached) listEl.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
   }
 }
 
@@ -3996,122 +4085,235 @@ document.addEventListener('click', function(e) {
 });
 
 // ============ 通知系统 ============
-// 记录已知订单状态，用于检测变化
-let _knownOrders = {};
-let _unreadNotifications = 0; // 未读通知计数
+let _knownOrders = {};        // 订单状态快照 { issueNum: {status} }
+let _knownReports = {};       // 投诉状态快照 { issueNum: status }
+let _notifications = [];      // 通知历史（内存镜像，同步 localStorage）
 
-// 更新导航栏红点
+// --- 通知持久化 ---
+function loadNotifications() {
+  try { _notifications = JSON.parse(localStorage.getItem('hust_notifications') || '[]'); }
+  catch(e) { _notifications = []; }
+}
+function saveNotifications() {
+  if (_notifications.length > 50) _notifications = _notifications.slice(0, 50);
+  try { localStorage.setItem('hust_notifications', JSON.stringify(_notifications)); } catch(e) {}
+}
+function getUnreadCount() { return _notifications.filter(n => !n.read).length; }
+
+// --- 导航栏铃铛红点 ---
 function updateNavBadge() {
-  const navLink = document.querySelector('[data-page="task"]');
-  if (!navLink) return;
-  let badge = navLink.querySelector('.nav-badge');
-  if (_unreadNotifications > 0) {
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className = 'nav-badge';
-      navLink.appendChild(badge);
-    }
-    badge.textContent = _unreadNotifications > 99 ? '99+' : String(_unreadNotifications);
+  const btn = document.getElementById('navNotifyBtn');
+  if (!btn) return;
+  let badge = btn.querySelector('.notify-badge');
+  const unread = getUnreadCount();
+  if (unread > 0) {
+    if (!badge) { badge = document.createElement('span'); badge.className = 'notify-badge'; btn.appendChild(badge); }
+    badge.textContent = unread > 99 ? '99+' : String(unread);
     badge.style.display = 'flex';
   } else {
     if (badge) badge.style.display = 'none';
   }
 }
 
-// 请求浏览器通知权限
+// --- 通知面板渲染 ---
+function renderNotifyPanel() {
+  const panel = document.getElementById('notifyPanel');
+  if (!panel) return;
+  const list = panel.querySelector('.notify-list');
+  if (!list) return;
+  if (_notifications.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:32px 0">🔔 暂无通知</div>';
+    return;
+  }
+  list.innerHTML = _notifications.map((n, i) =>
+    '<div class="notify-item' + (n.read ? '' : ' unread') + '" onclick="openNotifyLink(' + i + ')">' +
+      '<div class="notify-item-icon">' + (n.icon || '🔔') + '</div>' +
+      '<div class="notify-item-body">' +
+        '<div class="notify-item-title">' + esc(n.title) + '</div>' +
+        '<div class="notify-item-desc">' + esc(n.body) + '</div>' +
+        '<div class="notify-item-time">' + timeAgo(n.time) + '</div>' +
+      '</div>' +
+    '</div>'
+  ).join('');
+}
+function toggleNotifyPanel() {
+  const panel = document.getElementById('notifyPanel');
+  if (!panel) return;
+  panel.classList.toggle('active');
+  if (panel.classList.contains('active')) {
+    _notifications.forEach(n => n.read = true);
+    saveNotifications(); updateNavBadge(); renderNotifyPanel();
+  }
+}
+function openNotifyLink(idx) {
+  const n = _notifications[idx];
+  if (!n) return;
+  n.read = true; saveNotifications(); updateNavBadge(); renderNotifyPanel();
+  if (n.link) {
+    const p = document.getElementById('notifyPanel'); if (p) p.classList.remove('active');
+    navigate(n.link);
+  }
+}
+function markAllNotificationsRead() {
+  _notifications.forEach(n => n.read = true);
+  saveNotifications(); updateNavBadge(); renderNotifyPanel();
+}
+
+// --- 请求浏览器通知权限 ---
 function requestNotifyPermission() {
   if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    Notification.requestPermission();
-  }
+  if (Notification.permission === 'default') Notification.requestPermission();
 }
 
-// 发送浏览器通知
-function sendNotify(title, body) {
-  _unreadNotifications++;
-  updateNavBadge();
-  // 页面内 toast — 延长到 6 秒
+// --- 发送通知（核心：写历史 + toast + 浏览器通知） ---
+function sendNotify(title, body, opts) {
+  opts = opts || {};
+  _notifications.unshift({
+    icon: opts.icon || '🔔', title: title, body: body,
+    time: new Date().toISOString(), read: false, link: opts.link || null
+  });
+  saveNotifications(); updateNavBadge(); renderNotifyPanel();
   toast(title + '：' + body, 'info', 6000);
-  // 浏览器原生通知
   if ('Notification' in window && Notification.permission === 'granted') {
-    try { new Notification(title, { body, icon: '📋', tag: 'hust-notify' }); } catch(e) {}
+    try { new Notification(title, { body: body, icon: '📋', tag: 'hust-notify' }); } catch(e) {}
   }
 }
 
-// 点击任务大厅时清除红点
-const _origNavigate = navigate;
-navigate = function(page) {
-  if (page === 'task') {
-    _unreadNotifications = 0;
-    updateNavBadge();
-  }
-  _origNavigate(page);
-};
-
-// 轮询检查订单状态变化（仅登录用户）
-async function checkOrderNotifications() {
-  if (!S.user) return;
+// --- 订单状态变化检测（接收已拉数据，不额外请求） ---
+function checkOrderNotifications(issues) {
+  if (!S.user || !issues) return;
   const uid = S.user._issue_number || S.user.student_id;
-  if (!uid) return;
+  const sid = S.user.student_id;
+  const myOrders = issues.map(i => {
+    try { const o = JSON.parse(i.body); o._num = i.number; return o; }
+    catch(e) { return null; }
+  }).filter(o => o && (o.publisher_id == uid || o.taker_id == uid || o.publisher_student_id == sid || o.taker_student_id == sid));
 
+  for (const o of myOrders) {
+    const key = String(o._num);
+    const prev = _knownOrders[key];
+    if (prev !== undefined && prev.status !== o.status) {
+      const isPublisher = (o.publisher_id == uid || o.publisher_student_id == sid);
+      if (isPublisher) {
+        if (o.status === 'taken' && prev.status === 'open')
+          sendNotify('📢 有人接单了', (o.taker_name || '同学') + ' 接取了你的订单「' + (o.title || '无标题') + '」', {icon:'📢', link:'my'});
+        if (o.status === 'completed' && prev.status === 'taken')
+          sendNotify('✅ 订单已完成', '你的订单「' + (o.title || '无标题') + '」已被标记为完成', {icon:'✅', link:'my'});
+        if (o.status === 'cancelled')
+          sendNotify('❌ 订单已取消', '你的订单「' + (o.title || '无标题') + '」已被取消', {icon:'❌', link:'my'});
+      }
+      if (!isPublisher && (o.taker_id == uid || o.taker_student_id == sid)) {
+        if (o.status === 'completed' && prev.status === 'taken')
+          sendNotify('✅ 订单已完成', '你接的订单「' + (o.title || '无标题') + '」已确认完成', {icon:'✅', link:'my'});
+        if (o.status === 'cancelled')
+          sendNotify('❌ 订单已取消', '你接的订单「' + (o.title || '无标题') + '」已被取消', {icon:'❌', link:'my'});
+        if (o.status === 'expired' && o.bad_review)
+          sendNotify('⚠️ 收到差评', '订单「' + (o.title || '无标题') + '」被标记逾期未完成，信用分-15', {icon:'⚠️', link:'my'});
+      }
+    }
+    _knownOrders[key] = { status: o.status };
+  }
+}
+
+// --- 私信新消息检测（用 issue.comments 字段，零额外请求） ---
+function checkChatNotifications(issues) {
+  if (!S.user || !issues) return;
+  const uid = S.user._issue_number || S.user.student_id;
+  const sid = S.user.student_id;
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem('hust_chat_seen') || '{}'); } catch(e) {}
+  for (const i of issues) {
+    let o = null;
+    try { o = JSON.parse(i.body); } catch(e) { continue; }
+    if (o.type !== 'chat') continue;
+    if (!(o.publisher_id == uid || o.taker_id == uid || o.publisher_student_id == sid || o.taker_student_id == sid)) continue;
+    const key = String(i.number);
+    const cnt = i.comments || 0;
+    const prev = seen[key];
+    if (prev !== undefined && cnt > prev) {
+      const isPub = (o.publisher_id == uid || o.publisher_student_id == sid);
+      const peerName = isPub ? (o.taker_name || '对方') : (o.publisher_name || '对方');
+      sendNotify('💬 新私信消息', peerName + ' 给你发来了新消息', {icon:'💬', link:'my'});
+    }
+    seen[key] = cnt;
+  }
+  try { localStorage.setItem('hust_chat_seen', JSON.stringify(seen)); } catch(e) {}
+}
+
+// --- 投诉进度检测（低频60秒，独立轮询） ---
+async function checkReportNotifications() {
+  if (!S.user || document.hidden) return;
+  const uid = S.user._issue_number || S.user.student_id;
+  const sid = S.user.student_id;
   try {
-    const issues = await ghIssues('order');
-    const myOrders = issues.map(i => {
-      try { const o = JSON.parse(i.body); o._num = i.number; return o; }
-      catch(e) { return null; }
-    }).filter(o => o && (o.publisher_id == uid || o.taker_id == uid));
-
-    for (const o of myOrders) {
-      const key = String(o._num);
-      const prev = _knownOrders[key];
-
-      if (prev !== undefined && prev.status !== o.status) {
-        // 状态变化了！
-        const isPublisher = o.publisher_id == uid;
-        if (isPublisher) {
-          if (o.status === 'taken' && prev.status === 'open') {
-            sendNotify('📢 有人接单了', (o.taker_name || '同学') + ' 接取了你的订单「' + (o.title || '无标题') + '」');
-          }
-          if (o.status === 'completed' && prev.status === 'taken') {
-            sendNotify('✅ 订单已完成', '你的订单「' + (o.title || '无标题') + '」已被标记为完成');
-          }
-        }
-        if (!isPublisher && o.taker_id == uid) {
-          if (o.status === 'completed' && prev.status === 'taken') {
-            sendNotify('✅ 订单已完成', '你接的订单「' + (o.title || '无标题') + '」已确认完成');
-          }
+    const issues = await ghIssues('report');
+    for (const i of issues) {
+      let r = null;
+      try { r = JSON.parse(i.body); } catch(e) { continue; }
+      const key = String(i.number);
+      const prev = _knownReports[key];
+      if (prev !== undefined && prev !== r.status) {
+        const isReporter = (r.reporter_id == uid || r.reporter_student_id == sid);
+        const isTarget = (r.target_id == uid || r.target_student_id == sid);
+        if (r.status === 'resolved') {
+          if (isReporter) sendNotify('⚖️ 投诉已处理', '你的投诉已被裁定成立', {icon:'⚖️', link:'my'});
+          if (isTarget) sendNotify('⚠️ 投诉成立', '你被投诉且裁定成立，信用分-10', {icon:'⚠️', link:'my'});
+        } else if (r.status === 'rejected') {
+          if (isReporter) sendNotify('⚖️ 投诉结果', '你的投诉未被裁定成立', {icon:'⚖️', link:'my'});
         }
       }
-
-      // 更新已知状态
-      _knownOrders[key] = { status: o.status };
+      _knownReports[key] = r.status;
     }
-  } catch(e) { /* 静默失败 */ }
+  } catch(e) {}
 }
 
-// 初始化通知：登录后开始轮询
+// --- 拉一次数据跑订单+私信检测 ---
+async function runNotificationCheck() {
+  if (!S.user || document.hidden) return;
+  try {
+    const issues = await ghIssues('order');
+    checkOrderNotifications(issues);
+    checkChatNotifications(issues);
+  } catch(e) {}
+}
+
+// 点击面板外关闭通知面板
+document.addEventListener('click', function(e) {
+  const panel = document.getElementById('notifyPanel');
+  const btn = document.getElementById('navNotifyBtn');
+  if (panel && panel.classList.contains('active') && !panel.contains(e.target) && (!btn || !btn.contains(e.target))) {
+    panel.classList.remove('active');
+  }
+});
+
+// --- 初始化 ---
+loadNotifications();
+updateNavBadge();
+renderNotifyPanel();
+
 const _origHandleAuth = handleAuth;
 handleAuth = async function(e) {
   await _origHandleAuth(e);
   if (S.user) {
     requestNotifyPermission();
-    _knownOrders = {};
-    checkOrderNotifications();
+    _knownOrders = {}; _knownReports = {};
+    runNotificationCheck();
   }
 };
 
-// 初始化通知：已登录用户
 (function() {
-  if (S.user) {
-    requestNotifyPermission();
-    checkOrderNotifications();
-  }
+  if (S.user) { requestNotifyPermission(); runNotificationCheck(); }
 })();
 
-// 每 15 秒检查一次通知（降低频率，页面隐藏时跳过）
+// 每30秒检测订单+私信（复用数据），页面隐藏跳过
 setInterval(function() {
-  if (S.user && !document.hidden) checkOrderNotifications();
-}, 15000);
+  if (S.user && !document.hidden) runNotificationCheck();
+}, 30000);
+
+// 每60秒检测投诉进度，页面隐藏跳过
+setInterval(function() {
+  if (S.user && !document.hidden) checkReportNotifications();
+}, 60000);
 </script>
 
 </body>
