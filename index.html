@@ -3095,7 +3095,8 @@ async function sendVerifyCode() {
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
       to_email: toEmail,
       verification_code: code,
-      student_name: name || '同学'
+      student_name: name || '同学',
+      reply_to: '2361167255@qq.com'
     });
     toast('验证码已发送至 ' + toEmail + '（若未收到请检查垃圾箱）', 'success');
     let left = 60;
