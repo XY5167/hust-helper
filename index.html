@@ -689,8 +689,8 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
-// Cloudflare Worker 代理（减少 GitHub API 消耗 + 实时推送）
-// GitHub Token 已移至服务端云函数代理（fn/ 目录），前端不再持有任何密钥
+// 腾讯云 SCF 云函数代理（减少 GitHub API 消耗 + 服务端持有密钥 + 密码后端校验）
+// GitHub Token / ImgBB Key 均已移至服务端云函数代理（fn/ 目录），前端不再持有任何密钥
 const USE_PROXY = true;  // 走自建云函数代理（Token 在服务端持有）
 const PROXY_BASE = 'https://1466359189-c05gx8tm63.ap-guangzhou.tencentscf.com'; // 腾讯云 SCF 函数 URL
 const API_BASE = PROXY_BASE + '/gh'; // 裸 fetch 走 /gh 透传；ghApi() 语义路由走 PROXY_BASE 本身
@@ -698,9 +698,7 @@ const API_BASE = PROXY_BASE + '/gh'; // 裸 fetch 走 /gh 透传；ghApi() 语�
 const REPO = 'XY5167/hust-helper-backend';
 // GitHub Token 已移除：不再在前端硬编码，统一由服务端云函数（fn/index.js）持有并注入
 
-// ImgBB 图床 API Key（免费版每月 7500 张）
-// 如果提示上传失败/400，请去 https://api.imgbb.com/ 注册一个自己的 key 替换下面这行
-const IMGBB_API_KEY = '4d3ae82aeea4a3585cbb8a08c2f16d13';
+// ImgBB 图床 Key 已移至服务端云函数代理（fn/index.js 的 IMGBB_API_KEY 环境变量），前端不再持有任何密钥。
 
 // EmailJS 邮箱验证码服务配置
 const EMAILJS_SERVICE_ID = 'service_2ngckrm';
@@ -734,7 +732,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.14.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -797,8 +795,13 @@ function cacheBust(key) {
 
 // 初始化
 (function() {
+  // 恢复会话 Token（过期则清掉，强制重新登录）
+  if (getToken() && !tokenPayload()) { clearToken(); }
   const saved = localStorage.getItem('hust_current_user');
   if (saved) try { S.user = JSON.parse(saved); } catch(e) {}
+  // 用 Token 中的角色刷新本地（管理员 UI 判定以服务端为准）
+  const tp = tokenPayload();
+  if (S.user && tp) S.user.role = tp.role;
   if (S.user && !S.user._issue_number) ensureUserIssueNumber().then(updateUI).catch(()=>{});
   updateUI();
   // 初始化 EmailJS
@@ -815,11 +818,28 @@ function cacheBust(key) {
 // ============ GITHUB API ============
 // 通过 Worker 代理（缓存读 + 透传写 + WebSocket 通知）
 // Token 通过请求头传给 Worker
+// ---- 会话 Token 管理（与用户资料分离，绝不存储密码）----
+function getToken() { try { return localStorage.getItem('hust_token'); } catch (e) { return null; } }
+function setToken(t) { try { localStorage.setItem('hust_token', t); } catch (e) {} }
+function clearToken() { try { localStorage.removeItem('hust_token'); } catch (e) {} }
+function tokenPayload() {
+  const t = getToken();
+  if (!t) return null;
+  try {
+    const b = t.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+    const json = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b), c => c.charCodeAt(0))));
+    if (json.exp && Date.now() > json.exp) return null;
+    return json;
+  } catch (e) { return null; }
+}
+
 function ghApi(path, method, body) {
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json' }
   };
+  const tk = getToken();
+  if (tk) opts.headers['Authorization'] = 'Bearer ' + tk;
   if (body) opts.body = JSON.stringify(body);
   return fetch(PROXY_BASE + path, opts);
 }
@@ -922,19 +942,12 @@ function navigate(page) {
 // ============ STATS ============
 async function loadStats() {
   try {
-    const [users, orders] = await Promise.all([
-      ghIssues('user'),
-      ghIssues('order', 'all')
-    ]);
-    const orderList = orders
-      .filter(i => i.state === 'open')
-      .map(i => {
-        try { return JSON.parse(i.body); } catch(e) { return null; }
-      }).filter(Boolean);
-    const cnt = orderList.filter(o => o.status !== 'completed' && o.status !== 'cancelled' && o.type !== 'chat').length;
-    document.getElementById('statOrders').textContent = cnt;
-    document.getElementById('statUsers').textContent = users.length;
-    cacheSet('stats', { orders: cnt, users: users.length });
+    const res = await ghApi('/api/stats', 'GET');
+    if (!res.ok) throw new Error('stats ' + res.status);
+    const d = await res.json();
+    document.getElementById('statOrders').textContent = d.orders;
+    document.getElementById('statUsers').textContent = d.users;
+    cacheSet('stats', { orders: d.orders, users: d.users });
   } catch(e) {
     console.error(e);
     document.getElementById('statOrders').textContent = '?';
@@ -3395,14 +3408,12 @@ async function handleAuth(e) {
     }
 
     try {
-      // 查所有状态（open + closed），防止学号重复注册
+      // 查重：走服务端 /api/user/check（无需拉全量用户表）
       btn.textContent = '检查中...';
-      const issues = await ghIssues('user', 'all');
-      const dup = issues.find(i => {
-        try { const u = JSON.parse(i.body); return u.student_id === sid; } catch(e) { return false; }
-      });
-      if (dup) {
-        if (dup.state === 'open') {
+      const checkRes = await fetch(PROXY_BASE + '/api/user/check?sid=' + encodeURIComponent(sid));
+      const checkData = await checkRes.json().catch(() => ({}));
+      if (checkData.exists) {
+        if (checkData.state === 'open') {
           err.textContent = '该学号已注册，请直接登录。如果忘记密码请联系管理员。';
         } else {
           err.textContent = '该学号曾注册但账号被关闭，请用原密码直接登录以恢复账号。';
@@ -3414,101 +3425,95 @@ async function handleAuth(e) {
       // 管理员自动审核通过
       let initialStatus = (sid === ADMIN_STUDENT_ID) ? 'approved' : 'pending';
       if (verifyMethod === 'email') initialStatus = 'approved'; // 邮箱验证通过即放行
-      const userData = { student_id: sid, name, phone, dorm, password: pw, balance: 0, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
+      // 注意：密码不在前端存储，单独传给 /api/register，由服务端哈希后写入 Issue
+      const userData = { student_id: sid, name, phone, dorm, balance: 0, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
       if (verifyMethod === 'email') { userData.email = (document.getElementById('authEmail').value || '').trim().toLowerCase(); userData.email_verified = true; }
       else { userData.email_verified = false; }
       grantTrialVip(userData); // 新注册用户统一赠送 7 天试用会员
       btn.textContent = '创建中...';
-      let newIssue;
+      let regRes;
       try {
-        newIssue = await ghCreateIssue(sid, JSON.stringify(userData), ['user']);
+        regRes = await fetch(PROXY_BASE + '/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userData, password: pw })
+        });
       } catch(ex) {
         err.textContent = '创建用户失败：' + ex.message;
         err.style.display = 'block';
         console.error(ex);
         return;
       }
-      userData._issue_number = newIssue.number;
-      S.user = userData;
-      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
-      updateUI();
-      closeAuthModal();
-      resetEmailVerify();
-      if (userData.status === 'approved') {
-        toast('注册成功！邮箱已验证，现在即可使用。', 'success');
+      if (regRes.status === 409) {
+        err.textContent = '该学号已注册，请直接登录。';
+        err.style.display = 'block';
+        return;
+      }
+      if (!regRes.ok) {
+        const d = await regRes.json().catch(() => ({}));
+        err.textContent = '注册失败：' + (d.error || regRes.status);
+        err.style.display = 'block';
+        return;
+      }
+      const regData = await regRes.json();
+      const u = regData.user;
+      if (regData.token) {
+        // 邮箱验证 / 管理员注册：直接签发会话并登录
+        setToken(regData.token);
+        S.user = u;
+        localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+        updateUI();
+        closeAuthModal();
+        resetEmailVerify();
+        toast('注册成功！现在即可使用。', 'success');
       } else {
+        closeAuthModal();
+        resetEmailVerify();
         toast('注册成功！请等待管理员审核通过后即可使用。', 'success');
-        // 注册后不自动登录，提示用户等待审核
         S.user = null;
       }
     } catch(ex) { console.error(ex); err.textContent = '注册失败：' + ex.message; err.style.display = 'block'; return; }
   } else {
     try {
-      // 登录时也查所有状态，避免用户 issue 被关闭后无法登录
-      const issues = await ghIssues('user', 'all');
-      const found = issues.find(i => {
-        try {
-          const u = JSON.parse(i.body);
-          return u.student_id === sid && u.password === pw;
-        } catch(e) { return false; }
+      // 服务端校验：/api/login 负责比对密码、明文迁移、签发会话 Token
+      btn.textContent = '登录中...';
+      const res = await fetch(PROXY_BASE + '/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: sid, password: pw })
       });
-      if (!found) { err.textContent = '学号或密码错误'; err.style.display = 'block'; return; }
-      // 确保 issue 处于 open 状态（清理数据时可能被误关）
-      if (found.state !== 'open') {
-        const reopenRes = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + found.number, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ state: 'open' })
-        });
-        if (!reopenRes.ok) {
-          err.textContent = '账号恢复失败，请联系管理员';
-          err.style.display = 'block';
-          return;
-        }
-        toast('账号已自动恢复可用状态', 'success');
-      }
-      const u = JSON.parse(found.body);
-      // 安全网：清理数据后从未审核的老账号自动激活
-      // 管理员始终自动设为 approved
-      if (!u.status || u.status === 'None' || (sid === ADMIN_STUDENT_ID && u.status === 'pending')) {
-        u.status = 'approved';
-        // 去掉 base64 图片（如果有的话），GitHub Issues API 在大 body 上有写入限制
-        if (u.payment_image && u.payment_image.startsWith('data:')) {
-          u.payment_image = '';
-        }
-        try { await ghUpdateIssue(found.number, JSON.stringify(u)); } catch(e) {}
-      }
-      // 检查审核状态（管理员始终通过）
-      if (u.status === 'pending' && sid !== ADMIN_STUDENT_ID) {
-        err.textContent = '您的账号正在审核中，请耐心等待管理员审核通过。';
+      if (res.status === 401) {
+        err.textContent = '学号或密码错误';
         err.style.display = 'block';
         return;
       }
-      if (u.status === 'rejected') {
-        err.textContent = '您的账号审核未通过，请联系管理员了解原因。';
+      if (res.status === 403) {
+        const d = await res.json().catch(() => ({}));
+        if (d.error === 'PENDING') err.textContent = '您的账号正在审核中，请耐心等待管理员审核通过。';
+        else if (d.error === 'REJECTED') err.textContent = '您的账号审核未通过，请联系管理员了解原因。';
+        else if (d.error === 'CREDIT_BLOCKED') err.textContent = '您的信用分过低，账号已被限制使用，良好完成订单可逐步恢复，如需申诉请联系管理员。';
+        else err.textContent = '账号状态异常，请联系管理员。';
         err.style.display = 'block';
         return;
       }
-      // 确保信用分字段存在（兼容老用户）
-      if (u.credit_score == null) { u.credit_score = 100; u.credit_history = []; }
-      // 信用分过低限制登录
-      if (u.credit_score < 25 && sid !== ADMIN_STUDENT_ID) {
-        const level = getCreditLevel(u.credit_score);
-        err.textContent = '您的信用分仅为 ' + u.credit_score + ' 分（' + level.text + '），账号已被限制使用。良好完成订单可逐步恢复信用分，如需申诉请联系管理员。';
+      if (res.status === 429) {
+        err.textContent = '尝试过于频繁，请稍后再试。';
         err.style.display = 'block';
         return;
       }
-      u._issue_number = found.number;
-      // 确保关键字段存在
-      u.payment_info = u.payment_info || '';
-      u.payment_image = u.payment_image || '';
-      u.vip_expire = u.vip_expire || null;
-      S.user = u;
+      if (!res.ok) {
+        err.textContent = '登录失败（' + res.status + '），请稍后重试。';
+        err.style.display = 'block';
+        return;
+      }
+      const data = await res.json();
+      setToken(data.token);
+      S.user = data.user;
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       updateUI();
       closeAuthModal();
       toast('登录成功', 'success');
-    } catch(ex) { err.textContent = '登录失败：' + ex.message; err.style.display = 'block'; return; }
+    } catch (ex) { err.textContent = '登录失败：' + ex.message; err.style.display = 'block'; return; }
   }
   loadStats();
   if (S.page === 'task') refreshCurrentTab();
@@ -3527,6 +3532,7 @@ async function handleAuth(e) {
 function logout() {
   if (!confirm('确定要退出登录吗？')) return;
   S.user = null;
+  clearToken();
   localStorage.removeItem('hust_current_user');
   updateUI();
   // 切到首页
@@ -4218,6 +4224,17 @@ async function submitRunnerApply() {
 }
 
 // ============ 图床上传（ImgBB，免费无限制） ===========
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const s = r.result;
+      resolve(s.indexOf(',') >= 0 ? s.split(',')[1] : s); // 去掉 data:<mime>;base64, 前缀
+    };
+    r.onerror = () => reject(new Error('读取图片失败'));
+    r.readAsDataURL(file);
+  });
+}
 async function uploadToImgBB(file, opts = {}) {
   const maxSize = opts.maxSize || 10 * 1024 * 1024;     // 默认最大 10MB
   const compressThreshold = opts.compressThreshold || 2 * 1024 * 1024; // 超过 2MB 压缩
@@ -4243,21 +4260,21 @@ async function uploadToImgBB(file, opts = {}) {
     } catch(e) { /* 压缩失败则用原图 */ }
   }
 
-  // ImgBB 免费账号最大支持约 32MB，超过会返回 400
-  const formData = new FormData();
-  formData.append('image', uploadFile);
-  const res = await fetch('https://api.imgbb.com/1/upload?key=' + IMGBB_API_KEY, {
+  // 转 base64 后走服务端代理（代理注入 ImgBB key，前端不再持有密钥）
+  const b64 = await fileToBase64(uploadFile);
+  const res = await fetch(PROXY_BASE + '/api/imgbb', {
     method: 'POST',
-    body: formData
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: b64 })
   });
   if (!res.ok) {
-    const text = await res.text();
-    console.error('ImgBB upload error:', res.status, text);
-    throw new Error('Upload failed: ' + res.status + '（请检查 ImgBB API Key 是否有效）');
+    const d = await res.json().catch(() => ({}));
+    console.error('ImgBB upload error:', res.status, d);
+    throw new Error('图片上传失败：' + (d.error || res.status));
   }
   const data = await res.json();
-  if (!data.success) throw new Error(data.error?.message || 'Upload failed');
-  return data.data.display_url || data.data.url;
+  if (!data.url) throw new Error('Upload failed');
+  return data.url;
 }
 
 function compressImage(file, maxWidth = 1920, quality = 0.85) {
