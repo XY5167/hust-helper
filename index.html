@@ -280,6 +280,11 @@ input,select,textarea{font-family:inherit;font-size:1rem}
     </div>
   </div>
 
+  <!-- 公告横幅（首页顶部，管理员发布后展示） -->
+  <div class="container">
+    <div id="announceBanner" style="display:none;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:12px;padding:12px 16px;margin:0 auto 8px;max-width:920px"></div>
+  </div>
+
   <div class="container">
     <div class="section" style="padding-top:24px">
       <div class="hero-actions" style="margin:0">
@@ -677,6 +682,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <button class="modal-tab" id="adminTabManage" onclick="switchAdminTab('manage')">用户管理</button>
       <button class="modal-tab" id="adminTabReports" onclick="switchAdminTab('reports')">投诉处理</button>
       <button class="modal-tab" id="adminTabVip" onclick="switchAdminTab('vip')">会员管理</button>
+      <button class="modal-tab" id="adminTabAnnounce" onclick="switchAdminTab('announce')">公告管理</button>
     </div>
     <div id="adminContent"><p>加载中...</p></div>
   </div>
@@ -732,7 +738,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.1';
+const APP_VERSION = '1.14.3';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -2247,12 +2253,12 @@ async function adminStartChat(targetSid, targetName, targetIssueNum) {
 }
 
 // ============ 管理员审核 ============
-let _adminTab = 'users'; // 'users' | 'runners' | 'manage' | 'reports'
+let _adminTab = 'users'; // 'users' | 'runners' | 'manage' | 'reports' | 'vip' | 'announce'
 
 function switchAdminTab(tab) {
   _adminTab = tab;
   document.querySelectorAll('#adminModal .modal-tab').forEach(t => t.classList.remove('active'));
-  const tabMap = { users: 'Users', runners: 'Runners', manage: 'Manage', reports: 'Reports', vip: 'Vip' };
+  const tabMap = { users: 'Users', runners: 'Runners', manage: 'Manage', reports: 'Reports', vip: 'Vip', announce: 'Announce' };
   const activeTab = document.getElementById('adminTab' + tabMap[tab]);
   if (activeTab) activeTab.classList.add('active');
   if (tab === 'users') loadAdminPanel();
@@ -2260,6 +2266,7 @@ function switchAdminTab(tab) {
   else if (tab === 'manage') loadUserManagement();
   else if (tab === 'reports') loadReportManagement();
   else if (tab === 'vip') loadVipManagement();
+  else if (tab === 'announce') loadAnnouncementManagement();
 }
 
 async function showAdminPanel() {
@@ -2385,6 +2392,76 @@ async function rejectUser(inum) {
     toast('已拒绝该用户', 'info');
     await loadAdminPanel();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
+}
+
+// ============ 管理员公告管理 ============
+async function loadAnnouncementManagement() {
+  const ct = document.getElementById('adminContent');
+  ct.innerHTML = '<p>加载中...</p>';
+  try {
+    const issues = await ghIssues('announcement', 'all');
+    const list = issues.map(i => {
+      try { const b = JSON.parse(i.body); b._num = i.number; b._state = i.state; return b; }
+      catch(e) { return { title: (i.title || '').replace(/^\[公告\]\s*/, ''), content: '', _num: i.number, _state: i.state, created: 0 }; }
+    }).sort((a, b) => b._num - a._num);
+
+    let html = '';
+    // 发布表单
+    html += '<div style="background:var(--bg);border-radius:12px;padding:16px;margin-bottom:18px">'
+      + '<h4 style="margin-bottom:12px">📢 发布公告</h4>'
+      + '<input id="annTitle" class="form-input" placeholder="公告标题" maxlength="60" style="margin-bottom:10px">'
+      + '<textarea id="annContent" class="form-input" rows="3" placeholder="公告内容" style="margin-bottom:10px;resize:vertical"></textarea>'
+      + '<button class="btn btn-primary" onclick="publishAnnouncement()">发布</button>'
+      + '</div>';
+
+    // 历史列表
+    html += '<h4 style="margin-bottom:10px">📋 公告历史 (' + list.length + ')</h4>';
+    if (list.length === 0) {
+      html += '<p style="color:var(--text-secondary)">暂无公告</p>';
+    } else {
+      html += '<div style="max-height:320px;overflow-y:auto">';
+      for (const a of list) {
+        const isOpen = a._state === 'open';
+        html += '<div style="padding:12px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
+          + '<div style="flex:1;min-width:0"><strong>' + esc(a.title || '') + '</strong>'
+          + (isOpen ? ' <span style="font-size:.72rem;color:#15803d;background:#dcfce7;padding:1px 6px;border-radius:99px">展示中</span>' : ' <span style="font-size:.72rem;color:var(--text-muted);background:#f1f5f9;padding:1px 6px;border-radius:99px">已撤回</span>')
+          + '<br><span style="font-size:.84rem;color:var(--text-secondary)">' + esc(a.content || '') + '</span>'
+          + (a.created ? '<br><span style="font-size:.72rem;color:var(--text-muted)">' + timeAgo(new Date(a.created).toISOString()) + ' 发布</span>' : '')
+          + '</div>'
+          + '<div style="flex-shrink:0">' + (isOpen ? '<button class="btn btn-sm btn-danger" onclick="deleteAnnouncement(' + a._num + ')">撤回</button>' : '') + '</div>'
+          + '</div></div>';
+      }
+      html += '</div>';
+    }
+    ct.innerHTML = html;
+  } catch(e) {
+    ct.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
+  }
+}
+
+async function publishAnnouncement() {
+  const titleEl = document.getElementById('annTitle');
+  const contentEl = document.getElementById('annContent');
+  const title = (titleEl && titleEl.value || '').trim();
+  const content = (contentEl && contentEl.value || '').trim();
+  if (!title || !content) { toast('标题和内容都不能为空', 'error'); return; }
+  try {
+    const res = await ghApi('/api/announce', 'POST', { title, content });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); toast('发布失败：' + (j.error || res.status), 'error'); return; }
+    toast('公告已发布', 'success');
+    await loadAnnouncementManagement();
+  } catch(e) { toast('发布失败：' + e.message, 'error'); }
+}
+
+async function deleteAnnouncement(num) {
+  if (!confirm('确定撤回该公告？撤回后将不再在首页展示。')) return;
+  try {
+    const res = await ghApi('/api/announce/delete', 'POST', { number: num });
+    if (!res.ok) { const j = await res.json().catch(()=>({})); toast('撤回失败：' + (j.error || res.status), 'error'); return; }
+    toast('公告已撤回', 'info');
+    await loadAnnouncementManagement();
+  } catch(e) { toast('撤回失败：' + e.message, 'error'); }
 }
 
 // ============ 跑腿认证审核 ============
@@ -4666,7 +4743,65 @@ async function runNotificationCheck() {
     const issues = await ghIssues('order');
     checkOrderNotifications(issues);
     checkChatNotifications(issues);
+    await checkAnnouncementNotifications();
   } catch(e) {}
+}
+
+// --- 公告检测：新公告进铃铛 + 刷新首页横幅 ---
+async function checkAnnouncementNotifications() {
+  if (!S.user) return;
+  try {
+    const issues = await ghIssues('announcement', 'open');
+    let seen = {};
+    try { seen = JSON.parse(localStorage.getItem('hust_announcement_seen') || '{}'); } catch(e) {}
+    let changed = false;
+    for (const i of issues) {
+      const num = i.number;
+      if (!seen[num]) {
+        let a = null;
+        try { a = JSON.parse(i.body); } catch(e) {}
+        const title = (a && a.title) || (i.title || '').replace(/^\[公告\]\s*/, '');
+        const content = (a && a.content) || '';
+        sendNotify('📢 公告', content ? (title + '：' + content) : title, { icon: '📢', link: 'home' });
+        seen[num] = true; changed = true;
+      }
+    }
+    if (changed) { try { localStorage.setItem('hust_announcement_seen', JSON.stringify(seen)); } catch(e) {} }
+    renderAnnounceBanner(issues);
+  } catch(e) {}
+}
+
+// 渲染首页公告横幅（取最新一条 open 公告）
+function renderAnnounceBanner(issues) {
+  const el = document.getElementById('announceBanner');
+  if (!el) return;
+  const open = (issues || []).filter(i => i.state === 'open');
+  if (open.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  open.sort((a, b) => b.number - a.number);
+  const i = open[0];
+  let a = null;
+  try { a = JSON.parse(i.body); } catch(e) {}
+  const title = (a && a.title) || (i.title || '').replace(/^\[公告\]\s*/, '');
+  const content = (a && a.content) || '';
+  el.style.display = 'block';
+  el.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    + '<span style="font-size:1.2rem">📢</span>'
+    + '<div style="flex:1;min-width:0"><strong>' + esc(title) + '</strong>'
+    + (content ? ' <span style="color:var(--text-secondary)">' + esc(content) + '</span>' : '') + '</div>'
+    + '<button class="btn btn-sm btn-ghost" onclick="dismissAnnounceBanner()">✕</button></div>';
+}
+
+// 仅渲染首页横幅（不进铃铛），供初始加载/游客访问
+async function loadAnnounceBanner() {
+  try {
+    const issues = await ghIssues('announcement', 'open');
+    renderAnnounceBanner(issues);
+  } catch(e) {}
+}
+
+function dismissAnnounceBanner() {
+  const el = document.getElementById('announceBanner');
+  if (el) el.style.display = 'none';
 }
 
 // 点击面板外关闭通知面板
@@ -4695,6 +4830,7 @@ handleAuth = async function(e) {
 
 (function() {
   if (S.user) { requestNotifyPermission(); runNotificationCheck(); }
+  loadAnnounceBanner();
 })();
 
 // 每30秒检测订单+私信（复用数据），页面隐藏跳过
@@ -4705,6 +4841,11 @@ setInterval(function() {
 // 每60秒检测投诉进度，页面隐藏跳过
 setInterval(function() {
   if (S.user && !document.hidden) checkReportNotifications();
+}, 60000);
+
+// 每60秒刷新首页公告横幅（所有访客可见）
+setInterval(function() {
+  if (!document.hidden) loadAnnounceBanner();
 }, 60000);
 </script>
 
