@@ -71,6 +71,20 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .btn-warning{background:#f59e0b;color:#fff}
 .btn-warning:hover{opacity:.85}
 
+/* 深色模式 */
+html[data-theme="dark"] {
+  --bg: #0f172a; --bg-card: #1e293b; --bg-hover: #334155;
+  --text: #e2e8f0; --text-secondary: #94a3b8; --text-muted: #64748b;
+  --border: #334155; --border-light: #2b3a4f;
+  --primary-light: #1e3a5f;
+  --shadow: 0 1px 3px rgba(0,0,0,.4);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.35);
+  --shadow-lg: 0 10px 25px rgba(0,0,0,.5);
+}
+html[data-theme="dark"] .hero { background: linear-gradient(180deg,#172033 0%,var(--bg) 100%); }
+html[data-theme="dark"] .header { background: rgba(15,23,42,.85); }
+html[data-theme="dark"] .modal { color: var(--text); }
+
 /* Hero */
 .hero{padding:70px 0 50px;text-align:center;background:linear-gradient(180deg,#eff6ff 0%,var(--bg) 100%)}
 .hero-title{font-size:2.4rem;font-weight:800;margin-bottom:10px;letter-spacing:-.5px}
@@ -159,6 +173,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .form-hint{font-size:.78rem;color:var(--text-muted);margin-bottom:10px}
 .form-error{font-size:.83rem;color:var(--danger);margin-bottom:10px;display:none}
+.char-count{float:right;font-size:.72rem;color:var(--text-muted);font-weight:400}
 .verify-badge{display:inline-block;font-size:.68rem;font-weight:600;background:var(--success);color:#fff;padding:1px 7px;border-radius:99px;margin-left:5px;vertical-align:middle}
 
 /* Detail */
@@ -242,6 +257,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       <a href="#" class="nav-link" data-page="my" onclick="navigate('my')">我的</a>
     </nav>
     <div class="header-actions" id="headerActions">
+      <button class="btn btn-ghost btn-sm" id="themeToggle" onclick="toggleTheme()" title="切换深色/浅色">🌙</button>
       <button class="btn btn-outline btn-sm" onclick="showAuthModal()" id="btnLogin">登录</button>
       <div class="user-menu" id="userMenu" style="display:none">
         <button class="nav-notify-btn" id="navNotifyBtn" onclick="toggleNotifyPanel()" title="消息通知">🔔</button>
@@ -479,11 +495,13 @@ input,select,textarea{font-family:inherit;font-size:1rem}
       </div>
       <div class="form-group">
         <label>标题</label>
-        <input type="text" id="publishTitle" required placeholder="简要描述你的需求">
+        <input type="text" id="publishTitle" required maxlength="50" placeholder="简要描述你的需求" oninput="updateCharCount('publishTitle','titleCount',50)">
+        <span class="char-count" id="titleCount">0/50</span>
       </div>
       <div class="form-group">
         <label>详细描述</label>
-        <textarea id="publishDesc" rows="3" placeholder="详细说明需求、地点等"></textarea>
+        <textarea id="publishDesc" rows="3" maxlength="500" placeholder="详细说明需求、地点等" oninput="updateCharCount('publishDesc','descCount',500)"></textarea>
+        <span class="char-count" id="descCount">0/500</span>
       </div>
       <div class="form-group" id="bountyGroup" style="display:none">
         <label>🏆 悬赏费用（有问必答可选）</label>
@@ -738,7 +756,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.3';
+const APP_VERSION = '1.14.4';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -955,7 +973,7 @@ async function loadStats() {
     document.getElementById('statUsers').textContent = d.users;
     cacheSet('stats', { orders: d.orders, users: d.users });
   } catch(e) {
-    console.error(e);
+    reportError('统计数据加载失败，请稍后重试', e, 'stats');
     document.getElementById('statOrders').textContent = '?';
   }
 }
@@ -3299,6 +3317,7 @@ async function deleteAllComments(inum) {
 function showAuthModal() {
   document.getElementById('authModal').classList.add('active');
   switchAuthTab('login');
+  setTimeout(() => { const f = document.querySelector('#authModal input:not([type=hidden]),#authModal textarea,#authModal select'); if (f) f.focus(); }, 60);
 }
 
 function closeAuthModal() {
@@ -3623,6 +3642,7 @@ function showPublishModal() {
   if (!checkApproved()) return;
   document.getElementById('publishModal').classList.add('active');
   updatePublishCategories();
+  setTimeout(() => { const f = document.querySelector('#publishModal input:not([type=hidden]),#publishModal textarea,#publishModal select'); if (f) f.focus(); }, 60);
   // 默认截止时间为明天同一时间
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
   tomorrow.setMinutes(tomorrow.getMinutes() - tomorrow.getTimezoneOffset());
@@ -3644,6 +3664,9 @@ function checkApproved() {
 }
 
 function closePublishModal() {
+  window._publishLock = false;
+  const _pb = document.querySelector('#publishForm button[type=submit]');
+  if (_pb) { _pb.disabled = false; _pb.textContent = '发布'; }
   document.getElementById('publishModal').classList.remove('active');
   document.getElementById('publishError').style.display = 'none';
   document.getElementById('publishForm').reset();
@@ -3804,6 +3827,11 @@ async function handlePublish(e) {
     created_at: new Date().toISOString()
   };
 
+  if (window._publishLock) return;
+  window._publishLock = true;
+  const _pb = document.querySelector('#publishForm button[type=submit]');
+  if (_pb) { _pb.disabled = true; _pb.textContent = '发布中…'; }
+
   try {
     const label = type === 'qa' ? 'qa' : 'order';
     const prefix = type === 'qa' ? '[问答] ' : (type === 'borrow' ? '[借物] ' : '[订单] ');
@@ -3816,7 +3844,12 @@ async function handlePublish(e) {
       loadOrders(S.page, S.filter[S.page] || 'all');
     }
     loadStats();
-  } catch(ex) { err.textContent = '发布失败：' + ex.message; err.style.display = 'block'; }
+  } catch(ex) {
+    window._publishLock = false;
+    const _pb = document.querySelector('#publishForm button[type=submit]');
+    if (_pb) { _pb.disabled = false; _pb.textContent = '发布'; }
+    err.textContent = '发布失败：' + ex.message; err.style.display = 'block';
+  }
 }
 
 // ============ UI ============
@@ -3893,7 +3926,7 @@ async function ensureUserIssueNumber() {
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       return true;
     }
-  } catch(e) { console.error('ensureUserIssueNumber error:', e); }
+  } catch(e) { reportError('用户初始化失败，请刷新页面', e, 'ensure'); }
   return false;
 }
 
@@ -4346,7 +4379,7 @@ async function uploadToImgBB(file, opts = {}) {
   });
   if (!res.ok) {
     const d = await res.json().catch(() => ({}));
-    console.error('ImgBB upload error:', res.status, d);
+    reportError('图片上传失败，请重试', null, 'imgbb');
     throw new Error('图片上传失败：' + (d.error || res.status));
   }
   const data = await res.json();
@@ -4534,6 +4567,38 @@ function toast(msg, type, duration) {
   const d = duration || 2500;
   setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, d);
 }
+
+const _errThrottle = {};
+function reportError(msg, e, key) {
+  if (e) console.error(msg, e);
+  const now = Date.now();
+  if (key) { if (_errThrottle[key] && now - _errThrottle[key] < 10000) return; _errThrottle[key] = now; }
+  toast(msg, 'error');
+}
+
+function applyTheme() {
+  const saved = localStorage.getItem('hust_theme');
+  const t = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', t);
+  const b = document.getElementById('themeToggle'); if (b) b.textContent = t === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('hust_theme', next);
+  const b = document.getElementById('themeToggle'); if (b) b.textContent = next === 'dark' ? '☀️' : '🌙';
+}
+function updateCharCount(inputId, countId, max) {
+  const el = document.getElementById(inputId), c = document.getElementById(countId);
+  if (el && c) c.textContent = el.value.length + '/' + max;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const open = document.querySelector('.modal-overlay.active, .notify-panel.active');
+    if (open) open.classList.remove('active');
+  }
+});
 
 // ============ HELPERS ============
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -4814,6 +4879,7 @@ document.addEventListener('click', function(e) {
 });
 
 // --- 初始化 ---
+applyTheme();
 loadNotifications();
 updateNavBadge();
 renderNotifyPanel();
