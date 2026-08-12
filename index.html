@@ -9,7 +9,34 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1a73e8">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<title>Hust互助</title>
+<title>Hust互助 - 华中科技大学校园互助平台</title>
+<meta name="description" content="Hust互助是华中科技大学(HUST)校园互助平台，提供跑腿代拿、二手交易、有问必答、校园公告互助。学生发布需求，同学接单赚钱，校园生活更轻松。">
+<meta name="keywords" content="华中科技大学,华科,HUST,校园互助,跑腿代拿,二手交易,校园问答,华科互助,武汉高校互助">
+<meta name="author" content="Hust互助">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://xy5167.github.io/hust-helper/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Hust互助">
+<meta property="og:title" content="Hust互助 - 华中科技大学校园互助平台">
+<meta property="og:description" content="华科校园互助平台：跑腿代拿、二手交易、有问必答。学生发布需求，同学接单赚钱。">
+<meta property="og:url" content="https://xy5167.github.io/hust-helper/">
+<meta property="og:image" content="https://xy5167.github.io/hust-helper/icons/icon-512.png">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hust互助 - 华中科技大学校园互助平台">
+<meta name="twitter:description" content="华科校园互助平台：跑腿代拿、二手交易、有问必答。学生发布需求，同学接单赚钱。">
+<meta name="twitter:image" content="https://xy5167.github.io/hust-helper/icons/icon-512.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Hust互助",
+  "url": "https://xy5167.github.io/hust-helper/",
+  "logo": "https://xy5167.github.io/hust-helper/icons/icon-512.png",
+  "description": "华中科技大学校园互助平台，提供跑腿代拿、二手交易、有问必答、校园公告互助。",
+  "areaServed": { "@type": "CollegeOrUniversity", "name": "华中科技大学" }
+}
+</script>
 <style>
 :root {
   --primary: #1a73e8;
@@ -278,6 +305,13 @@ html[data-theme="dark"] .modal { color: var(--text); }
 </style>
 </head>
 <body>
+<noscript>
+  <div style="max-width:720px;margin:48px auto;padding:0 20px;font-family:-apple-system,'Noto Sans SC',sans-serif;line-height:1.8;color:#1e293b">
+    <h1 style="font-size:1.6rem;margin-bottom:12px;color:#1a73e8">Hust互助 · 华中科技大学校园互助平台</h1>
+    <p style="margin-bottom:10px">Hust互助是面向华中科技大学（HUST）学生的校园互助平台，提供跑腿代拿快递外卖、校园二手交易、有问必答、校园公告互助等服务。发布需求，同学接单，让校园生活更轻松。</p>
+    <p style="color:#64748b">本平台为单页应用，请使用支持 JavaScript 的浏览器（Chrome / Edge / Safari）访问以获得完整功能。</p>
+  </div>
+</noscript>
 
 <header class="header">
   <div class="container nav-inner">
@@ -793,7 +827,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.8';
+const APP_VERSION = '1.14.9';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');

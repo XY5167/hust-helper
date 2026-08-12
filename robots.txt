@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://xy5167.github.io/hust-helper/sitemap.xml
