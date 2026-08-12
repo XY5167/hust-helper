@@ -205,6 +205,24 @@ html[data-theme="dark"] .modal { color: var(--text); }
 .empty-state{text-align:center;padding:56px 16px;color:var(--text-muted)}
 .empty-state-icon{font-size:2.8rem;margin-bottom:14px}
 .empty-state p{font-size:.9rem}
+.empty-state .btn{margin-top:18px}
+/* 骨架屏 */
+.skeleton{background:linear-gradient(90deg,var(--bg-hover) 25%,var(--bg-card) 50%,var(--bg-hover) 75%);background-size:200% 100%;animation:sk-shimmer 1.4s ease-in-out infinite;border-radius:6px}
+@keyframes sk-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skeleton-card{padding:16px}
+@media(prefers-reduced-motion:reduce){.skeleton{animation:none}}
+/* 移动端底部导航 */
+.bottom-nav{display:none}
+@media(max-width:768px){
+  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;height:58px;background:var(--bg-card);border-top:1px solid var(--border);box-shadow:0 -2px 12px rgba(0,0,0,.08);z-index:300;align-items:stretch}
+  .bottom-nav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;flex:1;color:var(--text-secondary);font-size:.66rem;text-decoration:none;transition:color .15s}
+  .bottom-nav-item .bi{font-size:1.3rem;line-height:1}
+  .bottom-nav-item.active{color:var(--primary)}
+  .bottom-nav-item.active span{font-weight:700}
+  .nav-links{display:none}
+  body{padding-bottom:58px}
+  .page{min-height:calc(100vh - 58px)}
+}
 
 /* Responsive */
 @media(max-width:768px){
@@ -272,6 +290,12 @@ html[data-theme="dark"] .modal { color: var(--text); }
     </div>
   </div>
 </header>
+
+<nav class="bottom-nav" id="bottomNav">
+  <a href="#" class="bottom-nav-item active" data-page="home" onclick="navigate('home');return false"><span class="bi">🏠</span><span>首页</span></a>
+  <a href="#" class="bottom-nav-item" data-page="task" onclick="navigate('task');return false"><span class="bi">📋</span><span>任务</span></a>
+  <a href="#" class="bottom-nav-item" data-page="my" onclick="navigate('my');return false"><span class="bi">👤</span><span>我的</span></a>
+</nav>
 
 <div class="notify-panel" id="notifyPanel">
   <div class="notify-panel-header">
@@ -758,7 +782,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.5';
+const APP_VERSION = '1.14.6';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -955,14 +979,28 @@ function navigate(page) {
   S.page = page;
   _lastUserAction = Date.now(); // 重置空闲计时
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('[data-page]').forEach(l => l.classList.remove('active'));
   const el = document.getElementById('page-' + page);
   if (el) el.style.display = 'block';
-  const nl = document.querySelector('[data-page="' + page + '"]');
-  if (nl) nl.classList.add('active');
+  document.querySelectorAll('[data-page="' + page + '"]').forEach(nl => nl.classList.add('active'));
   if (page === 'home') loadStats();
   else if (page === 'my') loadMyOrders();
   else if (page === 'task') refreshCurrentTab();
+}
+
+// 骨架屏占位（列表加载时使用）
+function skeletonCards(n) {
+  n = n || 6;
+  let h = '';
+  for (let i = 0; i < n; i++) {
+    h += '<div class="card skeleton-card">'
+      + '<div class="skeleton" style="height:18px;width:52%;margin-bottom:12px"></div>'
+      + '<div class="skeleton" style="height:13px;width:100%;margin-bottom:8px"></div>'
+      + '<div class="skeleton" style="height:13px;width:84%;margin-bottom:16px"></div>'
+      + '<div class="skeleton" style="height:28px;width:34%;border-radius:99px"></div>'
+      + '</div>';
+  }
+  return h;
 }
 
 // ============ STATS ============
@@ -1012,7 +1050,7 @@ async function loadOrders(type, cat) {
   }
 
   // 2. 始终后台静默拉取最新数据（缓存命中时也不return，继续拉新数据）
-  if (!cached) grid.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
+  if (!cached) grid.innerHTML = skeletonCards(6);
 
   try {
     const label = type === 'qa' ? 'qa' : 'order';
@@ -1082,7 +1120,11 @@ function renderOrders(orders) {
 
   if (orders.length === 0) {
     const emptyMap = { task: '暂无跑腿订单，来做第一个发布者吧', goods: '暂无物品流转信息，快来发布吧', qa: '暂无问答，来提出你的问题吧' };
-    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>' + (emptyMap[_cachedType] || '暂无匹配内容') + '</p></div>';
+    const actMap = { task: { label: '发布需求', fn: 'showPublishModal()' }, goods: { label: '发布物品', fn: "switchTaskTab('goods')" }, qa: { label: '去提问', fn: "switchTaskTab('qa')" } };
+    const key = _cachedType || 'task';
+    const act = actMap[key];
+    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>' + (emptyMap[_cachedType] || '暂无匹配内容') + '</p>'
+      + (act ? '<button class="btn btn-primary" onclick="' + act.fn + '">' + act.label + '</button>' : '') + '</div>';
     return;
   }
 
@@ -3959,7 +4001,8 @@ function renderMyOrders(orders, tab, subTab) {
   const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
 
   if (orders.length === 0) {
-    listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p></div>';
+    listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p>'
+      + '<button class="btn btn-primary" onclick="navigate(\'task\')">去任务大厅逛逛</button></div>';
     return;
   }
 
@@ -4101,7 +4144,7 @@ async function loadMyOrders(myTab) {
   if (!cached) {
     // 无localStorage缓存：若内存有乐观更新缓存则先用，否则显示加载中
     if (_cachedMyOrders) renderMyOrders(_cachedMyOrders, tab, subTab);
-    else listEl.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
+    else listEl.innerHTML = skeletonCards(4);
   }
 
   try {
