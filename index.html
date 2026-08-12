@@ -649,7 +649,7 @@ html[data-theme="dark"] .modal { color: var(--text); }
       <p class="form-error" id="myPaymentError" style="display:none"></p>
       <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
       <div class="form-group">
-        <label>网页昵称 <span class="form-hint" style="display:inline">（站内显示用，留空则显示真实姓名）</span></label>
+        <label>网页昵称 <span class="form-hint" style="display:inline">（站内显示用，留空则显示真实姓名）</span> <span id="myNicknameCooldown" class="form-hint" style="display:none;color:#f59e0b"></span></label>
         <input type="text" id="myNickname" placeholder="设置你的站内昵称" maxlength="20">
       </div>
       <button class="btn btn-outline btn-sm" onclick="saveMyNickname()">保存昵称</button>
@@ -838,7 +838,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.11';
+const APP_VERSION = '1.14.12';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -3646,7 +3646,20 @@ async function saveMyNickname() {
       const remoteUser = JSON.parse(issue.body);
       S.user = Object.assign({}, remoteUser, { _issue_number: S.user._issue_number });
     }
+    // 冷却：每 60 天（2个月）才能改一次，首次设置（无记录）不受限
+    const NICKNAME_COOLDOWN_DAYS = 60;
+    const lastTs = S.user.nickname_updated_at ? new Date(S.user.nickname_updated_at).getTime() : 0;
+    if (lastTs) {
+      const elapsed = (Date.now() - lastTs) / 86400000;
+      if (elapsed < NICKNAME_COOLDOWN_DAYS) {
+        const remain = Math.ceil(NICKNAME_COOLDOWN_DAYS - elapsed);
+        errEl.textContent = '昵称每 2 个月才能修改一次，还需 ' + remain + ' 天';
+        errEl.style.display = 'block';
+        return;
+      }
+    }
     S.user.nickname = nn || ''; // 留空即不设置昵称，展示时自动回落真实姓名
+    S.user.nickname_updated_at = new Date().toISOString();
     localStorage.setItem('hust_current_user', JSON.stringify(S.user));
     await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user));
     toast('昵称已保存', 'success');
@@ -4238,6 +4251,18 @@ async function loadMyOrders(myTab) {
   // 显示当前昵称（避免用户看不到已设内容）
   const nicknameInput = document.getElementById('myNickname');
   if (nicknameInput) nicknameInput.value = S.user.nickname || '';
+  // 显示昵称修改冷却倒计时
+  const cooldownEl = document.getElementById('myNicknameCooldown');
+  if (cooldownEl) {
+    const lastTs = S.user.nickname_updated_at ? new Date(S.user.nickname_updated_at).getTime() : 0;
+    if (lastTs) {
+      const remain = Math.ceil(60 - (Date.now() - lastTs) / 86400000);
+      if (remain > 0) { cooldownEl.textContent = '（每2个月可改1次，还需 ' + remain + ' 天）'; cooldownEl.style.display = 'inline'; }
+      else { cooldownEl.style.display = 'none'; }
+    } else {
+      cooldownEl.style.display = 'none';
+    }
+  }
   if (paymentPreview && S.user.payment_image) {
     paymentPreview.innerHTML = '<img src="' + S.user.payment_image + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
   }
