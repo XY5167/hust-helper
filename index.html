@@ -170,6 +170,8 @@ html[data-theme="dark"] .modal { color: var(--text); }
 .form-group label{display:block;font-size:.83rem;font-weight:500;margin-bottom:5px;color:var(--text-secondary)}
 .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 13px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg);transition:all .15s}
 .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.form-input{width:100%;padding:9px 13px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg);color:var(--text);transition:all .15s}
+.form-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .form-hint{font-size:.78rem;color:var(--text-muted);margin-bottom:10px}
 .form-error{font-size:.83rem;color:var(--danger);margin-bottom:10px;display:none}
@@ -756,7 +758,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.4';
+const APP_VERSION = '1.14.5';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -2425,11 +2427,19 @@ async function loadAnnouncementManagement() {
 
     let html = '';
     // 发布表单
-    html += '<div style="background:var(--bg);border-radius:12px;padding:16px;margin-bottom:18px">'
-      + '<h4 style="margin-bottom:12px">📢 发布公告</h4>'
-      + '<input id="annTitle" class="form-input" placeholder="公告标题" maxlength="60" style="margin-bottom:10px">'
-      + '<textarea id="annContent" class="form-input" rows="3" placeholder="公告内容" style="margin-bottom:10px;resize:vertical"></textarea>'
-      + '<button class="btn btn-primary" onclick="publishAnnouncement()">发布</button>'
+    html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:18px">'
+      + '<h4 style="margin-bottom:14px;font-size:1rem">📢 发布公告</h4>'
+      + '<div class="form-group">'
+      + '<label for="annTitle">公告标题</label>'
+      + '<input id="annTitle" class="form-input" placeholder="请输入公告标题" maxlength="60">'
+      + '</div>'
+      + '<div class="form-group">'
+      + '<label for="annContent">公告内容</label>'
+      + '<textarea id="annContent" class="form-input" rows="4" placeholder="请输入公告内容，支持纯文本" style="resize:vertical"></textarea>'
+      + '</div>'
+      + '<div style="display:flex;justify-content:flex-end;margin-top:8px">'
+      + '<button class="btn btn-primary" id="annPublishBtn" onclick="publishAnnouncement()">发布</button>'
+      + '</div>'
       + '</div>';
 
     // 历史列表
@@ -2443,7 +2453,7 @@ async function loadAnnouncementManagement() {
         html += '<div style="padding:12px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
           + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
           + '<div style="flex:1;min-width:0"><strong>' + esc(a.title || '') + '</strong>'
-          + (isOpen ? ' <span style="font-size:.72rem;color:#15803d;background:#dcfce7;padding:1px 6px;border-radius:99px">展示中</span>' : ' <span style="font-size:.72rem;color:var(--text-muted);background:#f1f5f9;padding:1px 6px;border-radius:99px">已撤回</span>')
+          + (isOpen ? ' <span style="font-size:.72rem;color:var(--success);background:rgba(22,163,74,.12);padding:1px 7px;border-radius:99px">展示中</span>' : ' <span style="font-size:.72rem;color:var(--text-muted);background:var(--bg-hover);padding:1px 7px;border-radius:99px">已撤回</span>')
           + '<br><span style="font-size:.84rem;color:var(--text-secondary)">' + esc(a.content || '') + '</span>'
           + (a.created ? '<br><span style="font-size:.72rem;color:var(--text-muted)">' + timeAgo(new Date(a.created).toISOString()) + ' 发布</span>' : '')
           + '</div>'
@@ -2459,17 +2469,25 @@ async function loadAnnouncementManagement() {
 }
 
 async function publishAnnouncement() {
+  if (window._publishAnnounceLock) return;
   const titleEl = document.getElementById('annTitle');
   const contentEl = document.getElementById('annContent');
   const title = (titleEl && titleEl.value || '').trim();
   const content = (contentEl && contentEl.value || '').trim();
   if (!title || !content) { toast('标题和内容都不能为空', 'error'); return; }
+  const btn = document.getElementById('annPublishBtn');
+  window._publishAnnounceLock = true;
+  if (btn) { btn.disabled = true; btn.textContent = '发布中…'; }
   try {
     const res = await ghApi('/api/announce', 'POST', { title, content });
     if (!res.ok) { const j = await res.json().catch(()=>({})); toast('发布失败：' + (j.error || res.status), 'error'); return; }
     toast('公告已发布', 'success');
     await loadAnnouncementManagement();
   } catch(e) { toast('发布失败：' + e.message, 'error'); }
+  finally {
+    window._publishAnnounceLock = false;
+    if (btn) { btn.disabled = false; btn.textContent = '发布'; }
+  }
 }
 
 async function deleteAnnouncement(num) {
