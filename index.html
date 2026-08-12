@@ -5,8 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="version" content="1.3.4">
 <link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1a73e8">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<title>HUST 校园互助</title>
+<title>Hust互助</title>
 <style>
 :root {
   --primary: #1a73e8;
@@ -790,7 +793,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.7';
+const APP_VERSION = '1.14.8';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -5015,6 +5018,14 @@ setInterval(function() {
 setInterval(function() {
   if (!document.hidden) loadAnnounceBanner();
 }, 60000);
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/hust-helper/sw.js', { scope: '/hust-helper/' })
+      .catch(function (e) { console.warn('SW registration failed:', e); });
+  });
+}
 </script>
 
 </body>
