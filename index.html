@@ -121,7 +121,14 @@ html[data-theme="dark"] .modal { color: var(--text); }
 .filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 
 /* Order Grid */
-.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;margin-bottom:40px}
+.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;margin-bottom:20px}
+.pager{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;margin:8px 0 40px}
+.pager-btn{padding:7px 12px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text-secondary);border-radius:var(--radius-xs);font-size:.85rem;cursor:pointer;transition:all .15s;min-width:38px}
+.pager-btn:hover:not([disabled]):not(.active){border-color:var(--primary);color:var(--primary)}
+.pager-btn.active{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+.pager-btn[disabled]{opacity:.45;cursor:not-allowed}
+.pager-info{margin-left:8px;font-size:.8rem;color:var(--text-muted)}
+@media (max-width:768px){.pager-btn{padding:6px 9px;font-size:.8rem;min-width:32px}.pager-info{width:100%;text-align:center;margin:4px 0 0}}
 .order-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px;transition:all .15s;cursor:pointer}
 .order-card:hover{border-color:var(--primary);box-shadow:var(--shadow-md)}
 .order-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
@@ -377,8 +384,8 @@ html[data-theme="dark"] .modal { color: var(--text); }
     </div>
     <!-- 搜索和排序 -->
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap" id="taskSearchBar">
-      <input type="text" id="taskSearchInput" placeholder="🔍 搜索标题/描述/地点..." style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card)" oninput="applySearchAndSort()">
-      <select id="taskDormFilter" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card);cursor:pointer" onchange="applySearchAndSort()">
+      <input type="text" id="taskSearchInput" placeholder="🔍 搜索标题/描述/地点..." style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card)" oninput="resetTaskPageAndApply()">
+      <select id="taskDormFilter" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card);cursor:pointer" onchange="resetTaskPageAndApply()">
         <option value="">📍 全部区域</option>
         <option value="紫菘">紫菘</option>
         <option value="韵苑">韵苑</option>
@@ -386,7 +393,7 @@ html[data-theme="dark"] .modal { color: var(--text); }
         <option value="东校区">东校区</option>
         <option value="西校区">西校区</option>
       </select>
-      <select id="taskSortSelect" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card);cursor:pointer" onchange="applySearchAndSort()">
+      <select id="taskSortSelect" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card);cursor:pointer" onchange="resetTaskPageAndApply()">
         <option value="newest">🕐 最新发布</option>
         <option value="oldest">🕐 最早发布</option>
         <option value="price_high">💰 价格从高到低</option>
@@ -394,6 +401,7 @@ html[data-theme="dark"] .modal { color: var(--text); }
       </select>
     </div>
     <div class="order-grid" id="taskOrders"></div>
+    <div id="taskPagination"></div>
   </div>
 </section>
 
@@ -782,7 +790,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.6';
+const APP_VERSION = '1.14.7';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1020,6 +1028,8 @@ async function loadStats() {
 
 // ============ ORDERS ============
 let _cachedOrders = null;
+let _taskCurrentPage = 1;
+const TASK_PAGE_SIZE = 12;
 let _cachedType = null;
 let _cachedMyOrders = null;
 let _cachedMyTab = null;
@@ -1033,6 +1043,7 @@ function refreshCurrentTab() {
 async function loadOrders(type, cat) {
   const grid = document.getElementById('taskOrders');
   if (!grid) return;
+  _taskCurrentPage = 1;
 
   // 清空搜索
   const searchInput = document.getElementById('taskSearchInput');
@@ -1117,18 +1128,26 @@ async function loadOrders(type, cat) {
 function renderOrders(orders) {
   const grid = document.getElementById('taskOrders');
   if (!grid) return;
+  const pager = document.getElementById('taskPagination');
 
   if (orders.length === 0) {
     const emptyMap = { task: '暂无跑腿订单，来做第一个发布者吧', goods: '暂无物品流转信息，快来发布吧', qa: '暂无问答，来提出你的问题吧' };
     const actMap = { task: { label: '发布需求', fn: 'showPublishModal()' }, goods: { label: '发布物品', fn: "switchTaskTab('goods')" }, qa: { label: '去提问', fn: "switchTaskTab('qa')" } };
-    const key = _cachedType || 'task';
-    const act = actMap[key];
+    const act = actMap[_cachedType] || actMap.task;
     grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>' + (emptyMap[_cachedType] || '暂无匹配内容') + '</p>'
-      + (act ? '<button class="btn btn-primary" onclick="' + act.fn + '">' + act.label + '</button>' : '') + '</div>';
+      + '<button class="btn btn-primary" onclick="' + act.fn + '">' + act.label + '</button></div>';
+    if (pager) pager.innerHTML = '';
     return;
   }
 
-  grid.innerHTML = orders.map(o => {
+  // 分页切片
+  const totalPages = Math.max(1, Math.ceil(orders.length / TASK_PAGE_SIZE));
+  if (_taskCurrentPage > totalPages) _taskCurrentPage = totalPages;
+  if (_taskCurrentPage < 1) _taskCurrentPage = 1;
+  const start = (_taskCurrentPage - 1) * TASK_PAGE_SIZE;
+  const pageItems = orders.slice(start, start + TASK_PAGE_SIZE);
+
+  grid.innerHTML = pageItems.map(o => {
     const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答', borrow:'借物', goods:'物品流转'};
     const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
@@ -1158,7 +1177,29 @@ function renderOrders(orders) {
       + '<span>' + timeAgo(o.created_at) + '</span>'
       + '</div></div>';
   }).join('');
+
+  if (pager) renderTaskPager(pager, totalPages, orders.length);
 }
+
+function renderTaskPager(pager, totalPages, totalCount) {
+  if (totalPages <= 1) { pager.innerHTML = ''; return; }
+  let html = '<div class="pager">';
+  html += '<button class="pager-btn" ' + (_taskCurrentPage <= 1 ? 'disabled' : 'onclick="gotoTaskPage(' + (_taskCurrentPage - 1) + ')"') + '>‹ 上一页</button>';
+  const windowSize = 5;
+  let s = Math.max(1, _taskCurrentPage - 2);
+  let e = Math.min(totalPages, s + windowSize - 1);
+  s = Math.max(1, e - windowSize + 1);
+  for (let p = s; p <= e; p++) {
+    html += '<button class="pager-btn' + (p === _taskCurrentPage ? ' active' : '') + '" onclick="gotoTaskPage(' + p + ')">' + p + '</button>';
+  }
+  html += '<button class="pager-btn" ' + (_taskCurrentPage >= totalPages ? 'disabled' : 'onclick="gotoTaskPage(' + (_taskCurrentPage + 1) + ')"') + '>下一页 ›</button>';
+  html += '<span class="pager-info">第 ' + _taskCurrentPage + ' / ' + totalPages + ' 页 · 共 ' + totalCount + ' 条</span>';
+  html += '</div>';
+  pager.innerHTML = html;
+}
+
+function gotoTaskPage(n) { _taskCurrentPage = n; applySearchAndSort(); }
+function resetTaskPageAndApply() { _taskCurrentPage = 1; applySearchAndSort(); }
 
 function applySearchAndSort() {
   if (!_cachedOrders) return;
