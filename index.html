@@ -838,7 +838,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.10';
+const APP_VERSION = '1.14.11';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -3646,7 +3646,7 @@ async function saveMyNickname() {
       const remoteUser = JSON.parse(issue.body);
       S.user = Object.assign({}, remoteUser, { _issue_number: S.user._issue_number });
     }
-    S.user.nickname = nn || S.user.name; // 留空回落真实姓名
+    S.user.nickname = nn || ''; // 留空即不设置昵称，展示时自动回落真实姓名
     localStorage.setItem('hust_current_user', JSON.stringify(S.user));
     await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user));
     toast('昵称已保存', 'success');
@@ -4235,6 +4235,9 @@ async function loadMyOrders(myTab) {
   const paymentInput = document.getElementById('myPaymentInfo');
   const paymentPreview = document.getElementById('myPaymentPreview');
   if (paymentInput && S.user.payment_info) paymentInput.value = S.user.payment_info;
+  // 显示当前昵称（避免用户看不到已设内容）
+  const nicknameInput = document.getElementById('myNickname');
+  if (nicknameInput) nicknameInput.value = S.user.nickname || '';
   if (paymentPreview && S.user.payment_image) {
     paymentPreview.innerHTML = '<img src="' + S.user.payment_image + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
   }
