@@ -847,7 +847,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.16';
+const APP_VERSION = '1.14.17';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1782,24 +1782,46 @@ async function loadComments(issueNum) {
     // 追加输入框
     if (canSend) {
       el.innerHTML += '<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
-        + '<input type="text" id="commentInput" placeholder="输入消息..." style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem" onkeydown="if(event.key===\'Enter\')sendComment(' + issueNum + ')">'
+        + '<input type="text" id="commentInput" placeholder="输入消息..." style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem" oninput="saveCommentDraft(' + issueNum + ', this.value)" onkeydown="if(event.key===\'Enter\')sendComment(' + issueNum + ')">'
         + '<button class="btn btn-primary btn-sm" onclick="sendComment(' + issueNum + ')" style="white-space:nowrap">发送</button>'
         + '</div>';
+      restoreCommentDraft(issueNum);   // 轮询/刷新重建输入框后回填草稿
     } else if (sendHint) {
       el.innerHTML += '<p style="color:var(--text-muted);font-size:.78rem;text-align:center;padding:10px;margin-top:10px;border-top:1px solid var(--border)">' + sendHint + '</p>';
     }
   } catch(e) { el.innerHTML = ''; }
 }
 
+// ===== 评论/私信草稿持久化（刷新/误触/轮询重建不丢，与验证码同源）=====
+function saveCommentDraft(issueNum, text) {
+  try {
+    if (text && text.trim()) sessionStorage.setItem('hust_cmt_' + issueNum, text);
+    else sessionStorage.removeItem('hust_cmt_' + issueNum);
+  } catch (_) {}
+}
+function restoreCommentDraft(issueNum) {
+  try {
+    const v = sessionStorage.getItem('hust_cmt_' + issueNum);
+    const input = document.getElementById('commentInput');
+    if (v && input) input.value = v;
+  } catch (_) {}
+}
+function clearCommentDraft(issueNum) {
+  try { sessionStorage.removeItem('hust_cmt_' + issueNum); } catch (_) {}
+}
+
 async function sendComment(issueNum) {
   if (!S.user) { showAuthModal(); return; }
+  if (window._commentLock) return;            // 防双击/连点重复发送（发布/登录/公告已各有锁，评论补齐）
   const input = document.getElementById('commentInput');
+  if (!input) return;
   const text = input.value.trim();
   if (!text) return;
 
   const sw = checkSensitive(text);
   if (sw) { toast('消息包含敏感词「' + sw + '」，请修改后发送', 'error'); return; }
 
+  window._commentLock = true;
   input.disabled = true;
   try {
     const body = JSON.stringify({ name: S.user.nickname || S.user.name, student_id: S.user.student_id, text });
@@ -1831,9 +1853,11 @@ async function sendComment(issueNum) {
       }
     } catch(e) { /* 静默处理，不影响发消息 */ }
     input.value = '';
+    clearCommentDraft(issueNum);            // 发送成功后清掉草稿
     await loadComments(issueNum);
   } catch(e) { toast('发送失败：' + e.message, 'error'); }
   input.disabled = false;
+  window._commentLock = false;
 }
 
 // 问答：发布者采纳某条评论为最佳答案（悬赏线下支付给答主，仿跑腿收款）
@@ -1943,7 +1967,7 @@ function startCommentPolling(issueNum) {
     if (!_commentIssueNum) return;
     if (document.hidden) return; // 页面隐藏时跳过
     loadComments(_commentIssueNum);
-  }, 8000);
+  }, 10000);
 }
 
 function stopCommentPolling() {
@@ -3947,11 +3971,56 @@ function logout() {
 }
 
 // ============ PUBLISH ============
+// ===== 发布表单草稿持久化（刷新/误触/部署刷新不丢，与验证码同源）=====
+function savePublishDraft() {
+  try {
+    const g = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+    const draft = {
+      type: g('publishType'), category: g('publishCategory'),
+      title: g('publishTitle'), desc: g('publishDesc'),
+      location: g('publishLocation'), urgency: g('publishUrgency'),
+      payment: g('publishPayment'), deadline: g('publishDeadline'),
+      bountyEnable: document.getElementById('bountyEnable') ? document.getElementById('bountyEnable').checked : false,
+      bounty: g('publishBounty')
+    };
+    sessionStorage.setItem('hust_publish_draft', JSON.stringify(draft));
+  } catch (_) {}
+}
+function restorePublishDraft() {
+  try {
+    const raw = sessionStorage.getItem('hust_publish_draft');
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    const set = (id, v) => { const e = document.getElementById(id); if (e && v != null) e.value = v; };
+    if (d.type) { const t = document.getElementById('publishType'); if (t) t.value = d.type; updatePublishCategories(); }
+    set('publishCategory', d.category);
+    set('publishTitle', d.title); set('publishDesc', d.desc);
+    set('publishLocation', d.location); set('publishUrgency', d.urgency);
+    set('publishPayment', d.payment); set('publishDeadline', d.deadline);
+    const be = document.getElementById('bountyEnable'); if (be && d.bountyEnable) { be.checked = true; toggleBountyInput(); set('publishBounty', d.bounty); }
+    updateCharCount('publishTitle', 'titleCount', 50);
+    updateCharCount('publishDesc', 'descCount', 500);
+  } catch (_) {}
+}
+function clearPublishDraft() {
+  try { sessionStorage.removeItem('hust_publish_draft'); } catch (_) {}
+}
+
 function showPublishModal() {
   if (!S.user) { showAuthModal(); return; }
   if (!checkApproved()) return;
   document.getElementById('publishModal').classList.add('active');
   updatePublishCategories();
+  // 绑定草稿自动保存（发布/关闭均保留，成功发布才清）
+  if (!window._publishDraftBound) {
+    window._publishDraftBound = true;
+    const pf = document.getElementById('publishForm');
+    if (pf) pf.querySelectorAll('input,textarea,select').forEach(el => {
+      el.addEventListener('input', savePublishDraft);
+      el.addEventListener('change', savePublishDraft);
+    });
+  }
+  restorePublishDraft();
   setTimeout(() => { const f = document.querySelector('#publishModal input:not([type=hidden]),#publishModal textarea,#publishModal select'); if (f) f.focus(); }, 60);
   // 默认截止时间为明天同一时间
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -4157,6 +4226,7 @@ async function handlePublish(e) {
     const prefix = type === 'qa' ? '[问答] ' : (type === 'borrow' ? '[借物] ' : '[订单] ');
     await ghCreateIssue(prefix + title, JSON.stringify(order), [label, type, cat]);
     toast('发布成功！', 'success');
+    clearPublishDraft();
     closePublishModal();
     if (S.page === 'task') {
       refreshCurrentTab();
@@ -4862,7 +4932,7 @@ setTimeout(autoCleanOldOrders, 5000);
 
 // ============ 智能轮询（页面可见时快、隐藏时慢、空闲时停） ============
 let _pollTimer = null;
-let _pollInterval = 5000;  // 当前轮询间隔（毫秒）
+let _pollInterval = 10000;  // 当前轮询间隔（毫秒）
 let _lastUserAction = Date.now();
 
 // 记录用户操作时间
@@ -4878,7 +4948,7 @@ function startSmartPolling() {
 
     // 30 秒无操作 → 降为 15 秒轮询
     const idle = Date.now() - _lastUserAction;
-    const targetInterval = idle > 30000 ? 15000 : 5000;
+    const targetInterval = idle > 30000 ? 20000 : 10000;
 
     // 只在达到目标间隔时刷新
     if (_pollInterval !== targetInterval) {
@@ -4903,7 +4973,7 @@ function stopSmartPolling() {
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && S.page && !_pollTimer) {
     _lastUserAction = Date.now();
-    _pollInterval = 5000;
+    _pollInterval = 10000;
     startSmartPolling();
   }
 });
