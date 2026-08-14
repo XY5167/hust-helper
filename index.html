@@ -847,7 +847,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.15';
+const APP_VERSION = '1.14.16';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -3514,9 +3514,57 @@ function closeAuthModal() {
 // ===== 校园邮箱验证码验证（EmailJS，无需后端）=====
 let _emailCode = null;        // 当前生成的验证码
 let _emailCodeExpire = 0;     // 验证码过期时间戳
+let _emailCodeEmail = '';     // 验证码对应的邮箱（用于判断同邮箱是否可复用）
 let _emailVerified = false;   // 邮箱是否已通过验证
 let _lastSendAt = 0;          // 上次发送时间（60秒间隔）
 let _emailManuallyEdited = false; // 用户是否手动改过邮箱框
+
+// 验证码持久化到 sessionStorage：刷新页面不丢、同一邮箱有效期内复用，避免重复发信浪费 EmailJS 免费额度
+const _VC_CODE_KEY = 'hust_vc_code';
+const _VC_EXP_KEY = 'hust_vc_exp';
+const _VC_EMAIL_KEY = 'hust_vc_email';
+const _VC_LASTSEND_KEY = 'hust_vc_lastsend';
+
+function _loadStoredCode() {
+  try {
+    const c = sessionStorage.getItem(_VC_CODE_KEY);
+    const e = parseInt(sessionStorage.getItem(_VC_EXP_KEY) || '0', 10);
+    const m = sessionStorage.getItem(_VC_EMAIL_KEY) || '';
+    if (c && e && Date.now() < e) { _emailCode = c; _emailCodeExpire = e; _emailCodeEmail = m; }
+  } catch (_) {}
+}
+function _saveStoredCode(email) {
+  try {
+    if (_emailCode && _emailCodeExpire) {
+      sessionStorage.setItem(_VC_CODE_KEY, _emailCode);
+      sessionStorage.setItem(_VC_EXP_KEY, String(_emailCodeExpire));
+      sessionStorage.setItem(_VC_EMAIL_KEY, email || '');
+    }
+  } catch (_) {}
+}
+function _clearStoredCode() {
+  try {
+    sessionStorage.removeItem(_VC_CODE_KEY);
+    sessionStorage.removeItem(_VC_EXP_KEY);
+    sessionStorage.removeItem(_VC_EMAIL_KEY);
+  } catch (_) {}
+}
+function _loadLastSend() {
+  try { const v = parseInt(sessionStorage.getItem(_VC_LASTSEND_KEY) || '0', 10); if (v) _lastSendAt = v; } catch (_) {}
+}
+function _saveLastSend() {
+  try { sessionStorage.setItem(_VC_LASTSEND_KEY, String(_lastSendAt)); } catch (_) {}
+}
+function startSendCountdown(btn) {
+  btn.disabled = true;
+  let left = 60;
+  btn.textContent = left + 's';
+  const timer = setInterval(() => {
+    left--;
+    if (left <= 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '重新发送'; }
+    else btn.textContent = left + 's';
+  }, 1000);
+}
 
 function deriveEmail(sid) {
   return sid.toLowerCase() + '@hust.edu.cn';
@@ -3537,9 +3585,11 @@ function onEmailInput() {
 function resetEmailVerify() {
   _emailCode = null;
   _emailCodeExpire = 0;
+  _emailCodeEmail = '';
   _emailVerified = false;
   _lastSendAt = 0;
   _emailManuallyEdited = false;
+  _clearStoredCode();
   const codeInput = document.getElementById('authVerifyCode');
   const sendBtn = document.getElementById('sendCodeBtn');
   const emailInput = document.getElementById('authEmail');
@@ -3575,7 +3625,18 @@ async function sendVerifyCode() {
     toast('请填写有效的邮箱地址', 'error');
     return;
   }
+  _loadStoredCode();
+  _loadLastSend();
   const now = Date.now();
+
+  // 同一邮箱、且仍在有效期内的验证码直接复用，不再发新邮件（省 EmailJS 免费额度）
+  if (_emailCode && _emailCodeExpire > now && _emailCodeEmail === toEmail) {
+    const leftMin = Math.max(1, Math.ceil((_emailCodeExpire - now) / 60000));
+    toast('验证码已发送至 ' + toEmail + '，请查收（' + leftMin + ' 分钟内有效，无需重复发送）', 'success');
+    startSendCountdown(btn);
+    return;
+  }
+
   if (now - _lastSendAt < 60000) {
     const wait = Math.ceil((60000 - (now - _lastSendAt)) / 1000);
     toast('发送过于频繁，请 ' + wait + ' 秒后再试', 'error');
@@ -3584,9 +3645,9 @@ async function sendVerifyCode() {
   const code = String(Math.floor(100000 + Math.random() * 900000));
   _emailCode = code;
   _emailCodeExpire = now + 10 * 60 * 1000; // 10分钟有效
+  _emailCodeEmail = toEmail;
   _emailVerified = false;
   _lastSendAt = now;
-  btn.disabled = true;
   try {
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
       to_email: toEmail,
@@ -3594,29 +3655,30 @@ async function sendVerifyCode() {
       student_name: name || '同学',
       reply_to: 'xy5167@qq.com'
     });
+    _saveStoredCode(toEmail);
+    _saveLastSend();
     toast('验证码已发送至 ' + toEmail + '（若未收到请检查垃圾箱）', 'success');
-    let left = 60;
-    btn.textContent = left + 's';
-    const timer = setInterval(() => {
-      left--;
-      if (left <= 0) { clearInterval(timer); btn.disabled = false; btn.textContent = '重新发送'; }
-      else btn.textContent = left + 's';
-    }, 1000);
+    startSendCountdown(btn);
   } catch (ex) {
     console.error(ex);
     btn.disabled = false;
     _emailCode = null;
+    _emailCodeExpire = 0;
+    _emailCodeEmail = '';
+    _clearStoredCode();
     toast('验证码发送失败：' + (ex && ex.text ? ex.text : (ex && ex.message ? ex.message : '请稍后重试')), 'error');
   }
 }
 
 function checkVerifyCode() {
+  _loadStoredCode();
   const input = document.getElementById('authVerifyCode');
   const code = (input.value || '').trim();
   if (!_emailCode) return;
   if (Date.now() > _emailCodeExpire) {
     _emailVerified = false;
     _emailCode = null;
+    _clearStoredCode();
     toast('验证码已过期，请重新发送', 'error');
     return;
   }
