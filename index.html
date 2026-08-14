@@ -847,7 +847,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.14';
+const APP_VERSION = '1.14.15';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -914,6 +914,12 @@ function cacheBust(key) {
   if (getToken() && !tokenPayload()) { clearToken(); }
   const saved = localStorage.getItem('hust_current_user');
   if (saved) try { S.user = JSON.parse(saved); } catch(e) {}
+  else {
+    // 前端加固：localStorage 被手机端清空时，从 cookie 兜底恢复（随后 syncCurrentUser 补全资料）
+    const ct = getCookieToken(), cuid = getCookieUid();
+    if (ct) setToken(ct);
+    if (ct && cuid) S.user = { _issue_number: parseInt(cuid, 10) };
+  }
   // 用 Token 中的角色刷新本地（管理员 UI 判定以服务端为准）
   const tp = tokenPayload();
   if (S.user && tp) S.user.role = tp.role;
@@ -940,19 +946,31 @@ function cacheBust(key) {
 // 通过 Worker 代理（缓存读 + 透传写 + WebSocket 通知）
 // Token 通过请求头传给 Worker
 // ---- 会话 Token 管理（与用户资料分离，绝不存储密码）----
-function getToken() { try { return localStorage.getItem('hust_token'); } catch (e) { return null; } }
+function getToken() { try { return localStorage.getItem('hust_token') || getCookieToken(); } catch (e) { return null; } }
 function setToken(t) { try { localStorage.setItem('hust_token', t); } catch (e) {} }
-function clearToken() { try { localStorage.removeItem('hust_token'); } catch (e) {} }
+function clearToken() { try { localStorage.removeItem('hust_token'); } catch (e) {} clearAuthCookies(); }
 function tokenPayload() {
   const t = getToken();
   if (!t) return null;
   try {
-    const b = t.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+    const b = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'); // 修正：解析 payload 段([1])，原 [0] 是 header 不含 exp/role
     const json = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b), c => c.charCodeAt(0))));
     if (json.exp && Date.now() > json.exp) return null;
     return json;
   } catch (e) { return null; }
 }
+
+// ---- Cookie 兜底（手机端 localStorage 易被清空，cookie 抗清空能力更强）----
+function setCookie(n, v, d) { try { document.cookie = n + '=' + encodeURIComponent(v) + '; max-age=' + (d * 86400) + '; path=/; samesite=lax'; } catch (e) {} }
+function getCookie(n) { try { const m = document.cookie.match(new RegExp('(?:^|; )' + n + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : null; } catch (e) { return null; } }
+function setAuthCookies() {
+  const t = getToken();
+  if (t) setCookie('hust_token', t, 30);
+  if (S.user && S.user._issue_number) setCookie('hust_uid', String(S.user._issue_number), 30);
+}
+function getCookieToken() { return getCookie('hust_token'); }
+function getCookieUid() { return getCookie('hust_uid'); }
+function clearAuthCookies() { setCookie('hust_token', '', -1); setCookie('hust_uid', '', -1); }
 
 function ghApi(path, method, body) {
   const opts = {
@@ -3785,6 +3803,7 @@ async function handleAuth(e) {
         setToken(regData.token);
         S.user = u;
         localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+        setAuthCookies();
         updateUI();
         closeAuthModal();
         resetEmailVerify();
@@ -3833,6 +3852,7 @@ async function handleAuth(e) {
       setToken(data.token);
       S.user = data.user;
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      setAuthCookies();
       updateUI();
       closeAuthModal();
       toast('登录成功', 'success');
@@ -3856,6 +3876,7 @@ function logout() {
   if (!confirm('确定要退出登录吗？')) return;
   S.user = null;
   clearToken();
+  clearAuthCookies();
   localStorage.removeItem('hust_current_user');
   updateUI();
   // 切到首页
@@ -4154,6 +4175,7 @@ async function syncCurrentUser() {
     S.user = Object.assign({}, remoteUser, { _issue_number: issueNumber });
     if (!S.user.role && localRole) S.user.role = localRole;
     localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+    setAuthCookies();
     updateUI();
   } catch(e) { console.warn('syncCurrentUser failed', e); }
 }
