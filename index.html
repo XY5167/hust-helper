@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1a73e8">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <title>Hust互助 - 华中科技大学校园互助平台</title>
-<meta name="description" content="Hust互助是华中科技大学(HUST)校园互助平台，提供跑腿代拿、二手交易、有问必答、学术互助、校园公告互助。学生发布需求，同学接单赚钱，校园生活更轻松。">
+<meta name="description" content="Hust互助是华中科技大学(HUST)校园互助平台，提供跑腿代拿、二手交易、有问必答（含习题解答）、校园公告互助。学生发布需求，同学接单赚钱，校园生活更轻松。">
 <meta name="keywords" content="华中科技大学,华科,HUST,校园互助,跑腿代拿,二手交易,校园问答,华科互助,武汉高校互助">
 <meta name="author" content="Hust互助">
 <meta name="robots" content="index,follow">
@@ -18,13 +18,13 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Hust互助">
 <meta property="og:title" content="Hust互助 - 华中科技大学校园互助平台">
-<meta property="og:description" content="华科校园互助平台：跑腿代拿、二手交易、有问必答、学术互助。学生发布需求，同学接单赚钱。">
+<meta property="og:description" content="华科校园互助平台：跑腿代拿、二手交易、有问必答（含习题解答）。学生发布需求，同学接单赚钱。">
 <meta property="og:url" content="https://xy5167.github.io/hust-helper/">
 <meta property="og:image" content="https://xy5167.github.io/hust-helper/icons/icon-512.png">
 <meta property="og:locale" content="zh_CN">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Hust互助 - 华中科技大学校园互助平台">
-<meta name="twitter:description" content="华科校园互助平台：跑腿代拿、二手交易、有问必答、学术互助。学生发布需求，同学接单赚钱。">
+<meta name="twitter:description" content="华科校园互助平台：跑腿代拿、二手交易、有问必答（含习题解答）。学生发布需求，同学接单赚钱。">
 <meta name="twitter:image" content="https://xy5167.github.io/hust-helper/icons/icon-512.png">
 <script type="application/ld+json">
 {
@@ -33,7 +33,7 @@
   "name": "Hust互助",
   "url": "https://xy5167.github.io/hust-helper/",
   "logo": "https://xy5167.github.io/hust-helper/icons/icon-512.png",
-  "description": "华中科技大学校园互助平台，提供跑腿代拿、二手交易、有问必答、学术互助、校园公告互助。",
+  "description": "华中科技大学校园互助平台，提供跑腿代拿、二手交易、有问必答（含习题解答）、校园公告互助。",
   "areaServed": { "@type": "CollegeOrUniversity", "name": "华中科技大学" }
 }
 </script>
@@ -395,7 +395,6 @@ html[data-theme="dark"] .modal { color: var(--text); }
       <button class="tab-btn" data-tasktab="goods" onclick="switchTaskTab('goods')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">📦 物品流转</button>
       <button class="tab-btn" data-tasktab="qa" onclick="switchTaskTab('qa')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">💬 有问必答</button>
       <button class="tab-btn" data-tasktab="find" onclick="switchTaskTab('find')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">🔍 找人</button>
-      <button class="tab-btn" data-tasktab="academic" onclick="switchTaskTab('academic')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">📚 学术互助</button>
     </div>
     <!-- 任务子分类 -->
     <div class="filter-bar" id="taskFilters">
@@ -421,6 +420,7 @@ html[data-theme="dark"] .modal { color: var(--text); }
       <button class="filter-btn" data-filter="exam" onclick="filterOrders('qa','exam')">📝 考研保研</button>
       <button class="filter-btn" data-filter="life" onclick="filterOrders('qa','life')">🍜 校园生活</button>
       <button class="filter-btn" data-filter="job" onclick="filterOrders('qa','job')">💼 实习就业</button>
+      <button class="filter-btn" data-filter="exercise" onclick="filterOrders('qa','exercise')">📝 习题解答</button>
       <button class="filter-btn" data-filter="other" onclick="filterOrders('qa','other')">📌 其他</button>
     </div>
     <!-- 找人子分类 -->
@@ -429,16 +429,6 @@ html[data-theme="dark"] .modal { color: var(--text); }
       <button class="filter-btn" data-filter="team" onclick="filterOrders('find','team')">🏆 竞赛组队</button>
       <button class="filter-btn" data-filter="carpool" onclick="filterOrders('find','carpool')">🚗 出行拼车</button>
       <button class="filter-btn" data-filter="survey" onclick="filterOrders('find','survey')">📋 问卷招募</button>
-    </div>
-    <!-- 学术互助子分类 -->
-    <div class="filter-bar" id="academicFilters" style="display:none">
-      <button class="filter-btn active" data-filter="all" onclick="filterOrders('academic','all')">全部</button>
-      <button class="filter-btn" data-filter="calc" onclick="filterOrders('academic','calc')">∫ 微积分/高数</button>
-      <button class="filter-btn" data-filter="physics" onclick="filterOrders('academic','physics')">🔭 大学物理</button>
-      <button class="filter-btn" data-filter="code" onclick="filterOrders('academic','code')">💻 编程代码</button>
-      <button class="filter-btn" data-filter="major" onclick="filterOrders('academic','major')">📚 专业课</button>
-      <button class="filter-btn" data-filter="exam" onclick="filterOrders('academic','exam')">🎓 考研真题</button>
-      <button class="filter-btn" data-filter="other" onclick="filterOrders('academic','other')">📌 其他</button>
     </div>
     <!-- 搜索和排序 -->
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap" id="taskSearchBar">
@@ -582,8 +572,7 @@ html[data-theme="dark"] .modal { color: var(--text); }
           <option value="task">跑腿代办</option>
           <option value="secondhand">物品流转 - 出售转让</option>
           <option value="borrow">物品流转 - 短期租借</option>
-          <option value="qa">有问必答</option>
-          <option value="academic">学术互助（解题/答疑，可附照片）</option>
+          <option value="qa">有问必答（含习题解答）</option>
           <option value="find">找人（组队/拼车/招募）</option>
         </select>
       </div>
@@ -602,7 +591,7 @@ html[data-theme="dark"] .modal { color: var(--text); }
         <span class="char-count" id="descCount">0/500</span>
       </div>
       <div class="form-group" id="bountyGroup" style="display:none">
-        <label>🏆 悬赏费用（问答/学术互助可选）</label>
+        <label>🏆 悬赏费用（问答可选）</label>
         <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:.85rem;cursor:pointer;margin-bottom:6px">
           <input type="checkbox" id="bountyEnable" onchange="toggleBountyInput()"> 设置悬赏，吸引更多同学回答
         </label>
@@ -861,7 +850,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.18';
+const APP_VERSION = '1.14.19';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1159,7 +1148,7 @@ async function loadOrders(type, cat) {
   if (!cached) grid.innerHTML = skeletonCards(6);
 
   try {
-    const label = type === 'qa' ? 'qa' : (type === 'academic' ? 'academic' : 'order');
+    const label = type === 'qa' ? 'qa' : 'order';
     const issues = await ghIssues(label);
     let orders = issues.map(i => {
       try {
@@ -1197,9 +1186,7 @@ async function loadOrders(type, cat) {
 
     // 根据类型筛选
     if (type === 'qa') {
-      orders = orders.filter(o => o.type === 'qa');
-    } else if (type === 'academic') {
-      orders = orders.filter(o => o.type === 'academic');
+      orders = orders.filter(o => o.type === 'qa' || o.type === 'academic');
     } else if (type === 'goods') {
       const sub = S.goodsSubTab || 'all';
       if (sub === 'sale') orders = orders.filter(o => o.type === 'secondhand');
@@ -1230,8 +1217,8 @@ function renderOrders(orders) {
   const pager = document.getElementById('taskPagination');
 
   if (orders.length === 0) {
-    const emptyMap = { task: '暂无跑腿订单，来做第一个发布者吧', goods: '暂无物品流转信息，快来发布吧', qa: '暂无问答，来提出你的问题吧', find: '暂无找人信息，快来发布组队/拼车/招募吧', academic: '暂无学术互助内容，来提出你的难题吧' };
-    const actMap = { task: { label: '发布需求', fn: 'showPublishModal()' }, goods: { label: '发布物品', fn: "switchTaskTab('goods')" }, qa: { label: '去提问', fn: "switchTaskTab('qa')" }, find: { label: '发布找人', fn: "switchTaskTab('find')" }, academic: { label: '去提问', fn: "switchTaskTab('academic')" } };
+    const emptyMap = { task: '暂无跑腿订单，来做第一个发布者吧', goods: '暂无物品流转信息，快来发布吧', qa: '暂无问答，来提出你的问题吧', find: '暂无找人信息，快来发布组队/拼车/招募吧' };
+    const actMap = { task: { label: '发布需求', fn: 'showPublishModal()' }, goods: { label: '发布物品', fn: "switchTaskTab('goods')" }, qa: { label: '去提问', fn: "switchTaskTab('qa')" }, find: { label: '发布找人', fn: "switchTaskTab('find')" } };
     const act = actMap[_cachedType] || actMap.task;
     grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>' + (emptyMap[_cachedType] || '暂无匹配内容') + '</p>'
       + '<button class="btn btn-primary" onclick="' + act.fn + '">' + act.label + '</button></div>';
@@ -1247,8 +1234,8 @@ function renderOrders(orders) {
   const pageItems = orders.slice(start, start + TASK_PAGE_SIZE);
 
   grid.innerHTML = pageItems.map(o => {
-    const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答', borrow:'借物', goods:'物品流转', find:'找人', academic:'学术'};
-    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具',team:'竞赛组队',carpool:'出行拼车',survey:'问卷招募',calc:'微积分/高数',physics:'大学物理',code:'编程代码',major:'专业课'};
+    const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答', borrow:'借物', goods:'物品流转', find:'找人'};
+    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',exercise:'习题解答',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具',team:'竞赛组队',carpool:'出行拼车',survey:'问卷招募',calc:'习题解答',physics:'习题解答',code:'习题解答',major:'习题解答'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
     const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
@@ -1425,11 +1412,10 @@ function switchTaskTab(tab) {
   document.getElementById('goodsCategoryFilters').style.display = (tab === 'goods') ? 'flex' : 'none';
   document.getElementById('qaFilters').style.display = (tab === 'qa') ? 'flex' : 'none';
   document.getElementById('findFilters').style.display = (tab === 'find') ? 'flex' : 'none';
-  document.getElementById('academicFilters').style.display = (tab === 'academic') ? 'flex' : 'none';
-  // 问答/找人/学术互助 隐藏区域/价格筛选
+  // 问答/找人 隐藏区域/价格筛选
   const dormFilter = document.getElementById('taskDormFilter');
   const sortSelect = document.getElementById('taskSortSelect');
-  const isQA = (tab === 'qa' || tab === 'find' || tab === 'academic');
+  const isQA = (tab === 'qa' || tab === 'find');
   if (dormFilter) dormFilter.style.display = isQA ? 'none' : '';
   if (sortSelect) {
     sortSelect.style.display = isQA ? 'none' : '';
@@ -1467,7 +1453,7 @@ async function showDetail(issueNum) {
     const o = JSON.parse(issue.body);
     o._issue_number = issueNum;
 
-    const tl = {errand:'跑腿代办', secondhand:'出售转让', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答', borrow:'短期租借', chat:'私信对话', find:'找人', academic:'学术互助'};
+    const tl = {errand:'跑腿代办', secondhand:'出售转让', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答', borrow:'短期租借', chat:'私信对话', find:'找人'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const isQA = (o.type === 'qa' || o.type === 'find');
     const isChat = o.type === 'chat';
@@ -1933,7 +1919,7 @@ async function acceptAnswer(issueNum, commentId) {
     if (!res.ok) { toast('加载失败', 'error'); return; }
     const issue = await res.json();
     const o = JSON.parse(issue.body);
-    if (o.type !== 'qa' && o.type !== 'academic') { toast('仅问答/学术互助可采纳答案', 'error'); return; }
+    if (o.type !== 'qa' && o.type !== 'academic') { toast('仅问答可采纳答案', 'error'); return; }
     if (o.solved) { toast('该问题已采纳过最佳答案', 'error'); return; }
 
     const bountyText = o.bounty > 0 ? ('赏金 ¥' + o.bounty.toFixed(2) + ' 将通过你的收款方式线下支付给对方。\n') : '';
@@ -4120,8 +4106,7 @@ function updatePublishCategories() {
     task: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'print',l:'帮忙打印'},{v:'repair',l:'维修'},{v:'other',l:'其他任务'}],
     borrow: [{v:'textbook',l:'教材参考书'},{v:'device',l:'数码设备'},{v:'sports',l:'体育器材'},{v:'tool',l:'生活工具'},{v:'other',l:'其他物品'}],
     secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'daily',l:'生活用品'},{v:'other',l:'其他'}],
-    qa: [{v:'course',l:'选课学习'},{v:'exam',l:'考研保研'},{v:'life',l:'校园生活'},{v:'job',l:'实习就业'},{v:'other',l:'其他问题'}],
-    academic: [{v:'calc',l:'微积分/高数'},{v:'physics',l:'大学物理'},{v:'code',l:'编程代码'},{v:'major',l:'专业课'},{v:'exam',l:'考研真题'},{v:'other',l:'其他问题'}],
+    qa: [{v:'course',l:'选课学习'},{v:'exam',l:'考研保研'},{v:'life',l:'校园生活'},{v:'job',l:'实习就业'},{v:'exercise',l:'习题解答'},{v:'other',l:'其他问题'}],
     find: [{v:'team',l:'竞赛组队'},{v:'carpool',l:'出行拼车'},{v:'survey',l:'问卷招募'}]
   };
   document.getElementById('publishCategory').innerHTML = cats[t].map(c => '<option value="' + c.v + '">' + c.l + '</option>').join('');
@@ -4134,14 +4119,14 @@ function updatePublishCategories() {
   const bountyGroup = document.getElementById('bountyGroup');
   const bountyEnable = document.getElementById('bountyEnable');
   const bountyInput = document.getElementById('publishBounty');
-  if (t === 'qa' || t === 'find' || t === 'academic') {
+  if (t === 'qa' || t === 'find') {
     priceGroup.style.display = 'none';
     payGroup.style.display = 'none';
     locGroup.style.display = 'none';
     urgencyGroup.style.display = 'none';
     deadlineGroup.style.display = 'none';
-    document.getElementById('publishPrice').required = false; // 问答/找人/学术无报酬，移除必填，否则隐藏的 required 字段会静默拦截提交
-    if (t === 'qa' || t === 'academic') {
+    document.getElementById('publishPrice').required = false; // 问答/找人无报酬，移除必填，否则隐藏的 required 字段会静默拦截提交
+    if (t === 'qa') {
       bountyGroup.style.display = 'block';
       bountyEnable.checked = false;
       bountyInput.style.display = 'none';
@@ -4195,7 +4180,7 @@ async function handlePublish(e) {
   const cat = document.getElementById('publishCategory').value;
   const title = document.getElementById('publishTitle').value.trim();
   const desc = document.getElementById('publishDesc').value.trim();
-  const price = (type === 'qa' || type === 'find' || type === 'academic') ? 0 : parseFloat(document.getElementById('publishPrice').value);
+  const price = (type === 'qa' || type === 'find') ? 0 : parseFloat(document.getElementById('publishPrice').value);
   const loc = document.getElementById('publishLocation').value.trim();
   const urgency = document.getElementById('publishUrgency').value;
   const deadline = document.getElementById('publishDeadline').value.trim();
@@ -4204,7 +4189,7 @@ async function handlePublish(e) {
   const bountyEnableEl = document.getElementById('bountyEnable');
   const bountyVal = document.getElementById('publishBounty').value.trim();
   let bounty = 0;
-  if ((type === 'qa' || type === 'academic') && bountyEnableEl && bountyEnableEl.checked && bountyVal) {
+  if ((type === 'qa') && bountyEnableEl && bountyEnableEl.checked && bountyVal) {
     bounty = parseFloat(bountyVal);
     if (isNaN(bounty) || bounty <= 0) { err.textContent = '悬赏金额需大于 0'; err.style.display = 'block'; return; }
     // 信用约束：信用分过低禁止发布悬赏问答（阈值与接单限制一致，避免赖账风险）
@@ -4286,8 +4271,8 @@ async function handlePublish(e) {
   if (_pb) { _pb.disabled = true; _pb.textContent = '发布中…'; }
 
   try {
-    const label = type === 'qa' ? 'qa' : (type === 'academic' ? 'academic' : 'order');
-    const prefix = type === 'qa' ? '[问答] ' : (type === 'academic' ? '[学术] ' : (type === 'borrow' ? '[借物] ' : '[订单] '));
+    const label = type === 'qa' ? 'qa' : 'order';
+    const prefix = type === 'qa' ? '[问答] ' : (type === 'borrow' ? '[借物] ' : '[订单] ');
     await ghCreateIssue(prefix + title, JSON.stringify(order), [label, type, cat]);
     toast('发布成功！', 'success');
     clearPublishDraft();
@@ -4411,8 +4396,8 @@ function renderMyOrders(orders, tab, subTab) {
   const sid = S.user ? S.user.student_id : null;
 
   const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
-    const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答', chat:'💬 私信', goods:'物品流转', find:'找人', academic:'学术'};
-    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具',team:'竞赛组队',carpool:'出行拼车',survey:'问卷招募',calc:'微积分/高数',physics:'大学物理',code:'编程代码',major:'专业课'};
+    const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答', chat:'💬 私信', goods:'物品流转', find:'找人'};
+    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',exercise:'习题解答',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具',team:'竞赛组队',carpool:'出行拼车',survey:'问卷招募',calc:'习题解答',physics:'习题解答',code:'习题解答',major:'习题解答'};
 
   if (orders.length === 0) {
     listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p>'
