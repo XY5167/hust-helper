@@ -172,6 +172,7 @@ html[data-theme="dark"] .modal { color: var(--text); }
 .type-report{background:#f3e8ff;color:#7c3aed}
 .type-repair{background:#fce7f3;color:#be185d}
 .type-other{background:#f1f5f9;color:#475569}
+.type-buy{background:#fff7ed;color:#c2410c}
 /* 借物子分类 */
 .type-textbook{background:#fef3c7;color:#92400e}
 .type-device{background:#dbeafe;color:#1e40af}
@@ -401,6 +402,7 @@ html[data-theme="dark"] .modal { color: var(--text); }
       <button class="filter-btn active" data-filter="all" onclick="filterOrders('task','all')">全部</button>
       <button class="filter-btn" data-filter="express" onclick="filterOrders('task','express')">📦 代拿快递</button>
       <button class="filter-btn" data-filter="food" onclick="filterOrders('task','food')">🍔 代取外卖</button>
+      <button class="filter-btn" data-filter="buy" onclick="filterOrders('task','buy')">🛒 帮买帮送</button>
       <button class="filter-btn" data-filter="print" onclick="filterOrders('task','print')">🖨️ 帮忙打印</button>
 
       <button class="filter-btn" data-filter="repair" onclick="filterOrders('task','repair')">🔧 维修</button>
@@ -850,7 +852,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.20';
+const APP_VERSION = '1.14.21';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1235,7 +1237,7 @@ function renderOrders(orders) {
 
   grid.innerHTML = pageItems.map(o => {
     const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答', borrow:'借物', goods:'物品流转', find:'找人'};
-    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',exercise:'习题解答',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具',team:'竞赛组队',carpool:'出行拼车',survey:'问卷招募',calc:'习题解答',physics:'习题解答',code:'习题解答',major:'习题解答'};
+    const ct = {express:'代拿快递',food:'代取外卖',buy:'帮买帮送',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',exercise:'习题解答',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具',team:'竞赛组队',carpool:'出行拼车',survey:'问卷招募',calc:'习题解答',physics:'习题解答',code:'习题解答',major:'习题解答'};
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
     const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
@@ -4107,7 +4109,7 @@ function closePublishModal() {
 function updatePublishCategories() {
   const t = document.getElementById('publishType').value;
   const cats = {
-    task: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'print',l:'帮忙打印'},{v:'repair',l:'维修'},{v:'other',l:'其他任务'}],
+    task: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'buy',l:'帮买帮送'},{v:'print',l:'帮忙打印'},{v:'repair',l:'维修'},{v:'other',l:'其他任务'}],
     borrow: [{v:'textbook',l:'教材参考书'},{v:'device',l:'数码设备'},{v:'sports',l:'体育器材'},{v:'tool',l:'生活工具'},{v:'other',l:'其他物品'}],
     secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'daily',l:'生活用品'},{v:'other',l:'其他'}],
     qa: [{v:'course',l:'选课学习'},{v:'exam',l:'考研保研'},{v:'life',l:'校园生活'},{v:'job',l:'实习就业'},{v:'exercise',l:'习题解答'},{v:'other',l:'其他问题'}],
@@ -4401,7 +4403,7 @@ function renderMyOrders(orders, tab, subTab) {
 
   const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const tl = {task:'跑腿代办', secondhand:'二手', borrow:'借物', errand:'跑腿代办', skill:'跑腿代办', qa:'问答', chat:'💬 私信', goods:'物品流转', find:'找人'};
-    const ct = {express:'代拿快递',food:'代取外卖',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',exercise:'习题解答',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具',team:'竞赛组队',carpool:'出行拼车',survey:'问卷招募',calc:'习题解答',physics:'习题解答',code:'习题解答',major:'习题解答'};
+    const ct = {express:'代拿快递',food:'代取外卖',buy:'帮买帮送',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',exercise:'习题解答',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具',team:'竞赛组队',carpool:'出行拼车',survey:'问卷招募',calc:'习题解答',physics:'习题解答',code:'习题解答',major:'习题解答'};
 
   if (orders.length === 0) {
     listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>还没有相关订单</p>'
