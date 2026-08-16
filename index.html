@@ -850,7 +850,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.19';
+const APP_VERSION = '1.14.20';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1218,7 +1218,7 @@ function renderOrders(orders) {
 
   if (orders.length === 0) {
     const emptyMap = { task: '暂无跑腿订单，来做第一个发布者吧', goods: '暂无物品流转信息，快来发布吧', qa: '暂无问答，来提出你的问题吧', find: '暂无找人信息，快来发布组队/拼车/招募吧' };
-    const actMap = { task: { label: '发布需求', fn: 'showPublishModal()' }, goods: { label: '发布物品', fn: "switchTaskTab('goods')" }, qa: { label: '去提问', fn: "switchTaskTab('qa')" }, find: { label: '发布找人', fn: "switchTaskTab('find')" } };
+    const actMap = { task: { label: '发布需求', fn: 'showPublishModal()' }, goods: { label: '发布物品', fn: "showPublishModal('secondhand')" }, qa: { label: '去提问', fn: "showPublishModal('qa')" }, find: { label: '发布找人', fn: "showPublishModal('find')" } };
     const act = actMap[_cachedType] || actMap.task;
     grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>' + (emptyMap[_cachedType] || '暂无匹配内容') + '</p>'
       + '<button class="btn btn-primary" onclick="' + act.fn + '">' + act.label + '</button></div>';
@@ -4055,7 +4055,7 @@ function clearPublishDraft() {
   try { sessionStorage.removeItem('hust_publish_draft'); } catch (_) {}
 }
 
-function showPublishModal() {
+function showPublishModal(preType) {
   if (!S.user) { showAuthModal(); return; }
   if (!checkApproved()) return;
   document.getElementById('publishModal').classList.add('active');
@@ -4070,6 +4070,10 @@ function showPublishModal() {
     });
   }
   restorePublishDraft();
+  if (preType) {
+    const _ps = document.getElementById('publishType');
+    if (_ps) { for (const _o of _ps.options) { if (_o.value === preType) { _ps.value = preType; updatePublishCategories(); break; } } }
+  }
   setTimeout(() => { const f = document.querySelector('#publishModal input:not([type=hidden]),#publishModal textarea,#publishModal select'); if (f) f.focus(); }, 60);
   // 默认截止时间为明天同一时间
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
