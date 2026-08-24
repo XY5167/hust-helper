@@ -371,6 +371,19 @@ html[data-theme="dark"] .modal { color: var(--text); }
   .ai-fab{bottom:84px}
   .ai-panel{bottom:150px;right:12px;height:calc(100vh - 180px);width:calc(100vw - 24px)}
 }
+#updateBanner{position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#1f2937;display:flex;align-items:center;justify-content:center;gap:12px;padding:9px 14px;font-size:.85rem;box-shadow:0 4px 12px rgba(245,158,11,.3);animation:bannerSlide .25s var(--ease)}
+#updateBanner .update-banner-text{flex:1 1 auto;text-align:center}
+#updateBanner .update-banner-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.update-banner-btn{padding:5px 12px;border-radius:var(--radius-xs);border:1px solid rgba(0,0,0,.15);background:rgba(255,255,255,.9);color:#1f2937;font-size:.78rem;font-weight:500;cursor:pointer;transition:all var(--t)}
+.update-banner-btn.primary{background:#1f2937;color:#fff;border-color:#1f2937}
+.update-banner-btn:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.update-banner-close{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:none;background:rgba(0,0,0,.08);color:#1f2937;font-size:14px;cursor:pointer;transition:background var(--t)}
+.update-banner-close:hover{background:rgba(0,0,0,.18)}
+@keyframes bannerSlide{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+@media (max-width:640px){
+  #updateBanner{flex-wrap:wrap;padding:8px 10px}
+  #updateBanner .update-banner-text{width:100%;text-align:left}
+}
 </style>
 </head>
 <body>
@@ -947,44 +960,56 @@ function checkContactLeak(text) {
 const APP_VERSION = '1.15.2';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
-  const v = localStorage.getItem('hust_ver_checked');
-  if (!v) { localStorage.setItem('hust_ver_checked', Date.now().toString()); return; }
+  const now = Date.now();
+  const lastCheck = parseInt(localStorage.getItem('hust_ver_checked') || '0', 10);
+  if (!lastCheck) { localStorage.setItem('hust_ver_checked', now.toString()); return; }
   // 每 5 分钟后台检查一次版本
-  if (Date.now() - parseInt(v) < 300000) return;
-  localStorage.setItem('hust_ver_checked', Date.now().toString());
-  // 用同域 + no-store 确保拿到最新版本，和网站同步部署
-  fetch('https://xy5167.github.io/hust-helper/version.txt?_=' + Date.now(), { cache: 'no-store' })
+  if (now - lastCheck < 300000) return;
+  localStorage.setItem('hust_ver_checked', now.toString());
+
+  fetch('https://xy5167.github.io/hust-helper/version.txt?_=' + now, { cache: 'no-store' })
     .then(r => r.text()).then(remote => {
-      if (remote.trim() !== APP_VERSION) {
-        localStorage.setItem('hust_ver_checked', '0'); // 下次立即检查
-        const banner = document.createElement('div');
-        banner.id = 'updateBanner';
-        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#000;text-align:center;padding:8px;cursor:pointer;font-size:14px';
-        banner.textContent = '🔄 有新版本可用，点击刷新';
-        banner.onclick = function() {
-          // 先强制拉最新版本确认，避免 CDN 缓存导致反复提示
-          fetch('https://xy5167.github.io/hust-helper/version.txt?_=' + Date.now(), { cache: 'no-store' })
-            .then(r => r.text()).then(latest => {
-              if (latest.trim() === APP_VERSION) {
-                // 实际已是最新版，只是缓存误报，直接隐藏提示条
-                banner.remove();
-                return;
-              }
-              // 确实需要刷新：清除缓存数据并强制绕过浏览器缓存重载
-              try {
-                for (let i = localStorage.length - 1; i >= 0; i--) {
-                  const k = localStorage.key(i);
-                  if (k && k.startsWith('hust_c_')) localStorage.removeItem(k);
-                }
-              } catch(e) {}
-              location.replace(location.pathname + '?reload=' + Date.now());
-            }).catch(() => {
-              // 网络异常，直接刷新
-              location.replace(location.pathname + '?reload=' + Date.now());
-            });
-        };
-        document.body.prepend(banner);
-      }
+      const remoteVer = remote.trim();
+      if (!remoteVer || remoteVer === APP_VERSION) return;
+
+      // 用户已选择忽略该远程版本，则不再反复打扰
+      if (localStorage.getItem('hust_ver_ignored') === remoteVer) return;
+
+      const banner = document.createElement('div');
+      banner.id = 'updateBanner';
+      banner.innerHTML = '<span class="update-banner-text">🔄 有新版本 <b>' + esc(remoteVer) + '</b> 可用，建议刷新获得最新功能</span>' +
+        '<span class="update-banner-actions">' +
+          '<button class="update-banner-btn primary" id="updateBannerRefresh">立即刷新</button>' +
+          '<button class="update-banner-btn" id="updateBannerIgnore">忽略此版本</button>' +
+          '<button class="update-banner-close" id="updateBannerClose" aria-label="关闭">✕</button>' +
+        '</span>';
+      document.body.prepend(banner);
+
+      banner.querySelector('#updateBannerRefresh').onclick = function(e) {
+        e.stopPropagation();
+        try {
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('hust_c_')) localStorage.removeItem(k);
+          }
+        } catch(err) {}
+        // 强制绕过浏览器/Service Worker 缓存：用全新 URL 并携带 no-cache 头重载
+        const url = new URL(location.href);
+        url.searchParams.delete('reload');
+        url.searchParams.set('v', now.toString());
+        location.href = url.toString();
+      };
+
+      banner.querySelector('#updateBannerIgnore').onclick = function(e) {
+        e.stopPropagation();
+        localStorage.setItem('hust_ver_ignored', remoteVer);
+        banner.remove();
+      };
+
+      banner.querySelector('#updateBannerClose').onclick = function(e) {
+        e.stopPropagation();
+        banner.remove();
+      };
     }).catch(()=>{});
 })();
 
