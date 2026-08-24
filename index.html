@@ -864,7 +864,7 @@ html[data-theme="dark"] .modal { color: var(--text); }
   <div class="modal modal-lg">
     <button class="modal-close" onclick="closeVipApply()">&times;</button>
     <h3 style="margin-bottom:16px">⭐ 开通会员</h3>
-    <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:16px">会员 ¥1/月，享发布优先展示、专属标识等权益。注：发布/接单需先通过跑腿认证（上传学生证），认证通过可获赠 7 天会员试用。扫描下方收款码付款后点击确认即可。</p>
+    <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:16px">会员 ¥1/月，享发布优先展示、专属标识等权益。注：发布/接单需先通过跑腿认证（上传学生证），认证通过可获赠 7 天会员试用。已认证非会员用户每天可发 1 单、接 1 单；开通会员后不限次数。扫描下方收款码付款后点击确认即可。</p>
     <div id="vipApplyContent" style="text-align:center;margin-bottom:16px">
       <div id="vipQrcodeContainer" style="margin-bottom:12px">
         <p style="color:var(--text-muted);font-size:.85rem">管理员收款码加载中...</p>
@@ -957,7 +957,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.15.3';
+const APP_VERSION = '1.15.4';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3529,6 +3529,14 @@ async function takeOrder(inum) {
     showRunnerApply();
     return;
   }
+  // 每日接单限制：已认证非 VIP 用户每天只能接 1 单，VIP 与管理员不限
+  if (!isVIP() && !isAdmin) {
+    const todayTaken = await getTodayMyOrders('taken');
+    if (todayTaken >= 1) {
+      toast('⚠️ 您已通过跑腿认证，每天可接 1 单。开通会员（¥1/月）即可无限接单！', 'info');
+      return;
+    }
+  }
   try {
     const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
       headers: {}
@@ -4338,6 +4346,15 @@ async function handlePublish(e) {
     err.style.display = 'block';
     showRunnerApply();
     return;
+  }
+  // 每日发单限制：已认证非 VIP 用户每天只能发布 1 单（交易类），VIP 与管理员不限
+  if ((type === 'task' || type === 'secondhand' || type === 'borrow') && !isVIP() && !isAdminUser()) {
+    const todayPublished = await getTodayMyOrders('published');
+    if (todayPublished >= 1) {
+      err.textContent = '您已通过跑腿认证，每天可发布 1 单。开通会员（¥1/月）即可无限发单！';
+      err.style.display = 'block';
+      return;
+    }
   }
   if (type !== 'qa' && !price) { err.textContent = '请填写报酬金额'; err.style.display = 'block'; return; }
   // 校验截止时间必须大于当前时间
@@ -5678,7 +5695,7 @@ if ('serviceWorker' in navigator) {
     const last = (messages[messages.length-1] || {}).content || '';
     if(/怎么发|如何发|发布|发单/.test(last)) return '点顶部「发布任务」选类型填需求即可。想省事就点发布弹窗里的「✨ AI 帮我写」，说句大白话 AI 帮你写好标题和描述～';
     if(/信用/.test(last)) return '信用分初始100，完成订单、被好评加分；爽约/被投诉扣分，过低会受限。';
-    if(/会员/.test(last)) return '会员可享发布优先展示、专属标识等。通过跑腿认证（上传学生证）即可解锁发布/接单，并获赠 7 天会员试用。';
+    if(/会员/.test(last)) return '会员可享发布优先展示、专属标识等。通过跑腿认证（上传学生证）即可解锁发布/接单，并获赠 7 天会员试用。已认证非会员用户每天可发 1 单、接 1 单，VIP 可不限次数。';
     if(/接单|赚钱|怎么赚/.test(last)) return '在任务大厅选分类，看到合适的单点「接单」并填收款方式，完成后对方线下支付即可。';
     return '我是 Hust互助 AI 小助手🤖，可以帮你了解平台用法、写发布内容。试试发布时点「✨ AI 帮我写」吧！';
   }
