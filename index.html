@@ -319,6 +319,46 @@ html[data-theme="dark"] .modal { color: var(--text); }
 #sendCodeBtn{white-space:nowrap;min-width:100px}
 #sendCodeBtn:disabled{opacity:.6;cursor:not-allowed}
 .email-verified-badge{color:var(--success);font-size:.8rem;font-weight:600}
+
+/* ===== AI 互助小助手 (ai+opc) ===== */
+.ai-fab{position:fixed;right:20px;bottom:24px;z-index:200;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,#6366f1,#1a73e8);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
+.ai-fab:hover{transform:translateY(-3px) scale(1.05);box-shadow:var(--shadow-xl)}
+.ai-fab:active{transform:scale(.95)}
+.ai-panel{position:fixed;right:20px;bottom:92px;z-index:201;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 130px));background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);display:none;flex-direction:column;overflow:hidden}
+.ai-panel.open{display:flex;animation:aiPop .18s var(--ease)}
+@keyframes aiPop{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+.ai-panel-header{display:flex;align-items:center;gap:8px;padding:14px 16px;background:linear-gradient(135deg,#6366f1,#1a73e8);color:#fff}
+.ai-panel-header .ai-avatar{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:1rem}
+.ai-panel-header h4{font-size:.95rem;margin:0;flex:1}
+.ai-panel-header .ai-close{background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer;line-height:1}
+.ai-panel-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
+.ai-msg{max-width:85%;padding:9px 12px;border-radius:14px;font-size:.88rem;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.ai-msg.bot{background:var(--bg-card);border:1px solid var(--border);align-self:flex-start;border-bottom-left-radius:4px}
+.ai-msg.me{background:var(--primary);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.ai-typing{display:inline-flex;gap:3px}
+.ai-typing span{width:6px;height:6px;border-radius:50%;background:var(--text-secondary);animation:aiBlink 1s infinite}
+.ai-typing span:nth-child(2){animation-delay:.2s}
+.ai-typing span:nth-child(3){animation-delay:.4s}
+@keyframes aiBlink{0%,60%,100%{opacity:.3}30%{opacity:1}}
+.ai-quick{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 6px}
+.ai-quick button{font-size:.78rem;padding:5px 10px;border:1px solid var(--border);background:var(--bg-card);border-radius:99px;cursor:pointer;color:var(--text-secondary)}
+.ai-quick button:hover{border-color:var(--primary);color:var(--primary)}
+.ai-input-row{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);background:var(--bg-card)}
+.ai-input-row input{flex:1;border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;font-size:.88rem;background:var(--bg);color:var(--text,#1a202c)}
+.ai-input-row input:focus{outline:none;border-color:var(--primary);box-shadow:var(--ring)}
+.ai-input-row button{white-space:nowrap}
+.ai-quota{font-size:.72rem;color:var(--text-secondary);text-align:center;padding:4px}
+.ai-assist-panel{margin:10px 0;padding:12px;border:1px dashed var(--primary);border-radius:var(--radius);background:rgba(99,102,241,.06);display:none}
+.ai-assist-panel.open{display:block}
+.ai-assist-panel textarea{width:100%;min-height:60px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;font-size:.85rem;background:var(--bg);color:var(--text,#1a202c);resize:vertical}
+.ai-assist-panel .ai-assist-actions{display:flex;gap:8px;margin-top:8px;align-items:center}
+.btn-ai{background:linear-gradient(135deg,#6366f1,#1a73e8);color:#fff;border:none}
+.btn-ai:hover{filter:brightness(1.06)}
+.btn-ai:disabled{opacity:.6;cursor:not-allowed}
+@media (max-width:768px){
+  .ai-fab{bottom:84px}
+  .ai-panel{bottom:150px;right:12px;height:calc(100vh - 180px);width:calc(100vw - 24px)}
+}
 </style>
 </head>
 <body>
@@ -581,6 +621,18 @@ html[data-theme="dark"] .modal { color: var(--text); }
   <div class="modal modal-lg">
     <button class="modal-close" onclick="closePublishModal()">&times;</button>
     <h3>发布需求</h3>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <button type="button" class="btn btn-ai btn-sm" onclick="toggleAiAssist()">✨ AI 帮我写</button>
+    </div>
+    <div class="ai-assist-panel" id="aiAssistPanel">
+      <label style="font-size:.82rem;color:var(--text-secondary);display:block;margin-bottom:6px">用大白话说说你的需求，AI 帮你生成规范的标题、描述和分类：</label>
+      <textarea id="aiAssistInput" placeholder="例如：想找人周五帮我从韵苑搬行李到东九，给20块"></textarea>
+      <div class="ai-assist-actions">
+        <button type="button" class="btn btn-ai btn-sm" id="aiAssistGenBtn" onclick="aiPolish()">✨ 生成</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="toggleAiAssist(false)">取消</button>
+        <span id="aiAssistStatus" style="font-size:.78rem;color:var(--text-secondary)"></span>
+      </div>
+    </div>
     <form id="publishForm" onsubmit="handlePublish(event)">
       <div class="form-group">
         <label>类型</label>
@@ -866,7 +918,7 @@ function checkSensitive(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.14.22';
+const APP_VERSION = '1.15.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -5416,6 +5468,163 @@ if ('serviceWorker' in navigator) {
       .catch(function (e) { console.warn('SW registration failed:', e); });
   });
 }
+</script>
+
+<!-- AI 互助小助手 (ai+opc) -->
+<button class="ai-fab" id="aiFab" onclick="toggleAiChat()" aria-label="AI 互助小助手" title="互助AI 小助手">🤖</button>
+<div class="ai-panel" id="aiPanel" role="dialog" aria-label="AI 互助小助手">
+  <div class="ai-panel-header">
+    <div class="ai-avatar">🤖</div>
+    <h4>互助AI 小助手</h4>
+    <button class="ai-close" onclick="toggleAiChat(false)" aria-label="关闭">✕</button>
+  </div>
+  <div class="ai-quick" id="aiQuick">
+    <button onclick="aiQuickAsk(this)">怎么发单？</button>
+    <button onclick="aiQuickAsk(this)">信用分怎么算？</button>
+    <button onclick="aiQuickAsk(this)">会员有什么用？</button>
+    <button onclick="aiQuickAsk(this)">怎么接单赚钱？</button>
+  </div>
+  <div class="ai-panel-body" id="aiBody"></div>
+  <div class="ai-quota" id="aiQuota"></div>
+  <div class="ai-input-row">
+    <input id="aiInput" type="text" placeholder="问问互助AI…" onkeydown="if(event.key==='Enter')sendAiMessage()">
+    <button class="btn btn-ai btn-sm" onclick="sendAiMessage()">发送</button>
+  </div>
+</div>
+
+<script>
+// ============ AI 互助小助手 (ai+opc) ============
+(function(){
+  const AI_QUOTA_PER_DAY = 30;
+  function aiQuotaState(){
+    try{
+      const d = new Date().toISOString().slice(0,10);
+      const rec = JSON.parse(localStorage.getItem('hust_ai_quota') || '{}');
+      if (rec.date !== d) return { date:d, count:0 };
+      return rec;
+    }catch(e){ return { date:new Date().toISOString().slice(0,10), count:0 }; }
+  }
+  function aiQuotaLeft(){ return Math.max(0, AI_QUOTA_PER_DAY - aiQuotaState().count); }
+  function aiQuotaUse(){ const r = aiQuotaState(); r.count = (r.count||0)+1; try{ localStorage.setItem('hust_ai_quota', JSON.stringify(r)); }catch(e){} updateAiQuotaLabel(); }
+  function updateAiQuotaLabel(){ const el = document.getElementById('aiQuota'); if(el) el.textContent = '今日剩余 AI 次数：' + aiQuotaLeft(); }
+  window.updateAiQuotaLabel = updateAiQuotaLabel;
+
+  function toggleAiChat(force){
+    const p = document.getElementById('aiPanel'); if(!p) return;
+    const open = force === undefined ? !p.classList.contains('open') : force;
+    p.classList.toggle('open', open);
+    if(open){
+      const body = document.getElementById('aiBody');
+      if(body && !body.childElementCount){
+        addAiMsg('bot','你好，我是 Hust互助 的 AI 小助手🤖。可以问我平台用法，或点发布里的「✨ AI 帮我写」让 AI 帮你写需求～');
+      }
+      updateAiQuotaLabel();
+      const inp = document.getElementById('aiInput'); if(inp) setTimeout(function(){ inp.focus(); }, 50);
+    }
+  }
+  function addAiMsg(role, text, typing){
+    const body = document.getElementById('aiBody'); if(!body) return null;
+    const d = document.createElement('div'); d.className = 'ai-msg ' + role;
+    if(typing){ d.innerHTML = '<span class="ai-typing"><span></span><span></span><span></span></span>'; }
+    else { d.textContent = text; }
+    body.appendChild(d); body.scrollTop = body.scrollHeight; return d;
+  }
+  const _aiHistory = [{ role:'system', content:'你是 Hust互助 校园互助平台的 AI 小助手。Hust互助 是华中科技大学(HUST)校园互助平台，有五大类：跑腿代办(代拿快递/外卖、帮买帮送、打印、维修)、物品流转(二手出售/租借)、有问必答(含习题解答)、找人(组队/拼车/招募)、校园公告。用户用学号邮箱验证登录，信用分初始100，新用户送7天会员。平台无资金托管，报酬线下支付。请用简洁友好中文回答，不超过120字，不知道就说不知道。' }];
+  async function sendAiMessage(){
+    const inp = document.getElementById('aiInput'); if(!inp) return;
+    const text = inp.value.trim(); if(!text) return;
+    if(aiQuotaLeft() <= 0){ addAiMsg('bot','今日 AI 次数已用完，明天再来吧～'); return; }
+    inp.value = '';
+    addAiMsg('me', text);
+    _aiHistory.push({ role:'user', content:text });
+    const typing = addAiMsg('bot','',true);
+    const reply = await callAiChat(_aiHistory.slice(1));
+    _aiHistory.push({ role:'assistant', content:reply });
+    if(typing){ typing.className = 'ai-msg bot'; typing.textContent = reply; }
+    const body = document.getElementById('aiBody'); if(body) body.scrollTop = body.scrollHeight;
+    aiQuotaUse();
+  }
+  function aiQuickAsk(btn){ const inp = document.getElementById('aiInput'); if(inp) inp.value = btn.textContent; sendAiMessage(); }
+  window.toggleAiChat = toggleAiChat; window.sendAiMessage = sendAiMessage; window.aiQuickAsk = aiQuickAsk;
+
+  async function callAiChat(messages){
+    try{
+      const res = await ghApi('/api/ai/chat','POST',{ messages:messages });
+      if(res.ok){ const data = await res.json(); if(data && data.reply) return data.reply; }
+    }catch(e){}
+    return mockAiChat(messages);
+  }
+  function mockAiChat(messages){
+    const last = (messages[messages.length-1] || {}).content || '';
+    if(/怎么发|如何发|发布|发单/.test(last)) return '点顶部「发布任务」选类型填需求即可。想省事就点发布弹窗里的「✨ AI 帮我写」，说句大白话 AI 帮你写好标题和描述～';
+    if(/信用/.test(last)) return '信用分初始100，完成订单、被好评加分；爽约/被投诉扣分，过低会受限。';
+    if(/会员/.test(last)) return '会员可享发布优先展示、专属标识等。新用户注册即送7天会员试用。';
+    if(/接单|赚钱|怎么赚/.test(last)) return '在任务大厅选分类，看到合适的单点「接单」并填收款方式，完成后对方线下支付即可。';
+    return '我是 Hust互助 AI 小助手🤖，可以帮你了解平台用法、写发布内容。试试发布时点「✨ AI 帮我写」吧！';
+  }
+
+  // 发布润色
+  function toggleAiAssist(force){
+    const p = document.getElementById('aiAssistPanel'); if(!p) return;
+    const open = force === undefined ? !p.classList.contains('open') : force;
+    p.classList.toggle('open', open);
+    if(open){ const t = document.getElementById('aiAssistInput'); if(t) setTimeout(function(){ t.focus(); }, 50); }
+  }
+  window.toggleAiAssist = toggleAiAssist;
+  async function aiPolish(){
+    const t = document.getElementById('aiAssistInput'); if(!t) return;
+    const text = t.value.trim(); if(!text){ if(window.toast) toast('先说点你的想法吧'); return; }
+    if(aiQuotaLeft() <= 0){ if(window.toast) toast('今日 AI 次数已用完，明天再来～'); return; }
+    const btn = document.getElementById('aiAssistGenBtn'); const st = document.getElementById('aiAssistStatus');
+    if(btn){ btn.disabled = true; btn.textContent = '生成中…'; }
+    if(st) st.textContent = 'AI 正在构思…';
+    let result = null;
+    try{
+      const res = await ghApi('/api/ai/polish','POST',{ text:text });
+      if(res.ok){ const d = await res.json(); if(d && d.title) result = d; }
+    }catch(e){}
+    if(!result) result = mockAiPolish(text);
+    applyPolish(result);
+    aiQuotaUse();
+    if(st) st.textContent = '';
+    if(btn){ btn.disabled = false; btn.textContent = '✨ 生成'; }
+    toggleAiAssist(false);
+    if(window.toast) toast('✨ AI 已帮你写好，检查一下再发布');
+  }
+  window.aiPolish = aiPolish;
+  function applyPolish(r){
+    const typeEl = document.getElementById('publishType');
+    const titleEl = document.getElementById('publishTitle');
+    const descEl = document.getElementById('publishDesc');
+    const priceEl = document.getElementById('publishPrice');
+    const catEl = document.getElementById('publishCategory');
+    if(typeEl && r.type){
+      typeEl.value = r.type;
+      if(typeof updatePublishCategories === 'function') updatePublishCategories();
+      if(catEl && r.subtype){ const opts = Array.prototype.map.call(catEl.options, function(o){ return o.value; }); if(opts.indexOf(r.subtype) >= 0) catEl.value = r.subtype; }
+    }
+    if(titleEl) titleEl.value = r.title || '';
+    if(descEl) descEl.value = r.desc || '';
+    if(priceEl && r.price != null && r.type && r.type !== 'qa') priceEl.value = r.price;
+    if(typeof updateCharCount === 'function'){
+      if(titleEl) updateCharCount('publishTitle','titleCount',50);
+      if(descEl) updateCharCount('publishDesc','descCount',500);
+    }
+  }
+  function mockAiPolish(text){
+    let type = 'task', subtype = 'other', price = 5;
+    if(/卖|出|二手|转让|闲置|租/.test(text)){ type='secondhand'; subtype='other'; }
+    else if(/问|题|作业|解答|怎么算|公式|证明/.test(text)){ type='qa'; subtype='exercise'; }
+    else if(/找人|拼车|组队|一起|招募/.test(text)){ type='find'; subtype='other'; }
+    else if(/快递/.test(text)){ type='task'; subtype='express'; }
+    else if(/外卖/.test(text)){ type='task'; subtype='food'; }
+    else if(/打印/.test(text)){ type='task'; subtype='print'; }
+    else if(/买|送|带/.test(text)){ type='task'; subtype='buydeliver'; }
+    const m = text.match(/(\d+)\s*块|(\d+)\s*元|¥\s*(\d+)/);
+    if(m){ price = parseInt(m[1]||m[2]||m[3], 10); }
+    return { type:type, subtype:subtype, title:text.replace(/\s+/g,' ').slice(0,50), desc:text.trim(), price:price };
+  }
+})();
 </script>
 
 </body>
