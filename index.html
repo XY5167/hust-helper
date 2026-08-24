@@ -355,6 +355,8 @@ html[data-theme="dark"] .modal { color: var(--text); }
 .btn-ai{background:linear-gradient(135deg,#6366f1,#1a73e8);color:#fff;border:none}
 .btn-ai:hover{filter:brightness(1.06)}
 .btn-ai:disabled{opacity:.6;cursor:not-allowed}
+#aiAssistMicBtn.recording{background:linear-gradient(135deg,#ef4444,#dc2626);animation:micPulse 1.1s infinite}
+@keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}70%{box-shadow:0 0 0 8px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
 @media (max-width:768px){
   .ai-fab{bottom:84px}
   .ai-panel{bottom:150px;right:12px;height:calc(100vh - 180px);width:calc(100vw - 24px)}
@@ -628,6 +630,7 @@ html[data-theme="dark"] .modal { color: var(--text); }
       <label style="font-size:.82rem;color:var(--text-secondary);display:block;margin-bottom:6px">用大白话说说你的需求，AI 帮你生成规范的标题、描述和分类：</label>
       <textarea id="aiAssistInput" placeholder="例如：想找人周五帮我从韵苑搬行李到东九，给20块"></textarea>
       <div class="ai-assist-actions">
+        <button type="button" class="btn btn-ai btn-sm" id="aiAssistMicBtn" onclick="toggleVoiceInput()" style="display:none">🎤 语音</button>
         <button type="button" class="btn btn-ai btn-sm" id="aiAssistGenBtn" onclick="aiPolish()">✨ 生成</button>
         <button type="button" class="btn btn-outline btn-sm" onclick="toggleAiAssist(false)">取消</button>
         <span id="aiAssistStatus" style="font-size:.78rem;color:var(--text-secondary)"></span>
@@ -902,7 +905,8 @@ const SENSITIVE_WORDS = new Set([
   '约炮','嫖娼','卖淫','一夜情','包养','援交',
   '傻逼','草泥马','操你','fuck','shit',
   '枪支','弹药','管制刀具','迷药','安眠药',
-  '自杀','自残','跳楼'
+  '自杀','自残','跳楼',
+  '垫付','先付款','先交钱','押金','保证金','刷单返利','扫码付款','私下转账','私下交易','定金不退','预付定金','先打款'
 ]);
 const SENSITIVE_MIN_LEN = 2, SENSITIVE_MAX_LEN = 10;
 function checkSensitive(text) {
@@ -916,9 +920,21 @@ function checkSensitive(text) {
   }
   return null;
 }
+// 联系方式泄露软提醒（不硬拦截，避免误伤正常线下联系，仅提示风险）
+const CONTACT_LEAK_PATTERNS = [
+  { re: /(微信|vx|weixin|wx)[\s:：]*[a-zA-Z0-9_-]{4,}/i, msg: '⚠️ 请勿在发布中直接留微信号，建议用平台私信沟通，警惕先付款诈骗' },
+  { re: /(qq|Q\d)[\s:：]*\d{4,}/i, msg: '⚠️ 请勿在发布中直接留 QQ 号，建议用平台私信沟通' },
+  { re: /1[3-9]\d{9}/, msg: '⚠️ 请勿在发布中直接留手机号，建议用平台私信沟通，保护隐私' },
+  { re: /(加我|加微信|加qq|扫[一码]|扫一扫|二维码)/i, msg: '⚠️ 提醒：任何要求先付款、垫付、押金的行为都可能是诈骗，请通过平台交易' }
+];
+function checkContactLeak(text) {
+  if (!text) return null;
+  for (const p of CONTACT_LEAK_PATTERNS) { if (p.re.test(text)) return p.msg; }
+  return null;
+}
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.15.0';
+const APP_VERSION = '1.15.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -1651,6 +1667,7 @@ async function showDetail(issueNum) {
     }
 
     // 问答悬赏收款信息（仿跑腿：发布者收款方式展示给答主）
+    if (o.type === 'qa') { window._qaSolveCtx = { title: o.title, desc: o.description }; }
     let qaBountyHTML = '';
     if (isQA && o.solved) {
       const answererSid = o.best_comment_author;
@@ -1690,6 +1707,7 @@ async function showDetail(issueNum) {
       + '</div>'
       + imageHTML
       + '<div class="detail-desc">' + esc(o.description || '无详细描述') + '</div>'
+      + (o.type === 'qa' ? '<div style="margin-top:12px"><button type="button" class="btn btn-ai btn-sm" onclick="aiSolve()">🤖 AI 解题思路</button><div id="qaAiSolveBox" style="margin-top:10px;font-size:.88rem;color:var(--text-secondary);white-space:pre-wrap"></div></div>' : '')
       + (isQA ? '' : paymentHTML + takerPayHTML) + qaBountyHTML
       + '<div class="detail-actions">' + actions + '</div>';
     // 加载评论区
@@ -4279,6 +4297,9 @@ async function handlePublish(e) {
   if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
   const sensitiveWord = checkSensitive(title + ' ' + desc);
   if (sensitiveWord) { err.textContent = '内容包含敏感词「' + sensitiveWord + '」，请修改后重新发布'; err.style.display = 'block'; return; }
+  // 联系方式泄露软提醒（不阻断发布，仅提示风险）
+  const contactWarn = checkContactLeak(title + ' ' + desc);
+  if (contactWarn && window.toast) toast(contactWarn);
 
   // 每日发单限制检查（非VIP 1天1单，管理员不受限，问答不受限）
   if (type !== 'qa' && type !== 'find' && !isVIP() && !isAdminUser()) {
@@ -5592,6 +5613,54 @@ if ('serviceWorker' in navigator) {
     if(window.toast) toast('✨ AI 已帮你写好，检查一下再发布');
   }
   window.aiPolish = aiPolish;
+
+  // ===== 语音智能输入（Web Speech API，类 YOYO 语音发单）=====
+  let _recognition = null, _voiceOn = false;
+  function initVoiceSupport(){
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const micBtn = document.getElementById('aiAssistMicBtn');
+    if(!SR || !micBtn){ if(micBtn) micBtn.style.display = 'none'; return; }
+    try{
+      _recognition = new SR();
+      _recognition.lang = 'zh-CN';
+      _recognition.interimResults = true;
+      _recognition.continuous = false;
+      _recognition.maxAlternatives = 1;
+      _recognition.onresult = function(ev){
+        let txt = '';
+        for(let i=ev.resultIndex;i<ev.results.length;i++){ txt += ev.results[i][0].transcript; }
+        const inp = document.getElementById('aiAssistInput');
+        if(inp) inp.value = txt;
+      };
+      _recognition.onerror = function(ev){
+        const st = document.getElementById('aiAssistStatus');
+        if(st) st.textContent = (ev.error==='not-allowed') ? '麦克风权限被拒绝' : '语音识别失败，请打字';
+        stopVoiceUI();
+      };
+      _recognition.onend = function(){ stopVoiceUI(); const inp = document.getElementById('aiAssistInput'); if(inp && inp.value.trim()){ try{ aiPolish(); }catch(e){} } };
+      micBtn.style.display = '';
+    }catch(e){ if(micBtn) micBtn.style.display = 'none'; }
+  }
+  function toggleVoiceInput(){
+    const micBtn = document.getElementById('aiAssistMicBtn');
+    if(_voiceOn){ if(_recognition) _recognition.stop(); return; }
+    if(!_recognition){ if(window.toast) toast('当前浏览器不支持语音输入，请直接打字'); return; }
+    try{
+      _recognition.start();
+      _voiceOn = true;
+      if(micBtn){ micBtn.classList.add('recording'); micBtn.textContent = '⏹ 停止'; }
+      const st = document.getElementById('aiAssistStatus');
+      if(st) st.textContent = '聆听中…请清晰说出你的需求';
+    }catch(e){ if(window.toast) toast('无法启动语音，请直接打字'); }
+  }
+  function stopVoiceUI(){
+    _voiceOn = false;
+    const micBtn = document.getElementById('aiAssistMicBtn');
+    if(micBtn){ micBtn.classList.remove('recording'); micBtn.textContent = '🎤 语音'; }
+  }
+  window.toggleVoiceInput = toggleVoiceInput;
+  initVoiceSupport();
+
   function applyPolish(r){
     const typeEl = document.getElementById('publishType');
     const titleEl = document.getElementById('publishTitle');
@@ -5622,8 +5691,44 @@ if ('serviceWorker' in navigator) {
     else if(/买|送|带/.test(text)){ type='task'; subtype='buydeliver'; }
     const m = text.match(/(\d+)\s*块|(\d+)\s*元|¥\s*(\d+)/);
     if(m){ price = parseInt(m[1]||m[2]||m[3], 10); }
-    return { type:type, subtype:subtype, title:text.replace(/\s+/g,' ').slice(0,50), desc:text.trim(), price:price };
+    const locM = text.match(/(韵苑\d*栋?|紫菘\d*栋?|沁苑\d*栋?|东[0-9一五六七八九十]+|西[0-9一五六七八九十]+|中[0-9一五六七八九十]+|图书馆|食堂|体育馆|驾部|韵酒|东九|东五|西十二)/);
+    const loc = locM ? locM[1] : '';
+    const title = text.replace(/\s+/g,' ').replace(/[。.!！?？]/g,'').slice(0,20);
+    const desc = '【需求】' + text.trim() + (loc ? '（地点：' + loc + '）' : '（地点请补充说明具体楼栋）') +
+      (type==='qa' ? '' : '。报酬 ' + price + ' 元，完成后线下支付。') +
+      '麻烦有空的同学帮忙，完成后请在平台确认，谢谢！如有疑问可平台私信联系。';
+    return { type:type, subtype:subtype, title:title, desc:desc, price:(type==='qa'?0:price) };
   }
+  // 习题辅导：AI 解题思路（只引导不代写）
+  async function aiSolve(){
+    const ctx = window._qaSolveCtx; const box = document.getElementById('qaAiSolveBox');
+    if(!ctx || !box) return;
+    if(aiQuotaLeft() <= 0){ box.textContent = '今日 AI 次数已用完，明天再来～'; return; }
+    box.textContent = 'AI 正在思考解题思路…';
+    const msgs = [
+      { role:'system', content:'你是华中科技大学的学业辅导 AI。用户会给你一道题或一个问题，请只提供解题思路、步骤引导和方法提示，不要直接给出最终答案（帮助学生独立思考）。用中文分点说明，简明友好，不超过200字。' },
+      { role:'user', content: (ctx.title||'') + '\n' + (ctx.desc||'') }
+    ];
+    let reply = null;
+    try{
+      const res = await ghApi('/api/ai/chat','POST',{ messages:msgs });
+      if(res.ok){ const d = await res.json(); if(d && d.reply) reply = d.reply; }
+    }catch(e){}
+    if(!reply) reply = mockAiSolve(ctx);
+    box.textContent = reply;
+    aiQuotaUse();
+  }
+  function mockAiSolve(ctx){
+    const t = ((ctx && ctx.title)||'') + ' ' + ((ctx && ctx.desc)||'');
+    if(/高数|微积分|求导|积分|极限|微分|级数/.test(t)) return '【解题思路】1) 审题，明确已知条件与所求；2) 回顾相关公式（求导/积分基本公式）；3) 分步代入运算，注意符号与定义域；4) 验算结果合理性。补充具体数字可帮你推步骤～';
+    if(/线代|矩阵|行列式|向量|特征值/.test(t)) return '【解题思路】1) 写出已知矩阵/向量；2) 选方法（初等变换、行列式展开或求特征值）；3) 按步骤化简；4) 检查秩与可逆性。可贴具体矩阵帮你推～';
+    if(/英语|四级|六级|翻译|阅读|作文/.test(t)) return '【解题思路】1) 通读把握主旨；2) 长难句拆主干（主谓宾）；3) 结合上下文猜词；4) 翻译先直译再润色。可贴原文帮你分析～';
+    if(/物理|力学|电路|电磁|光学/.test(t)) return '【解题思路】1) 画受力图/电路图；2) 列公式（牛顿定律/欧姆定律等）；3) 代入已知量；4) 检查单位与方向。可贴题目数字～';
+    if(/程序|代码|算法|C\+\+|Python|Java|数据结构/.test(t)) return '【解题思路】1) 明确输入输出；2) 拆分子问题；3) 选数据结构与算法；4) 先写伪代码再实现。可贴代码片段帮你看～';
+    if(/化学|方程|反应|有机/.test(t)) return '【解题思路】1) 写出已知反应物与条件；2) 判断反应类型；3) 配平方程式；4) 验证产物合理性。可贴具体反应式～';
+    return '【解题思路】建议：1) 先拆解题目要求；2) 回顾相关知识点；3) 列出解题步骤；4) 验证结果。把具体题目贴出来，AI 可以给你更针对性的步骤引导～';
+  }
+  window.aiSolve = aiSolve;
 })();
 </script>
 
