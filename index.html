@@ -339,6 +339,16 @@ html[data-theme="dark"] .modal { color: var(--text); }
 .ai-typing span{width:6px;height:6px;border-radius:50%;background:var(--text-secondary);animation:aiBlink 1s infinite}
 .ai-typing span:nth-child(2){animation-delay:.2s}
 .ai-typing span:nth-child(3){animation-delay:.4s}
+.ai-clear-btn{margin-left:auto;background:none;border:none;font-size:1rem;line-height:1;cursor:pointer;opacity:.65;padding:3px 7px;border-radius:8px;transition:var(--t,background .18s)}
+.ai-clear-btn:hover{opacity:1;background:var(--bg)}
+.ai-msg ul,.ai-msg ol{margin:6px 0;padding-left:18px}
+.ai-msg li{margin:2px 0;line-height:1.55}
+.ai-msg code{background:var(--bg);border:1px solid var(--border);padding:1px 5px;border-radius:5px;font-size:.85em;font-family:ui-monospace,Menlo,Consolas,monospace}
+.ai-msg pre{background:var(--bg);border:1px solid var(--border);padding:8px 10px;border-radius:8px;overflow:auto;white-space:pre;margin:6px 0;font-size:.85em;font-family:ui-monospace,Menlo,Consolas,monospace}
+.ai-msg a{color:var(--primary);text-decoration:underline}
+.ai-msg strong{font-weight:700}
+.ai-cursor{display:inline-block;color:var(--primary);animation:aiCursor 1s steps(1,end) infinite;margin-left:1px}
+@keyframes aiCursor{50%{opacity:0}}
 @keyframes aiBlink{0%,60%,100%{opacity:.3}30%{opacity:1}}
 .ai-quick{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 6px}
 .ai-quick button{font-size:.78rem;padding:5px 10px;border:1px solid var(--border);background:var(--bg-card);border-radius:99px;cursor:pointer;color:var(--text-secondary)}
@@ -934,7 +944,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.15.1';
+const APP_VERSION = '1.15.2';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const v = localStorage.getItem('hust_ver_checked');
@@ -5497,6 +5507,7 @@ if ('serviceWorker' in navigator) {
   <div class="ai-panel-header">
     <div class="ai-avatar">🤖</div>
     <h4>互助AI 小助手</h4>
+    <button class="ai-clear-btn" onclick="clearAiHistory()" title="清空对话" aria-label="清空对话">🗑</button>
     <button class="ai-close" onclick="toggleAiChat(false)" aria-label="关闭">✕</button>
   </div>
   <div class="ai-quick" id="aiQuick">
@@ -5537,7 +5548,9 @@ if ('serviceWorker' in navigator) {
     if(open){
       const body = document.getElementById('aiBody');
       if(body && !body.childElementCount){
-        addAiMsg('bot','你好，我是 Hust互助 的 AI 小助手🤖。可以问我平台用法，或点发布里的「✨ AI 帮我写」让 AI 帮你写需求～');
+        if(!loadAiHistory()){
+          addAiMsg('bot','你好，我是 Hust互助 的 AI 小助手🤖。可以问我平台用法，或点发布里的「✨ AI 帮我写」让 AI 帮你写需求～');
+        }
       }
       updateAiQuotaLabel();
       const inp = document.getElementById('aiInput'); if(inp) setTimeout(function(){ inp.focus(); }, 50);
@@ -5547,7 +5560,7 @@ if ('serviceWorker' in navigator) {
     const body = document.getElementById('aiBody'); if(!body) return null;
     const d = document.createElement('div'); d.className = 'ai-msg ' + role;
     if(typing){ d.innerHTML = '<span class="ai-typing"><span></span><span></span><span></span></span>'; }
-    else { d.textContent = text; }
+    else { d.innerHTML = renderMarkdown(text || ''); }
     body.appendChild(d); body.scrollTop = body.scrollHeight; return d;
   }
   const _aiHistory = [{ role:'system', content:'你是 Hust互助 校园互助平台的 AI 小助手。Hust互助 是华中科技大学(HUST)校园互助平台，有五大类：跑腿代办(代拿快递/外卖、帮买帮送、打印、维修)、物品流转(二手出售/租借)、有问必答(含习题解答)、找人(组队/拼车/招募)、校园公告。用户用学号邮箱验证登录，信用分初始100，新用户送7天会员。平台无资金托管，报酬线下支付。请用简洁友好中文回答，不超过120字，不知道就说不知道。' }];
@@ -5561,8 +5574,8 @@ if ('serviceWorker' in navigator) {
     const typing = addAiMsg('bot','',true);
     const reply = await callAiChat(_aiHistory.slice(1));
     _aiHistory.push({ role:'assistant', content:reply });
-    if(typing){ typing.className = 'ai-msg bot'; typing.textContent = reply; }
-    const body = document.getElementById('aiBody'); if(body) body.scrollTop = body.scrollHeight;
+    await typeOutAi(typing, reply);
+    saveAiHistory();
     aiQuotaUse();
   }
   function aiQuickAsk(btn){ const inp = document.getElementById('aiInput'); if(inp) inp.value = btn.textContent; sendAiMessage(); }
@@ -5575,6 +5588,73 @@ if ('serviceWorker' in navigator) {
     }catch(e){}
     return mockAiChat(messages);
   }
+  // 安全极简 Markdown 渲染（零依赖：先转义再套安全标签，杜绝 XSS）
+  function renderMarkdown(md){
+    if(!md) return '';
+    let s = String(md).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const blocks = [];
+    s = s.replace(/```([\s\S]*?)```/g, function(_, c){ blocks.push(c.replace(/^\n+/,'').replace(/\n+$/,'')); return '«B' + (blocks.length-1) + '»'; });
+    s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    s = s.replace(/(?:^|\n)([-*])\s+([^\n]+)/g, '\n<ul><li>$2</li></ul>');
+    s = s.replace(/<\/ul>\s*<ul>/g, '');
+    s = s.replace(/\n/g, '<br>');
+    s = s.replace(/«B(\d+)»/g, function(_, i){ return '<pre><code>'+blocks[+i]+'</code></pre>'; });
+    return s;
+  }
+  // 打字机流式输出：先逐字显示纯文本，完成后替换为 Markdown 渲染
+  function typeOutAi(el, text){
+    return new Promise(function(resolve){
+      if(!el){ resolve(); return; }
+      el.className = 'ai-msg bot';
+      const cursor = document.createElement('span'); cursor.className = 'ai-cursor'; cursor.textContent = '▌';
+      el.textContent = ''; el.appendChild(cursor);
+      const body = document.getElementById('aiBody');
+      let i = 0;
+      (function step(){
+        if(i < text.length){
+          const ch = text.charAt(i);
+          cursor.insertAdjacentText('beforebegin', ch);
+          i++;
+          if(body) body.scrollTop = body.scrollHeight;
+          const delay = /[，。！？、；：,.!?;:\n]/.test(ch) ? 55 : 16;
+          setTimeout(step, delay);
+        } else {
+          if(cursor.parentNode) cursor.parentNode.removeChild(cursor);
+          el.innerHTML = renderMarkdown(text);
+          if(body) body.scrollTop = body.scrollHeight;
+          resolve();
+        }
+      })();
+    });
+  }
+  // 会话记忆：localStorage 持久化对话，跨会话恢复
+  const AI_CHAT_KEY = 'hust_ai_chat_v1';
+  function saveAiHistory(){
+    try{ const conv = _aiHistory.filter(function(m){ return m.role !== 'system'; }); localStorage.setItem(AI_CHAT_KEY, JSON.stringify(conv)); }catch(e){}
+  }
+  function loadAiHistory(){
+    try{
+      const raw = localStorage.getItem(AI_CHAT_KEY);
+      if(!raw) return false;
+      const conv = JSON.parse(raw);
+      if(!Array.isArray(conv) || !conv.length) return false;
+      _aiHistory.length = 1;
+      const body = document.getElementById('aiBody'); if(body) body.innerHTML = '';
+      conv.forEach(function(m){ if(m && m.role && m.content != null){ _aiHistory.push(m); addAiMsg(m.role, m.content); } });
+      return true;
+    }catch(e){ return false; }
+  }
+  function clearAiHistory(){
+    try{ localStorage.removeItem(AI_CHAT_KEY); }catch(e){}
+    _aiHistory.length = 1;
+    const body = document.getElementById('aiBody'); if(body) body.innerHTML = '';
+    addAiMsg('bot','对话已清空，有什么可以帮你？');
+  }
+  window.clearAiHistory = clearAiHistory;
+
   function mockAiChat(messages){
     const last = (messages[messages.length-1] || {}).content || '';
     if(/怎么发|如何发|发布|发单/.test(last)) return '点顶部「发布任务」选类型填需求即可。想省事就点发布弹窗里的「✨ AI 帮我写」，说句大白话 AI 帮你写好标题和描述～';
