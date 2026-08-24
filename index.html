@@ -384,6 +384,28 @@ html[data-theme="dark"] .modal { color: var(--text); }
   #updateBanner{flex-wrap:wrap;padding:8px 10px}
   #updateBanner .update-banner-text{width:100%;text-align:left}
 }
+/* 跑腿接单喜好 chips */
+.pref-chip{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid var(--border);border-radius:99px;background:var(--bg-card);font-size:.82rem;cursor:pointer;color:var(--text-secondary);transition:var(--t)}
+.pref-chip:hover{border-color:var(--primary)}
+.pref-chip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+/* 任务卡片「为你推荐」绿标 */
+.rec-chip{display:inline-flex;align-items:center;gap:2px;font-size:.68rem;background:#dcfce7;color:#16a34a;padding:1px 7px;border-radius:99px;margin-left:4px}
+/* 只看推荐按钮激活态 */
+#btnRecOnly.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+html[data-theme="dark"] .rec-chip{background:#14532d;color:#4ade80}
+/* 跑腿接单状态翻牌（绿灯开关） */
+.runner-avail-toggle{display:inline-flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.runner-avail-toggle input{display:none}
+.runner-avail-track{width:48px;height:26px;border-radius:99px;background:var(--border);position:relative;transition:all .25s;flex-shrink:0}
+.runner-avail-track::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .25s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.runner-avail-toggle input:checked + .runner-avail-track{background:#22c55e}
+.runner-avail-toggle input:checked + .runner-avail-track::after{transform:translateX(22px)}
+html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
+.runner-avail-label{font-size:.92rem;font-weight:600}
+.runner-avail-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-left:6px;animation:runner-dot-pulse 1.6s infinite;vertical-align:middle}
+@keyframes runner-dot-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+/* 接单喜好表单 */
+.take-prefs-form .form-group{margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -528,6 +550,7 @@ html[data-theme="dark"] .modal { color: var(--text); }
         <option value="price_high">💰 价格从高到低</option>
         <option value="price_low">💰 价格从低到高</option>
       </select>
+      <button class="btn btn-outline btn-sm" id="btnRecOnly" onclick="toggleRecOnly()" style="display:none">🎯 只看推荐</button>
     </div>
     <div class="order-grid" id="taskOrders"></div>
     <div id="taskPagination"></div>
@@ -762,6 +785,52 @@ html[data-theme="dark"] .modal { color: var(--text); }
       <p class="form-error" id="myNicknameError" style="display:none"></p>
       <div id="myPaymentPreview" style="margin-top:12px"></div>
     </div>
+    <div id="runnerTakePanel" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;display:none">
+      <h3 style="font-size:1.05rem;margin-bottom:6px">🛵 跑腿接单设置<span id="runnerAvailDot" class="runner-avail-dot" style="display:none"></span></h3>
+      <p class="form-hint" style="margin-bottom:14px">亮起绿灯后，系统会按你的接单喜好智能匹配新订单，并通过站内通知推送给你。</p>
+      <label class="runner-avail-toggle">
+        <input type="checkbox" id="runnerAvailSwitch" onchange="toggleRunnerAvailable(this.checked)">
+        <span class="runner-avail-track"></span>
+        <span class="runner-avail-label" id="runnerAvailLabel">忙碌中</span>
+      </label>
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+      <div class="take-prefs-form">
+        <div class="form-group">
+          <label>偏好任务类型（可多选，不选 = 全部）</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap" id="takePrefsCats">
+            <span class="pref-chip" data-cat="express" onclick="togglePrefChip(this)">📦 代拿快递</span>
+            <span class="pref-chip" data-cat="food" onclick="togglePrefChip(this)">🍔 代取外卖</span>
+            <span class="pref-chip" data-cat="buy" onclick="togglePrefChip(this)">🛒 帮买帮送</span>
+            <span class="pref-chip" data-cat="print" onclick="togglePrefChip(this)">🖨️ 帮忙打印</span>
+            <span class="pref-chip" data-cat="repair" onclick="togglePrefChip(this)">🔧 维修</span>
+            <span class="pref-chip" data-cat="other" onclick="togglePrefChip(this)">📌 其他</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>偏好区域（选填）</label>
+            <select id="takePrefsArea">
+              <option value="">不限区域</option>
+              <option value="紫菘">紫菘</option>
+              <option value="韵苑">韵苑</option>
+              <option value="沁苑">沁苑</option>
+              <option value="东校区">东校区</option>
+              <option value="西校区">西校区</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>期望最低报酬 (¥，选填)</label>
+            <input type="number" id="takePrefsMinPrice" placeholder="如 3" min="0" step="0.5">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>备注（选填，如"只接韵苑的件"）</label>
+          <input type="text" id="takePrefsNote" maxlength="50" placeholder="接单偏好备注">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveTakePrefs()">保存接单喜好</button>
+        <p class="form-error" id="takePrefsError" style="display:none"></p>
+      </div>
+    </div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
       <button class="btn btn-outline btn-sm" onclick="showVipApply()" style="display:none" id="btnVipApply">⭐ 申请开通会员</button>
       <button class="btn btn-outline btn-sm" onclick="showRunnerApply()" style="display:none" id="btnRunnerApply">🛵 申请跑腿认证</button>
@@ -957,7 +1026,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.15.4';
+const APP_VERSION = '1.15.5';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1247,6 +1316,7 @@ async function loadOrders(type, cat) {
   const grid = document.getElementById('taskOrders');
   if (!grid) return;
   _taskCurrentPage = 1;
+  updateRecOnlyBtn();
 
   // 清空搜索
   const searchInput = document.getElementById('taskSearchInput');
@@ -1358,6 +1428,9 @@ function renderOrders(orders) {
     const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
     const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
+    // 智能派单：匹配当前用户接单喜好的订单加推荐标（v1.15.5）
+    const isMine = !!(S.user && o.publisher_student_id === S.user.student_id);
+    const recTag = (!isMine && matchOrderToPrefs(o)) ? '<span class="rec-chip">🎯 为你推荐</span>' : '';
     // 缩略图预览
     const imgList = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     const thumbHTML = imgList.length > 0
@@ -1365,7 +1438,7 @@ function renderOrders(orders) {
       : '';
     return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
       + '<div class="order-card-header">'
-      + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>'
+      + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + recTag
       + '<span class="order-card-status status-' + o.status + '">' + (o.type === 'qa' || o.type === 'find' || o.type === 'academic' ? (o.solved ? '✅ 已解决' : (o.type === 'find' ? '🔍 寻找中' : '💬 待解答')) : sl[o.status]) + '</span>'
       + '</div>'
       + thumbHTML
@@ -1427,6 +1500,11 @@ function applySearchAndSort() {
   // 宿舍区域筛选（模糊匹配）
   if (dormFilter) {
     orders = orders.filter(o => (o.publisher_dorm || '').includes(dormFilter));
+  }
+
+  // 只看推荐：仅跑腿 tab、认证且已填喜好的用户（v1.15.5）
+  if (S.recOnly && (S.taskTab || 'task') === 'task') {
+    orders = orders.filter(o => matchOrderToPrefs(o) && !(S.user && o.publisher_student_id === S.user.student_id));
   }
 
   // 排序
@@ -1554,6 +1632,7 @@ function switchTaskTab(tab) {
   } else {
     loadOrders(tab, S.filter[tab] || 'all');
   }
+  updateRecOnlyBtn();
 }
 
 // ============ DETAIL ============
@@ -4654,6 +4733,21 @@ async function loadMyOrders(myTab) {
     paymentPreview.innerHTML = '<img src="' + S.user.payment_image + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
   }
 
+  // 跑腿接单设置面板：仅已认证用户可见（v1.15.5）
+  const runnerPanel = document.getElementById('runnerTakePanel');
+  if (runnerPanel) runnerPanel.style.display = S.user.runner_verified ? 'block' : 'none';
+  if (S.user.runner_verified) {
+    updateRunnerAvailUI();
+    const p = S.user.takePrefs || {};
+    document.querySelectorAll('#takePrefsCats .pref-chip').forEach(c => c.classList.toggle('active', (p.cats || []).includes(c.dataset.cat)));
+    const areaEl = document.getElementById('takePrefsArea');
+    if (areaEl) areaEl.value = p.area || '';
+    const mpEl = document.getElementById('takePrefsMinPrice');
+    if (mpEl) mpEl.value = p.minPrice > 0 ? p.minPrice : '';
+    const noteEl = document.getElementById('takePrefsNote');
+    if (noteEl) noteEl.value = p.note || '';
+  }
+
   // 更新一级 tab 样式
   document.querySelectorAll('#myOrderTabs .tab-btn').forEach(b => {
     b.style.color = 'var(--text-secondary)';
@@ -4840,6 +4934,134 @@ async function saveMyPayment() {
   } catch(e) {
     errEl.textContent = '保存到云端失败：' + e.message + '。请检查网络后重试。';
     errEl.style.display = 'block';
+  }
+}
+
+// ============ 跑腿接单设置（v1.15.5：可用性翻牌 + 接单喜好 + 智能派单） ============
+// 从云端拉取最新用户数据，防止覆盖他人并发修改
+async function pullRemoteUser() {
+  try {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + S.user._issue_number, { headers: {} });
+    if (res.ok) {
+      const remote = JSON.parse((await res.json()).body);
+      S.user = Object.assign({}, remote, { _issue_number: S.user._issue_number });
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+// 刷新接单状态开关 UI
+function updateRunnerAvailUI() {
+  const on = !!(S.user && S.user.runner_verified && S.user.available);
+  const label = document.getElementById('runnerAvailLabel');
+  const dot = document.getElementById('runnerAvailDot');
+  const sw = document.getElementById('runnerAvailSwitch');
+  if (sw) sw.checked = on;
+  if (label) label.textContent = on ? '有空接单（绿灯）' : '忙碌中';
+  if (dot) dot.style.display = on ? 'inline-block' : 'none';
+}
+
+// 切换"是否可接单"（绿灯翻牌），写入用户 issue available 字段
+async function toggleRunnerAvailable(on) {
+  const sw = document.getElementById('runnerAvailSwitch');
+  if (!S.user) { toast('请先登录', 'error'); if (sw) sw.checked = false; return; }
+  try {
+    const hasIssue = await ensureUserIssueNumber();
+    if (!hasIssue) throw new Error('用户信息不完整');
+    await pullRemoteUser();
+    S.user.available = !!on;
+    localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+    await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user));
+    toast(on ? '🟢 已亮绿灯，系统将按你的接单喜好推送新订单' : '已切换为忙碌，暂停智能派单提醒', 'success');
+  } catch(e) {
+    if (sw) sw.checked = !on;
+    toast('状态保存失败：' + e.message, 'error');
+    return;
+  }
+  updateRunnerAvailUI();
+}
+
+// 喜好 chips 点击切换
+function togglePrefChip(el) { el.classList.toggle('active'); }
+
+// 保存接单喜好到用户 issue takePrefs 字段
+async function saveTakePrefs() {
+  const errEl = document.getElementById('takePrefsError');
+  if (errEl) { errEl.style.display = 'none'; }
+  if (!S.user) { toast('请先登录', 'error'); return; }
+  const hasIssue = await ensureUserIssueNumber();
+  if (!hasIssue) {
+    if (errEl) { errEl.textContent = '用户信息不完整，请退出后重新登录。'; errEl.style.display = 'block'; }
+    return;
+  }
+  const cats = Array.from(document.querySelectorAll('#takePrefsCats .pref-chip.active')).map(c => c.dataset.cat);
+  const areaEl = document.getElementById('takePrefsArea');
+  const mpEl = document.getElementById('takePrefsMinPrice');
+  const noteEl = document.getElementById('takePrefsNote');
+  const prefs = {
+    cats: cats,
+    area: areaEl ? areaEl.value : '',
+    minPrice: mpEl ? (parseFloat(mpEl.value) || 0) : 0,
+    note: noteEl ? noteEl.value.trim() : '',
+    updated_at: new Date().toISOString()
+  };
+  await pullRemoteUser();
+  S.user.takePrefs = prefs;
+  localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+  try {
+    await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user));
+    toast('接单喜好已保存，任务大厅将按偏好为你标记推荐订单', 'success');
+    updateRecOnlyBtn();
+    if (S.taskTab === 'task') refreshCurrentTab();
+  } catch(e) {
+    if (errEl) { errEl.textContent = '保存到云端失败：' + e.message; errEl.style.display = 'block'; }
+  }
+}
+
+// 订单是否匹配当前用户接单喜好
+function matchOrderToPrefs(o) {
+  if (!S.user || !S.user.runner_verified || !S.user.takePrefs || !o) return false;
+  if (o.type !== 'task' && o.type !== 'errand' && o.type !== 'skill') return false;
+  const p = S.user.takePrefs;
+  if (p.cats && p.cats.length && !p.cats.includes(o.category)) return false;
+  if (p.area && o.location && !(o.location || '').includes(p.area)) return false;
+  if (p.minPrice > 0 && (o.price || 0) < p.minPrice) return false;
+  return true;
+}
+
+// "只看推荐"按钮可见性（仅认证且已填喜好的用户）
+function updateRecOnlyBtn() {
+  const btn = document.getElementById('btnRecOnly');
+  if (!btn) return;
+  const show = !!(S.user && S.user.runner_verified && S.user.takePrefs && (S.taskTab || 'task') === 'task');
+  btn.style.display = show ? 'inline-flex' : 'none';
+  if (!show) { S.recOnly = false; btn.classList.remove('active'); }
+}
+
+function toggleRecOnly() {
+  S.recOnly = !S.recOnly;
+  const btn = document.getElementById('btnRecOnly');
+  if (btn) btn.classList.toggle('active', S.recOnly);
+  resetTaskPageAndApply();
+}
+
+// 智能派单通知：新出现的 open 跑腿订单匹配"绿灯+喜好"时推送（首刷只记录不推送）
+let _knownRecOrders = {};
+function checkRecommendedOrders(issues) {
+  if (!S.user || !S.user.runner_verified || !S.user.available || !S.user.takePrefs) return;
+  const sid = S.user.student_id;
+  for (const i of (issues || [])) {
+    let o = null;
+    try { o = JSON.parse(i.body); } catch(e) { continue; }
+    if (!o || (o.type !== 'task' && o.type !== 'errand' && o.type !== 'skill') || o.status !== 'open') continue;
+    if (o.publisher_student_id === sid) continue;
+    const key = String(i.number);
+    const isNew = (_knownRecOrders[key] === undefined);
+    _knownRecOrders[key] = true;
+    if (!isNew) continue;
+    if (!matchOrderToPrefs(o)) continue;
+    sendNotify('🎯 为你推荐新订单', '「' + (o.title || '新订单') + '」 ¥' + (o.price || 0).toFixed(2) + (o.location ? ' · ' + o.location : '') + '，符合你的接单喜好', { icon: '🎯', link: 'task' });
   }
 }
 
@@ -5422,6 +5644,7 @@ async function runNotificationCheck() {
     const issues = await ghIssues('order');
     checkOrderNotifications(issues);
     checkChatNotifications(issues);
+    checkRecommendedOrders(issues);
     await checkAnnouncementNotifications();
   } catch(e) {}
 }
