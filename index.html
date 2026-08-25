@@ -367,6 +367,13 @@ html[data-theme="dark"] .modal { color: var(--text); }
 .ocr-chip button{border:none;background:none;cursor:pointer;font-size:.8rem;color:var(--text-secondary);padding:0;line-height:1}
 .ocr-thumb{width:64px;height:64px;border-radius:var(--radius-sm,8px);object-fit:cover;border:1px solid var(--border);display:block}
 .ocr-badge{position:absolute;right:-6px;top:-6px;font-size:.6rem;background:var(--primary);color:#fff;border-radius:999px;padding:1px 5px;white-space:nowrap;line-height:1.4}
+.est-opt{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);cursor:pointer;font-size:.9rem;color:var(--text);transition:border-color .15s,background .15s}
+.est-opt:hover{border-color:var(--primary)}
+.est-opt:has(input:checked){border-color:var(--primary);background:rgba(99,102,241,.08)}
+.est-opt input[type=radio]{accent-color:var(--primary)}
+.est-opt input[type=datetime-local]{font-size:.85rem}
+.est-badge{font-size:.72rem;background:rgba(99,102,241,.12);color:var(--primary);border:1px solid var(--primary);border-radius:999px;padding:1px 8px;margin-left:6px;white-space:nowrap}
+.est-badge.overdue{background:#fee2e2;color:#dc2626;border-color:#dc2626}
 .btn-ai{background:linear-gradient(135deg,#6366f1,#1a73e8);color:#fff;border:none}
 .btn-ai:hover{filter:brightness(1.06)}
 .btn-ai:disabled{opacity:.6;cursor:not-allowed}
@@ -875,6 +882,28 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
   </div>
 </div>
 
+<!-- 预计完成时间 Modal（接单时选择，v1.17.0） -->
+<div class="modal-overlay" id="estimateModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeEstimateModal()">&times;</button>
+    <h3 style="margin-bottom:6px">⏰ 预计完成时间</h3>
+    <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:14px">接单后请在承诺时间内完成任务，超时将扣除信用分并通知双方。</p>
+    <div id="estimateOptions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+      <label class="est-opt"><input type="radio" name="estPick" value="1h"> ⚡ 1 小时内</label>
+      <label class="est-opt"><input type="radio" name="estPick" value="halfday"> 🕐 半天内（6 小时）</label>
+      <label class="est-opt"><input type="radio" name="estPick" value="1day" checked> 📅 1 天内（24 小时）</label>
+      <label class="est-opt"><input type="radio" name="estPick" value="2day"> 📅 2 天内</label>
+      <label class="est-opt"><input type="radio" name="estPick" value="3day"> 📅 3 天内</label>
+      <label class="est-opt"><input type="radio" name="estPick" value="custom"> 🗓 自定义时间
+        <input type="datetime-local" id="estCustomTime" style="display:block;margin-top:6px;padding:8px;border:1.5px solid var(--border);border-radius:var(--radius-xs);background:var(--bg-card);color:var(--text)" onchange="document.querySelector('input[name=estPick][value=custom]').checked=true">
+      </label>
+    </div>
+    <p class="form-error" id="estimateError" style="display:none"></p>
+    <button class="btn btn-primary btn-block" onclick="confirmTakeOrder()">✅ 确认接单</button>
+    <button class="btn btn-block" style="margin-top:8px;background:var(--bg);color:var(--text-secondary);border:1px solid var(--border)" onclick="closeEstimateModal()">取消</button>
+  </div>
+</div>
+
 <!-- Report Modal -->
 <div class="modal-overlay" id="reportModal">
   <div class="modal">
@@ -898,7 +927,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
     </div>
     <p class="form-error" id="reportError" style="display:none"></p>
     <button class="btn btn-danger btn-block" onclick="submitReport()">提交投诉</button>
-    <p style="font-size:.75rem;color:var(--text-muted);margin-top:8px">投诉达 5 次将自动封停账号。请如实反馈。</p>
+    <p style="font-size:.75rem;color:var(--text-muted);margin-top:8px">🤖 提交后将先由 AI 预审，事实清楚自动处理，复杂纠纷转人工复核。投诉达 5 次将自动封停账号，请如实反馈。</p>
   </div>
 </div>
 
@@ -1040,7 +1069,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.16.0';
+const APP_VERSION = '1.17.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1463,6 +1492,7 @@ function renderOrders(orders) {
           ? (o.bounty > 0 ? '<span class="order-card-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '</span>' : '<span style="color:var(--text-muted);font-size:.85rem">免费互助</span>')
           : (o.type === 'find' ? '' : '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>'))
       + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
+      + (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : '')
       + '</div>'
       + '<div class="order-card-footer">'
       + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
@@ -1832,6 +1862,8 @@ async function showDetail(issueNum) {
       + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
       + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_real_name || o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
       + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_real_name || o.taker_name || '未知') + '</a>' + (o.taker_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>' : ''))
+      + (isQA ? '' : (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期，原预计 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : ''))
+      + (isQA ? '' : (o.status === 'taken' && o.overdue ? '<span style="font-size:.75rem;color:#dc2626;margin-left:6px">已超时，可联系对方或投诉</span>' : ''))
       + '<span>🕐 ' + timeAgo(o.created_at) + '</span>'
       + (isQA ? '' : urgencyHTML + deadlineHTML)
       + '</div>'
@@ -2271,6 +2303,8 @@ async function submitReport() {
   const errEl = document.getElementById('reportError');
   if (!desc) { errEl.textContent = '请填写详细说明'; errEl.style.display = 'block'; return; }
 
+  const btn = document.querySelector('#reportModal .btn-danger');
+  if (btn) { btn.disabled = true; btn.textContent = '提交中…'; }
   // 获取订单信息以确定投诉对象
   try {
     const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + _reportIssueNum, {
@@ -2295,13 +2329,90 @@ async function submitReport() {
       status: 'open'
     };
 
+    // ---- v1.17.0 AI 预审：先让 AI 判断，高置信自动处理，否则转人工 ----
+    report.ai_review = null;
+    let aiMsg = '';
+    try {
+      const ar = await ghApi('/api/ai/review', 'POST', {
+        reason: reason || '未选择',
+        description: desc,
+        order_title: o.title || '',
+        target_name: targetName || '',
+        reporter_name: S.user.name || ''
+      });
+      if (ar.ok) {
+        const d = await ar.json();
+        if (d && d.verdict) report.ai_review = d;
+      }
+    } catch(e) { /* AI 预审失败 → 直接转人工，不阻断提交 */ }
+
+    if (report.ai_review && report.ai_review.verdict === 'valid' && report.ai_review.confidence >= 85) {
+      report.status = 'ai_resolved';
+      report.resolved_by = 'AI 自动审核';
+      report.resolved_at = new Date().toISOString();
+      report.resolution_note = 'AI 预审判定投诉成立（置信度 ' + report.ai_review.confidence + '%）：' + (report.ai_review.reason || '');
+      aiMsg = 'AI 判定成立，已自动处理';
+    } else if (report.ai_review && report.ai_review.verdict === 'invalid' && report.ai_review.confidence >= 85) {
+      report.status = 'ai_dismissed';
+      report.resolved_by = 'AI 自动审核';
+      report.resolved_at = new Date().toISOString();
+      report.resolution_note = 'AI 预审判定证据不足/不成立（置信度 ' + report.ai_review.confidence + '%）：' + (report.ai_review.reason || '');
+      aiMsg = 'AI 判定证据不足，已自动驳回';
+    } else {
+      report.status = 'open';
+      aiMsg = report.ai_review
+        ? 'AI 预审后转人工复核（置信度 ' + report.ai_review.confidence + '%）'
+        : '已转人工复核';
+    }
+
     await ghCreateIssue('[投诉] ' + targetName + ' - ' + reason, JSON.stringify(report), ['report']);
-    toast('投诉已提交，我们会尽快处理', 'success');
+    // AI 判定成立：立即执行处罚（扣分 + 悬赏自动结算 + 通知）
+    if (report.status === 'ai_resolved') {
+      await applyReportResolved(report);
+    }
+    toast('投诉已提交，' + aiMsg, report.status === 'ai_resolved' ? 'success' : 'info');
     closeReportModal();
     document.getElementById('reportDesc').value = '';
   } catch(e) {
     errEl.textContent = '提交失败：' + e.message;
     errEl.style.display = 'block';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '提交投诉'; }
+  }
+}
+
+// ---- v1.17.0 投诉成立处理（AI 自动 与 管理员手动 共用）----
+async function applyReportResolved(r) {
+  // 被投诉方 -10 信用分
+  if (r.target_id) {
+    const newScore = await updateCreditScore(r.target_id, -10, '投诉成立：' + (r.reason || ''));
+    if (newScore != null && newScore < 25) {
+      toast('⚠️ 被投诉方信用分已降至 ' + newScore + ' 分，账号将受到限制。', 'info');
+    } else if (newScore != null) {
+      toast('被投诉方信用分 -10，当前 ' + newScore + ' 分', 'info');
+    }
+  }
+  // 关联悬赏问答且未结算 → 自动结算（答主+2信用、暴露收款信息）
+  if (r.order_issue_number) {
+    try {
+      const ores = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + r.order_issue_number, {
+        headers: {}
+      });
+      if (ores.ok) {
+        const od = JSON.parse((await ores.json()).body);
+        if ((od.type === 'qa' || od.type === 'academic') && od.bounty > 0 && !od.solved) {
+          await autoSettleQa(r.order_issue_number, false);
+        }
+      }
+    } catch(e) {}
+  }
+  // 通知（仅当前用户视角）
+  if (S.user) {
+    const uid = S.user._issue_number || S.user.student_id;
+    const isReporter = (r.reporter_id == uid);
+    const isTarget = (r.target_id == uid);
+    if (isReporter) sendNotify('⚖️ 投诉已处理', '你的投诉「' + (r.reason || '') + '」经审核成立，已对被投诉方扣除信用分', { icon: '⚖️', link: 'my' });
+    else if (isTarget) sendNotify('⚠️ 投诉成立', '你被投诉「' + (r.reason || '') + '」且审核成立，信用分 -10', { icon: '⚠️', link: 'my' });
   }
 }
 
@@ -2313,8 +2424,8 @@ async function getUserReportCount(targetId) {
     for (const r of reports) {
       try {
         const rp = JSON.parse(r.body);
-        // 只有管理员裁定为 resolved（投诉成立）的才算入封停计数
-        if ((rp.target_id == targetId) && rp.status === 'resolved') count++;
+        // 只有判定为成立（含 AI 自动成立）的才算入封停计数
+        if ((rp.target_id == targetId) && (rp.status === 'resolved' || rp.status === 'ai_resolved')) count++;
       } catch(e) {}
     }
     return count;
@@ -2388,7 +2499,7 @@ async function showReportsView() {
     ct.innerHTML = myReports.map(r => {
       const isMe = r.reporter_id == uid;
       const badge = isMe ? '<span style="color:#f59e0b;font-size:.75rem">我发起的</span>' : '<span style="color:#dc2626;font-size:.75rem">投诉我的</span>';
-      const statusMap = { open: '<span style="color:#f59e0b">⏳ 处理中</span>', resolved: '<span style="color:#dc2626">⚠️ 投诉成立</span>', dismissed: '<span style="color:#16a34a">🤝 双方和解</span>', malicious: '<span style="color:#7c3aed">🚫 恶意投诉</span>' };
+      const statusMap = { open: '<span style="color:#f59e0b">⏳ 处理中</span>', resolved: '<span style="color:#dc2626">⚠️ 投诉成立</span>', dismissed: '<span style="color:#16a34a">🤝 双方和解</span>', malicious: '<span style="color:#7c3aed">🚫 恶意投诉</span>', ai_resolved: '<span style="color:#dc2626">🤖 成立（AI）</span>', ai_dismissed: '<span style="color:#16a34a">🤖 驳回（AI）</span>' };
       const statusBadge = statusMap[r.status] || '<span style="color:#94a3b8">未知</span>';
       const resolutionNote = r.resolution_note ? '<div style="font-size:.82rem;color:var(--text-secondary);margin-top:6px;background:var(--bg);padding:8px;border-radius:6px;border-left:3px solid var(--primary)">📝 处理说明：' + esc(r.resolution_note) + '</div>' : '';
       return '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px">'
@@ -3334,6 +3445,25 @@ async function rejectVipApply(applyNum) {
 }
 
 // ============ 投诉处理（管理员） ============
+// ---- v1.17.0 投诉 AI 预审卡片（管理员页面）----
+function aiReviewCardHTML(r, isOpen) {
+  const a = r.ai_review || {};
+  const verdictMap = { valid: '✅ 成立', invalid: '❌ 不成立', review: '🔍 需人工' };
+  const vLabel = verdictMap[a.verdict] || (a.verdict || '?');
+  const conf = (a.confidence != null) ? a.confidence : '?';
+  const confColor = (typeof conf === 'number' && conf >= 85) ? '#dc2626' : ((typeof conf === 'number' && conf >= 60) ? '#f59e0b' : '#94a3b8');
+  let html = '<div style="margin:8px 0;padding:10px 12px;background:linear-gradient(135deg,rgba(99,102,241,.10),rgba(99,102,241,.03));border:1px dashed var(--primary);border-radius:8px;font-size:.82rem">'
+    + '<div style="margin-bottom:4px"><strong>💡 AI 预审：</strong><span style="color:' + confColor + ';font-weight:600">' + vLabel + '</span>'
+    + ' <span style="color:var(--text-muted)">（置信度 ' + conf + '%）</span></div>'
+    + (a.reason ? '<div style="color:var(--text-secondary);margin-bottom:2px">理由：' + esc(a.reason) + '</div>' : '')
+    + (a.suggested_action ? '<div style="color:var(--text-secondary)">建议：' + esc(a.suggested_action) + '</div>' : '')
+    + '</div>';
+  if (isOpen && a.verdict === 'valid' && typeof conf === 'number' && conf >= 85) {
+    html += '<div style="margin-bottom:8px"><button class="btn btn-sm" style="background:#dc2626;color:#fff" onclick="handleReport(' + r._num + ',\'resolved\')">🤖 采纳 AI 建议：投诉成立（-10 信用分）</button></div>';
+  }
+  return html;
+}
+
 async function loadReportManagement() {
   const ct = document.getElementById('adminContent');
   ct.innerHTML = '<p>加载中...</p>';
@@ -3361,7 +3491,9 @@ async function loadReportManagement() {
     const reasonMap = {
       resolved: '<span style="color:#dc2626">⚠️ 投诉成立</span>',
       dismissed: '<span style="color:#16a34a">🤝 双方和解</span>',
-      malicious: '<span style="color:#7c3aed">🚫 恶意投诉</span>'
+      malicious: '<span style="color:#7c3aed">🚫 恶意投诉</span>',
+      ai_resolved: '<span style="color:#dc2626">🤖 投诉成立（AI 自动）</span>',
+      ai_dismissed: '<span style="color:#16a34a">🤖 已驳回（AI 自动）</span>'
     };
 
     let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">'
@@ -3394,6 +3526,7 @@ async function loadReportManagement() {
         + '📌 ' + esc(r.reason) + ' · 订单：' + esc(r.order_title || '无标题')
         + '</div>'
         + '<div style="font-size:.82rem;color:var(--text-muted);margin-bottom:4px;white-space:pre-wrap">' + esc(r.description || '') + '</div>'
+        + (r.ai_review ? aiReviewCardHTML(r, isOpen) : '')
         + (r.resolution_note ? '<div style="font-size:.82rem;color:var(--text-secondary);margin-bottom:6px;background:#f8fafc;padding:8px;border-radius:6px;border-left:3px solid var(--primary)">📝 ' + esc(r.resolution_note) + '</div>' : '')
         + '<div style="font-size:.75rem;color:var(--text-muted);margin-bottom:8px">' + timeAgo(r.created_at) + '</div>';
 
@@ -3471,31 +3604,8 @@ async function handleReport(num, action) {
     await ghUpdateIssue(num, JSON.stringify(r));
 
     if (action === 'resolved') {
-      // 投诉成立：被投诉方 -10 信用分
-      if (r.target_id) {
-        const newScore = await updateCreditScore(r.target_id, -10, '投诉成立：' + (r.reason || ''));
-        if (newScore != null && newScore < 25) {
-          toast('⚠️ 被投诉方信用分已降至 ' + newScore + ' 分，账号将受到限制。', 'info');
-        } else if (newScore != null) {
-          toast('被投诉方信用分 -10，当前 ' + newScore + ' 分', 'info');
-        }
-      }
-      // 投诉仲裁：若关联的是悬赏问答且仍未结算 → 自动结算（暴露收款信息给答主、答主+2信用）
-      // 发布者已由投诉成立扣 -10，此处不再重复扣分
-      if (r.order_issue_number) {
-        try {
-          const ores = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + r.order_issue_number, {
-            headers: {}
-          });
-          if (ores.ok) {
-            const od = JSON.parse((await ores.json()).body);
-            if ((od.type === 'qa' || od.type === 'academic') && od.bounty > 0 && !od.solved) {
-              await autoSettleQa(r.order_issue_number, false);
-              toast('该悬赏问答已自动结算，答主可查看到你的收款方式', 'info');
-            }
-          }
-        } catch(e) {}
-      }
+      // 投诉成立处理（扣分 + 悬赏自动结算）—— 与 AI 自动审核共用
+      await applyReportResolved(r);
     }
     if (action === 'malicious') {
       try {
@@ -3632,6 +3742,62 @@ async function takeOrder(inum) {
       return;
     }
   }
+  // 全部检查通过 → 先选择预计完成时间，再执行接单
+  _pendingTakeNum = inum;
+  openEstimateModal();
+}
+
+// ---- 预计完成时间选择（v1.17.0）----
+let _pendingTakeNum = null;
+
+function openEstimateModal() {
+  const m = document.getElementById('estimateModal');
+  if (!m) { confirmTakeOrder(); return; } // 兜底：找不到弹窗则直接按默认 1 天接单
+  document.getElementById('estimateError').style.display = 'none';
+  document.getElementById('estimateOptions').style.display = 'flex';
+  const r1 = document.querySelector('input[name=estPick][value="1day"]');
+  if (r1) r1.checked = true;
+  m.classList.add('active');
+}
+
+function closeEstimateModal() {
+  const m = document.getElementById('estimateModal');
+  if (m) m.classList.remove('active');
+  _pendingTakeNum = null;
+}
+
+// 读取当前选择，返回 {iso, label}；不合法返回 null
+function getEstimateSelection() {
+  const picked = document.querySelector('input[name=estPick]:checked');
+  if (!picked) return null;
+  const v = picked.value;
+  const now = Date.now();
+  let iso = '', label = '';
+  if (v === '1h') { iso = new Date(now + 60 * 60 * 1000).toISOString(); label = '1 小时内'; }
+  else if (v === 'halfday') { iso = new Date(now + 6 * 60 * 60 * 1000).toISOString(); label = '半天内'; }
+  else if (v === '1day') { iso = new Date(now + 24 * 60 * 60 * 1000).toISOString(); label = '1 天内'; }
+  else if (v === '2day') { iso = new Date(now + 48 * 60 * 60 * 1000).toISOString(); label = '2 天内'; }
+  else if (v === '3day') { iso = new Date(now + 72 * 60 * 60 * 1000).toISOString(); label = '3 天内'; }
+  else if (v === 'custom') {
+    const ct = document.getElementById('estCustomTime').value;
+    if (!ct) return null;
+    const d = new Date(ct);
+    if (isNaN(d.getTime()) || d.getTime() <= now) return null;
+    iso = d.toISOString();
+    label = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + (d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes() + ' 前';
+  } else return null;
+  return { iso: iso, label: label };
+}
+
+async function confirmTakeOrder() {
+  const inum = _pendingTakeNum;
+  if (!inum) return;
+  const est = getEstimateSelection();
+  const errEl = document.getElementById('estimateError');
+  if (!est) {
+    if (errEl) { errEl.textContent = '请选择预计完成时间（自定义时间需晚于当前时间）'; errEl.style.display = 'block'; }
+    return;
+  }
   try {
     const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
       headers: {}
@@ -3650,13 +3816,19 @@ async function takeOrder(inum) {
     // 接单时自动把接单人的收款码写入订单
     o.taker_payment_info = S.user.payment_info || '';
     o.taker_payment_image = S.user.payment_image || '';
+    // v1.17.0：预计完成时间
+    o.estimate_finish = est.iso;
+    o.estimate_finish_label = est.label;
+    o.estimate_finish_prompted_at = new Date().toISOString();
     await ghUpdateIssue(inum, JSON.stringify(o));
-    toast('接单成功！请提醒对方查看你的收款信息', 'success');
+    toast('接单成功！预计 ' + est.label + ' 完成，请提醒对方查看你的收款信息', 'success');
     closeDetailModal();
+    closeEstimateModal();
+    _pendingTakeNum = null;
     // 乐观更新：直接从缓存中更新该订单状态
     if (_cachedOrders) {
       const idx = _cachedOrders.findIndex(x => x._issue_number === inum);
-      if (idx !== -1) { _cachedOrders[idx].status = 'taken'; _cachedOrders[idx].taker_name = S.user.name; _cachedOrders[idx].taker_student_id = S.user.student_id; renderOrders(_cachedOrders); }
+      if (idx !== -1) { _cachedOrders[idx].status = 'taken'; _cachedOrders[idx].taker_name = S.user.name; _cachedOrders[idx].taker_student_id = S.user.student_id; _cachedOrders[idx].estimate_finish_label = est.label; renderOrders(_cachedOrders); }
     }
     if (S.page === 'my') loadMyOrders();
     else if (S.page === 'task') { /* 已通过缓存更新，但异步再拉一次确保数据一致 */ setTimeout(() => refreshCurrentTab(), 1500); }
@@ -4667,7 +4839,7 @@ function renderMyOrders(orders, tab, subTab) {
       ? '<div class="order-card-meta"><span style="color:var(--text-muted);font-size:.8rem">💬 私信对话</span></div>'
       : '<div class="order-card-meta">' + (o.type === 'qa' || o.type === 'academic'
           ? (o.bounty > 0 ? '<span class="order-card-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '</span>' : '<span style="color:var(--text-muted);font-size:.85rem">免费互助</span>')
-          : '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>') + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + '</div>';
+          : '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>') + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : '') + '</div>';
     // 缩略图
     const imgList2 = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     const thumbHTML2 = imgList2.length > 0
@@ -5702,6 +5874,54 @@ function sendNotify(title, body, opts) {
   }
 }
 
+// ---- 接单超时检测（v1.17.0）：超过预计完成时间+4h宽限 → 扣信用分+标记+通知 ----
+let _overdueBusy = false;
+async function checkOverdueOrders(issues) {
+  if (!S.user || !issues || !Array.isArray(issues) || _overdueBusy) return;
+  const uid = S.user._issue_number || S.user.student_id;
+  const sid = S.user.student_id;
+  const now = Date.now();
+  const targets = [];
+  for (const i of issues) {
+    let o; try { o = JSON.parse(i.body); o._num = i.number; } catch(e) { continue; }
+    if (o.status !== 'taken' || !o.estimate_finish || o.overdue_penalized) continue;
+    const isMine = (o.publisher_id == uid || o.taker_id == uid || o.publisher_student_id == sid || o.taker_student_id == sid);
+    if (!isMine) continue;
+    const est = new Date(o.estimate_finish).getTime();
+    if (isNaN(est)) continue;
+    if (now > est + 4 * 60 * 60 * 1000) targets.push(o); // 4 小时宽限，防骑手忘点完成
+  }
+  if (!targets.length) return;
+  _overdueBusy = true;
+  try {
+    for (const o of targets) {
+      try {
+        // 重新拉最新订单，防并发重复处罚
+        const fres = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + o._num, { headers: {} });
+        const fresh = JSON.parse((await fres.json()).body);
+        if (!fresh || fresh.status !== 'taken' || fresh.overdue_penalized) continue;
+        fresh.overdue = true;
+        fresh.overdue_penalized = true;
+        fresh.overdue_at = new Date().toISOString();
+        fresh.overdue_reason = '超过预计完成时间（' + (fresh.estimate_finish_label || '') + '）';
+        await ghUpdateIssue(o._num, JSON.stringify(fresh));
+        // 接单者扣信用分 -5（若已被发布者差评过 bad_review 则不再重复扣）
+        const isTaker = (fresh.taker_id == uid || fresh.taker_student_id == sid);
+        const isPub = (fresh.publisher_id == uid || fresh.publisher_student_id == sid);
+        if (!fresh.bad_review && fresh.taker_id) {
+          const ns = await updateCreditScore(fresh.taker_id, -5, '接单超时未完成：' + (fresh.title || ''));
+          if (ns != null && isTaker) toast('⏰ 订单超时，信用分 -5（当前 ' + ns + '）', 'error');
+        }
+        if (isTaker) {
+          sendNotify('⏰ 订单超时', '你接的订单「' + (fresh.title || '无标题') + '」超过预计完成时间，信用分已扣 5 分。请尽快完成或联系发布者说明。', { icon: '⏰', link: 'my' });
+        } else if (isPub) {
+          sendNotify('⏰ 订单超时', '接单者「' + (fresh.taker_name || '对方') + '」未在预计时间（' + (fresh.estimate_finish_label || '') + '）内完成订单「' + (fresh.title || '无标题') + '」。可联系对方或提交投诉。', { icon: '⏰', link: 'my' });
+        }
+      } catch(e) { /* 单条失败不阻断 */ }
+    }
+  } finally { _overdueBusy = false; }
+}
+
 // --- 订单状态变化检测（接收已拉数据，不额外请求） ---
 function checkOrderNotifications(issues) {
   if (!S.user || !issues) return;
@@ -5781,6 +6001,11 @@ async function checkReportNotifications() {
         if (r.status === 'resolved') {
           if (isReporter) sendNotify('⚖️ 投诉已处理', '你的投诉已被裁定成立', {icon:'⚖️', link:'my'});
           if (isTarget) sendNotify('⚠️ 投诉成立', '你被投诉且裁定成立，信用分-10', {icon:'⚠️', link:'my'});
+        } else if (r.status === 'ai_resolved') {
+          if (isReporter) sendNotify('⚖️ 投诉已处理', '你的投诉经 AI 审核成立，已自动处理', {icon:'⚖️', link:'my'});
+          if (isTarget) sendNotify('⚠️ 投诉成立', '你被投诉且经 AI 审核成立，信用分-10', {icon:'⚠️', link:'my'});
+        } else if (r.status === 'ai_dismissed') {
+          if (isReporter) sendNotify('⚖️ 投诉结果', '你的投诉经 AI 审核证据不足，已被驳回', {icon:'⚖️', link:'my'});
         } else if (r.status === 'rejected') {
           if (isReporter) sendNotify('⚖️ 投诉结果', '你的投诉未被裁定成立', {icon:'⚖️', link:'my'});
         }
@@ -5798,6 +6023,7 @@ async function runNotificationCheck() {
     checkOrderNotifications(issues);
     checkChatNotifications(issues);
     checkRecommendedOrders(issues);
+    checkOverdueOrders(issues);
     await checkAnnouncementNotifications();
   } catch(e) {}
 }
