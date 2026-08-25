@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.3.4">
+<meta name="version" content="1.18.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -681,6 +681,10 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
   <div class="modal modal-lg">
     <button class="modal-close" onclick="closePublishModal()">&times;</button>
     <h3>发布需求</h3>
+    <div id="safetyTipBar" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:.82rem;line-height:1.7">
+      🔒 <strong>安全须知</strong>：请在公共地点当面交接物品；<strong>不要预付押金/定金</strong>；优先使用站内私信沟通，避免直接泄露手机号/微信号。
+      <button type="button" class="btn btn-sm" style="margin-left:8px;padding:2px 10px;font-size:.75rem;background:var(--bg-card);border:1px solid var(--border);border-radius:6px" onclick="dismissSafetyTip()">知道了</button>
+    </div>
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
       <button type="button" class="btn btn-ai btn-sm" onclick="toggleAiAssist()">✨ AI 帮我写</button>
     </div>
@@ -730,7 +734,8 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
       <div class="form-row">
         <div class="form-group">
           <label>报酬 (¥)</label>
-          <input type="number" id="publishPrice" required placeholder="金额" step="0.01" min="1">
+          <input type="number" id="publishPrice" required placeholder="金额" step="0.01" min="1" oninput="checkPublishPrice()">
+          <p class="form-hint" id="publishPriceWarn" style="display:none"></p>
         </div>
         <div class="form-group">
           <label>地点</label>
@@ -755,6 +760,11 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
       <div class="form-group">
         <label>支付方式（接单人完成后来支付）</label>
         <input type="text" id="publishPayment" placeholder="如：微信 xxx / 支付宝 xxx / 面付">
+      </div>
+      <div class="form-group" id="handoffGroup" style="display:none">
+        <label>交接码（选填，4 位数字）</label>
+        <input type="text" id="publishHandoffCode" maxlength="4" placeholder="如：1234" inputmode="numeric" pattern="[0-9]*">
+        <p class="form-hint">设置后，接单人点"确认完成"时需输入交接码，你再点"确认收到"，订单才真正完成。留空则不启用。</p>
       </div>
       <div class="form-group">
         <label>图片（选填，最多6张，二手交易建议上传）</label>
@@ -887,6 +897,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
   <div class="modal">
     <button class="modal-close" onclick="closeEstimateModal()">&times;</button>
     <h3 style="margin-bottom:6px">⏰ 预计完成时间</h3>
+    <p style="font-size:.8rem;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-bottom:14px">🔒 安全提醒：请在公共地点当面交接，不预付押金，交易沟通优先使用站内私信。</p>
     <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:14px">接单后请在承诺时间内完成任务，超时将扣除信用分并通知双方。</p>
     <div id="estimateOptions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
       <label class="est-opt"><input type="radio" name="estPick" value="1h"> ⚡ 1 小时内</label>
@@ -901,6 +912,21 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
     <p class="form-error" id="estimateError" style="display:none"></p>
     <button class="btn btn-primary btn-block" onclick="confirmTakeOrder()">✅ 确认接单</button>
     <button class="btn btn-block" style="margin-top:8px;background:var(--bg);color:var(--text-secondary);border:1px solid var(--border)" onclick="closeEstimateModal()">取消</button>
+  </div>
+</div>
+
+<!-- 交接码确认 Modal（v1.18.0） -->
+<div class="modal-overlay" id="handoffModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeHandoffModal()">&times;</button>
+    <h3 style="margin-bottom:16px">🔑 输入交接码</h3>
+    <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:14px">发布者设置了 4 位数字交接码，请向对方确认后输入。订单将在发布者确认收到后完成。</p>
+    <div class="form-group">
+      <input type="text" id="handoffCodeInput" maxlength="4" placeholder="4 位数字交接码" inputmode="numeric" pattern="[0-9]*" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:1.05rem;text-align:center;letter-spacing:4px;background:var(--bg);color:var(--text)" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmHandoffCode();}">
+    </div>
+    <p class="form-error" id="handoffError" style="display:none"></p>
+    <button class="btn btn-primary btn-block" onclick="confirmHandoffCode()">提交</button>
+    <button class="btn btn-block" style="margin-top:8px;background:var(--bg);color:var(--text-secondary);border:1px solid var(--border)" onclick="closeHandoffModal()">取消</button>
   </div>
 </div>
 
@@ -1069,7 +1095,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.17.1';
+const APP_VERSION = '1.18.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1393,6 +1419,11 @@ async function loadOrders(type, cat) {
       } catch(e) { return null; }
     }).filter(o => o && o.status === 'open');
 
+    // v1.18.0：过滤被拉黑者发布的订单
+    if (S.user && Array.isArray(S.user.blocked) && S.user.blocked.length > 0) {
+      orders = orders.filter(o => !S.user.blocked.includes(o.publisher_student_id));
+    }
+
     // 自动过期检查（增加2小时缓冲期，避免订单一发布就消失）
     const now = new Date();
     for (const o of orders) {
@@ -1470,7 +1501,7 @@ function renderOrders(orders) {
   grid.innerHTML = pageItems.map(o => {
     const tl = {errand:'跑腿', secondhand:'二手', skill:'技能', task:'跑腿', qa:'问答', borrow:'借物', goods:'物品流转', find:'找人'};
     const ct = {express:'代拿快递',food:'代取外卖',buy:'帮买帮送',print:'帮忙打印',repair:'维修',other:'其他',book:'教材书籍',electronic:'电子产品',daily:'生活用品',course:'选课学习',exam:'考研保研',life:'校园生活',job:'实习就业',exercise:'习题解答',textbook:'教材参考书',device:'数码设备',sports:'体育器材',tool:'生活工具',team:'竞赛组队',carpool:'出行拼车',survey:'问卷招募',calc:'习题解答',physics:'习题解答',code:'习题解答',major:'习题解答'};
-    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
+    const sl = {open:'待接单', taken:'已接单', awaiting_confirm:'待发布者确认', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const ul = {normal:'', urgent:'🔥加急', asap:'⚡立刻'};
     const urgencyBadge = o.urgency && o.urgency !== 'normal' ? '<span style="font-size:.7rem;background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:99px;margin-left:4px">' + (ul[o.urgency] || '') + '</span>' : '';
     // 智能派单：匹配当前用户接单喜好的订单加推荐标（v1.15.5）
@@ -1718,7 +1749,7 @@ async function showDetail(issueNum) {
     o._issue_number = issueNum;
 
     const tl = {errand:'跑腿代办', secondhand:'出售转让', skill:'跑腿代办', task:'跑腿代办', qa:'有问必答', borrow:'短期租借', chat:'私信对话', find:'找人'};
-    const sl = {open:'待接单', taken:'已接单', completed:'已完成', cancelled:'已取消', expired:'已过期'};
+    const sl = {open:'待接单', taken:'已接单', awaiting_confirm:'待发布者确认', completed:'已完成', cancelled:'已取消', expired:'已过期'};
     const isQA = (o.type === 'qa' || o.type === 'find');
     const isChat = o.type === 'chat';
 
@@ -1759,6 +1790,14 @@ async function showDetail(issueNum) {
           closeBtn.innerHTML = '<button class="btn btn-sm btn-outline" onclick="adminEndChat(' + issueNum + ')">结束对话并清除记录</button>';
           ct.appendChild(closeBtn);
         }
+        // v1.18.0：聊天页拉黑按钮
+        if (S.user && counterpart && counterpart.sid && counterpart.sid !== mySid) {
+          const blocked = isBlockedByMe(counterpart.sid);
+          const bBtn = document.createElement('div');
+          bBtn.style.cssText = 'text-align:center;margin-top:8px';
+          bBtn.innerHTML = '<button class="btn btn-sm ' + (blocked ? 'btn-outline' : 'btn-danger') + '" onclick="toggleBlockUser(\'' + esc(counterpart.sid) + '\')">' + (blocked ? '✅ 取消拉黑' : '🚫 拉黑对方') + '</button>';
+          ct.appendChild(bBtn);
+        }
       }
       return;
     }
@@ -1779,11 +1818,19 @@ async function showDetail(issueNum) {
       if (S.user && o.status === 'taken' && o.taker_id === currentUid) {
         actions += '<button class="btn btn-success" onclick="completeOrder(' + issueNum + ')">确认完成</button>';
       }
+      // v1.18.0：待发布者确认状态
+      if (S.user && o.status === 'awaiting_confirm' && o.taker_id === currentUid) {
+        actions += '<button class="btn btn-success" disabled style="opacity:.75">✅ 已完成，等待发布者确认</button>';
+      }
+      if (S.user && o.status === 'awaiting_confirm' && o.publisher_id === currentUid) {
+        actions += '<button class="btn btn-success" onclick="finalizeOrder(' + issueNum + ')">✅ 确认收到</button>';
+        actions += '<button class="btn btn-danger" onclick="disputeAwaitingOrder(' + issueNum + ')">❌ 拒绝确认</button>';
+      }
       if (S.user && (o.publisher_id === currentUid || o.taker_id === currentUid)) {
         if (o.status === 'open' || o.status === 'taken') {
           actions += '<button class="btn btn-danger" onclick="cancelOrder(' + issueNum + ')">取消订单</button>';
         }
-        if (o.status === 'taken' || o.status === 'completed') {
+        if (o.status === 'taken' || o.status === 'awaiting_confirm' || o.status === 'completed') {
           actions += '<button class="btn btn-warning" onclick="showReportModal(' + issueNum + ')">投诉</button>';
         }
         // 发布者手动标记：已接单且逾期未完成 → 差评
@@ -1887,6 +1934,13 @@ async function showDetail(issueNum) {
       + '<span>🕐 ' + timeAgo(o.created_at) + '</span>'
       + (isQA ? '' : urgencyHTML + deadlineHTML)
       + '</div>'
+      + (o.status === 'awaiting_confirm'
+        ? '<div style="margin-top:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:.83rem;color:#92400e">'
+          + (o.publisher_id === currentUid
+            ? '📦 接单人已完成配送，请点击"确认收到"完成订单（48h 内未确认将自动完成）。若有纠纷请点"拒绝确认"。'
+            : '⏳ 已通知发布者确认收到，确认后订单完成。若长时间未确认，系统将自动完成。')
+          + '</div>'
+        : '')
       + imageHTML
       + '<div class="detail-desc">' + esc(o.description || '无详细描述') + '</div>'
       + (o.type === 'qa' ? '<div style="margin-top:12px"><button type="button" class="btn btn-ai btn-sm" onclick="aiSolve()">🤖 AI 解题思路</button><div id="qaAiSolveBox" style="margin-top:10px;font-size:.88rem;color:var(--text-secondary);white-space:pre-wrap"></div></div>' : '')
@@ -2128,7 +2182,32 @@ async function sendComment(issueNum) {
   if (text) {
     const sw = checkSensitive(text);
     if (sw) { toast('消息包含敏感词「' + sw + '」，请修改后发送', 'error'); return; }
+    // v1.18.0：联系方式泄露软提醒（不阻断）
+    if (checkContactLeak(text)) toast('⚠️ 建议避免在聊天中泄露联系方式，站内交易更安全', 'info', 5000);
   }
+
+  // v1.18.0：对方已拉黑我 → 拦截私信发送
+  try {
+    const ores = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum, { headers: {} });
+    if (ores.ok) {
+      const o = JSON.parse((await ores.json()).body);
+      if (o.type === 'chat') {
+        const mySid = S.user.student_id;
+        const peerSid = (o.publisher_student_id === mySid) ? o.taker_student_id : o.publisher_student_id;
+        if (peerSid) {
+          const users = await ghIssues('user', 'all');
+          const peer = users.find(i => { try { return JSON.parse(i.body).student_id === peerSid; } catch(e) { return false; } });
+          if (peer) {
+            const pu = JSON.parse(peer.body);
+            if (Array.isArray(pu.blocked) && pu.blocked.includes(mySid)) {
+              toast('对方已将你拉黑，无法发送消息', 'error');
+              return;
+            }
+          }
+        }
+      }
+    }
+  } catch(e) { /* 校验失败不阻断发送 */ }
 
   window._commentLock = true;
   input.disabled = true;
@@ -2426,6 +2505,14 @@ async function applyReportResolved(r) {
       }
     } catch(e) {}
   }
+  // v1.18.0：投诉成立累计 ≥5 次自动封停（管理员手动与 AI 自动两路共用）
+  try {
+    const cnt = await getUserReportCount(r.target_id);
+    if (cnt >= 5) {
+      const inum = await resolveUserIssueNum(r.target_id);
+      if (inum) await kickUser(inum, r.target_name || '该用户', true);
+    }
+  } catch(e) { /* 单次失败不阻断 */ }
   // 通知（仅当前用户视角）
   if (S.user) {
     const uid = S.user._issue_number || S.user.student_id;
@@ -2450,6 +2537,21 @@ async function getUserReportCount(targetId) {
     }
     return count;
   } catch(e) { return 0; }
+}
+
+// v1.18.0：将被投诉方 ID（可能是 issue number 或 student_id）解析为用户 issue number
+async function resolveUserIssueNum(targetId) {
+  if (!targetId) return null;
+  try {
+    const users = await ghIssues('user', 'all');
+    for (const i of users) {
+      try {
+        const u = JSON.parse(i.body);
+        if (u.student_id === targetId || u.student_id == targetId || i.number == targetId) return i.number;
+      } catch(e) {}
+    }
+  } catch(e) {}
+  return null;
 }
 
 // ============ 信用分系统 (v1.6.0) ============
@@ -2629,6 +2731,29 @@ async function markOrderIncomplete(inum) {
 }
 
 // ============ USER PROFILE ============
+// ---- v1.18.0 用户互拉黑 ----
+function isBlockedByMe(targetSid) {
+  return !!(S.user && Array.isArray(S.user.blocked) && S.user.blocked.includes(targetSid));
+}
+
+async function toggleBlockUser(targetSid) {
+  if (!S.user) { showAuthModal(); return; }
+  if (targetSid === S.user.student_id) { toast('不能拉黑自己', 'error'); return; }
+  const hasIssue = await ensureUserIssueNumber();
+  if (!hasIssue) return;
+  await pullRemoteUser();                       // 先同步云端最新数据，防覆盖
+  if (!Array.isArray(S.user.blocked)) S.user.blocked = [];
+  const idx = S.user.blocked.indexOf(targetSid);
+  if (idx >= 0) S.user.blocked.splice(idx, 1);
+  else S.user.blocked.push(targetSid);
+  localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+  try {
+    await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user));
+    try { cacheBust('orders_task'); } catch(e) {}
+    toast(idx >= 0 ? '已取消拉黑' : '已拉黑该用户，对方将无法给你发私信，其发布的订单也不再展示', 'success');
+  } catch(e) { toast('保存失败：' + e.message, 'error'); }
+}
+
 async function showUserProfile(studentId) {
   if (!studentId) return;
   const modal = document.getElementById('userProfileModal');
@@ -2724,6 +2849,15 @@ async function showUserProfile(studentId) {
     const creditLevel = getCreditLevel(creditScore);
     const creditHistory = user.credit_history || [];
 
+    // v1.18.0：拉黑按钮
+    let blockBtnHtml = '';
+    if (S.user && S.user.student_id !== studentId) {
+      const blocked = isBlockedByMe(studentId);
+      blockBtnHtml = '<div style="text-align:center;margin-bottom:16px">'
+        + '<button class="btn btn-sm ' + (blocked ? 'btn-outline' : 'btn-danger') + '" onclick="toggleBlockUser(\'' + esc(studentId) + '\')">'
+        + (blocked ? '✅ 取消拉黑' : '🚫 拉黑该用户') + '</button></div>';
+    }
+
     ct.innerHTML = ''
       + '<div style="text-align:center;margin-bottom:16px">'
       + '<div style="width:64px;height:64px;border-radius:50%;background:var(--primary-light);color:var(--primary);font-size:1.5rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-bottom:8px">' + ((user.nickname || user.name) || '?').charAt(0).toUpperCase() + '</div>'
@@ -2732,6 +2866,7 @@ async function showUserProfile(studentId) {
       + (user.email_verified ? '<span style="display:inline-block;margin-top:2px;font-size:.72rem;color:#15803d;background:#dcfce7;padding:2px 8px;border-radius:99px">📧 邮箱已验证</span>' : '')
       + '</div>'
       + chatBtnHtml
+      + blockBtnHtml
       // 信用分卡片
       + '<div style="background:' + creditLevel.bg + ';border:1px solid ' + creditLevel.color + '33;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">'
       + '<div>'
@@ -3275,13 +3410,15 @@ async function loadUserManagement() {
   }
 }
 
-async function kickUser(inum, name) {
-  if (!confirm('确定要踢出用户「' + name + '」吗？\n\n踢出后该用户将无法登录。')) return;
+async function kickUser(inum, name, silent) {
+  if (!silent && !confirm('确定要踢出用户「' + name + '」吗？\n\n踢出后该用户将无法登录。')) return;
   try {
     await ghCloseIssue(inum);
-    toast('已踢出用户「' + name + '」', 'success');
-    await loadUserManagement();
-  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+    toast(silent
+      ? '🚫 用户「' + name + '」投诉成立累计 5 次，已自动封停'
+      : '已踢出用户「' + name + '」', 'success');
+    if (!silent) await loadUserManagement(); // 静默模式由调用方负责刷新（handleReport 已有 loadReportManagement）
+  } catch(e) { if (!silent) toast('操作失败：' + e.message, 'error'); }
 }
 
 async function reactivateUser(inum, name) {
@@ -3496,6 +3633,16 @@ async function loadReportManagement() {
 
     const openReports = allReports.filter(r => r.status === 'open');
     const closedReports = allReports.filter(r => r.status !== 'open');
+    // v1.18.0：统计各被投诉方成立次数（用于显示封停标记）
+    const bannedTargets = {};
+    for (const r of allReports) {
+      const k = String(r.target_id);
+      if (!bannedTargets[k]) bannedTargets[k] = 0;
+      if (r.status === 'resolved' || r.status === 'ai_resolved') bannedTargets[k]++;
+    }
+    const bannedMark = function(targetId) {
+      return (bannedTargets[String(targetId)] >= 5) ? ' <span style="font-size:.7rem;color:#fff;background:#dc2626;border-radius:99px;padding:1px 7px;margin-left:4px">🚫 已封停</span>' : '';
+    };
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
     const now = Date.now();
     const recentClosed = closedReports.filter(r => {
@@ -3537,7 +3684,7 @@ async function loadReportManagement() {
       html += '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
         + '<div>'
-        + '<strong>' + esc(r.target_name) + '</strong>'
+        + '<strong>' + esc(r.target_name) + bannedMark(r.target_id) + '</strong>'
         + ' <span style="font-size:.82rem;color:var(--text-muted)">被 ' + esc(r.reporter_name) + ' 投诉</span>'
         + '</div>'
         + '<span style="font-size:.8rem">' + statusLabel + '</span>'
@@ -3877,28 +4024,143 @@ function optimisticUpdateMyOrder(inum, newStatus) {
   }
 }
 
+// ---- v1.18.0 交接码 + 双向确认 ----
+const HANDOFF_MAX_ATTEMPTS = 5;                 // 输错次数上限
+const AWAIT_CONFIRM_TIMEOUT = 48 * 60 * 60 * 1000; // 发布者 48h 未确认自动完成
+let _pendingCompleteNum = null;                 // 待完成的订单 issue number
+let _handoffAttemptCount = 0;                   // 会话内输错次数
+
 async function completeOrder(inum) {
+  if (!S.user) { showAuthModal(); return; }
   if (!confirm('确认订单已完成？')) return;
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
-      headers: {}
-    });
-    const issue = await res.json();
-    const o = JSON.parse(issue.body);
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, { headers: {} });
+    const o = JSON.parse((await res.json()).body);
     if (o.status !== 'taken') { toast('订单状态不正确', 'error'); return; }
+    if (o.taker_id != (S.user._issue_number || S.user.student_id)) { toast('只有接单人可确认完成', 'error'); return; }
+    if (o.handoff_code) {
+      _pendingCompleteNum = inum;
+      _handoffAttemptCount = 0;
+      const hInput = document.getElementById('handoffCodeInput');
+      if (hInput) hInput.value = '';
+      const hErr = document.getElementById('handoffError');
+      if (hErr) hErr.style.display = 'none';
+      document.getElementById('handoffModal').classList.add('active');
+    } else {
+      await submitCompleteOrder(inum, false);
+    }
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function closeHandoffModal() {
+  document.getElementById('handoffModal').classList.remove('active');
+  _pendingCompleteNum = null;
+}
+
+async function confirmHandoffCode() {
+  const inum = _pendingCompleteNum;
+  if (!inum) return;
+  const input = document.getElementById('handoffCodeInput').value.trim();
+  if (!/^\d{4}$/.test(input)) {
+    document.getElementById('handoffError').textContent = '请输入 4 位数字交接码';
+    document.getElementById('handoffError').style.display = 'block';
+    return;
+  }
+  const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, { headers: {} });
+  const o = JSON.parse((await res.json()).body);
+  if (o.status !== 'taken') { toast('订单状态不正确', 'error'); closeHandoffModal(); return; }
+  if (String(o.handoff_code) === input) {
+    await submitCompleteOrder(inum, true);
+    closeHandoffModal();
+  } else {
+    _handoffAttemptCount++;
+    const remain = HANDOFF_MAX_ATTEMPTS - _handoffAttemptCount;
+    if (remain <= 0) {
+      toast('交接码输错次数过多，请通过私信联系发布者确认', 'error');
+      closeHandoffModal();
+    } else {
+      document.getElementById('handoffError').textContent = '交接码错误，还可尝试 ' + remain + ' 次';
+      document.getElementById('handoffError').style.display = 'block';
+    }
+  }
+}
+
+async function submitCompleteOrder(inum, hasHandoff) {
+  try {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, { headers: {} });
+    const o = JSON.parse((await res.json()).body);
+    if (o.status !== 'taken') { toast('订单状态不正确', 'error'); return; }
+    if (hasHandoff) {
+      // 交接码验证通过 → 进入"待发布者确认"
+      o.status = 'awaiting_confirm';
+      o.awaiting_confirm_at = new Date().toISOString();
+      await ghUpdateIssue(inum, JSON.stringify(o));
+      toast('交接码正确！已通知发布者确认，确认后订单完成', 'success');
+      closeDetailModal();
+      optimisticUpdateMyOrder(inum, 'awaiting_confirm');
+      cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+      cacheBust('stats'); loadStats();
+      if (S.page === 'task') setTimeout(() => refreshCurrentTab(), 1500);
+      // 通知发布者（历史对话保留，最终完成时才清评论）
+      sendNotify('📦 接单人已完成', '接单人「' + (o.taker_name || '对方') + '」已完成订单「' + (o.title || '') + '」，请确认收到（48h 内未确认将自动完成）', { icon: '📦', link: 'my' });
+    } else {
+      // 无交接码 → 原逻辑直接 completed
+      o.status = 'completed';
+      await ghUpdateIssue(inum, JSON.stringify(o));
+      toast('订单完成！', 'success');
+      closeDetailModal();
+      optimisticUpdateMyOrder(inum, 'completed');
+      cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+      cacheBust('orders_' + (S.taskTab || 'task'));
+      cacheBust('stats'); loadStats();
+      deleteAllComments(inum).catch(()=>{});
+      if (o.taker_id && !isAdminUser()) updateCreditScore(o.taker_id, 1, '完成订单：' + (o.title || '')).catch(()=>{});
+      if (S.page === 'task') setTimeout(() => refreshCurrentTab(), 1500);
+    }
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// 发布者确认收到 → 订单真正完成（+信用分、清评论）
+async function finalizeOrder(inum) {
+  if (!S.user) { showAuthModal(); return; }
+  if (!confirm('确认已收到物品/服务？确认后订单将完成并结算信用分。')) return;
+  try {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, { headers: {} });
+    const o = JSON.parse((await res.json()).body);
+    if (o.status !== 'awaiting_confirm') { toast('订单状态不正确', 'error'); return; }
+    const uid = S.user._issue_number || S.user.student_id;
+    if (o.publisher_id != uid && o.publisher_student_id != uid) { toast('只有发布者可以确认收到', 'error'); return; }
     o.status = 'completed';
+    delete o.awaiting_confirm_at;
     await ghUpdateIssue(inum, JSON.stringify(o));
-    // === 本地优先：状态已存，立即反馈界面 ===
-    toast('订单完成！', 'success');
+    toast('已确认收到，订单完成！', 'success');
     closeDetailModal();
     optimisticUpdateMyOrder(inum, 'completed');
     cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
     cacheBust('orders_' + (S.taskTab || 'task'));
     cacheBust('stats'); loadStats();
-    // === 后台静默同步，不阻塞界面 ===
     deleteAllComments(inum).catch(()=>{});
     if (o.taker_id && !isAdminUser()) updateCreditScore(o.taker_id, 1, '完成订单：' + (o.title || '')).catch(()=>{});
-    if (S.page === 'task') setTimeout(() => refreshCurrentTab(), 1500);
+    sendNotify('✅ 订单已确认完成', '发布者已确认收到，订单「' + (o.title || '') + '」完成，信用分 +1', { icon: '✅', link: 'my' });
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// 发布者拒绝确认 → 订单回到"已接单"，引导投诉（不引入争议状态，复用现有投诉流程）
+async function disputeAwaitingOrder(inum) {
+  if (!confirm('确认拒绝确认？\n订单将回到"已接单"状态，建议通过投诉解决纠纷（提交后会进入投诉处理流程）。')) return;
+  try {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, { headers: {} });
+    const o = JSON.parse((await res.json()).body);
+    if (o.status !== 'awaiting_confirm') { toast('订单状态不正确', 'error'); return; }
+    o.status = 'taken';
+    delete o.awaiting_confirm_at;
+    await ghUpdateIssue(inum, JSON.stringify(o));
+    toast('已拒绝确认，订单回到已接单状态', 'info');
+    closeDetailModal();
+    optimisticUpdateMyOrder(inum, 'taken');
+    cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+    cacheBust('orders_' + (S.taskTab || 'task'));
+    showReportModal(inum);   // 直接打开投诉弹窗
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -4466,11 +4728,22 @@ function clearPublishDraft() {
   try { sessionStorage.removeItem('hust_publish_draft'); } catch (_) {}
 }
 
+// ---- v1.18.0 安全须知条 ----
+function dismissSafetyTip() {
+  try { localStorage.setItem('hust_safety_tip_seen', '1'); } catch(e) {}
+  const tip = document.getElementById('safetyTipBar');
+  if (tip) tip.style.display = 'none';
+}
+
 function showPublishModal(preType) {
   if (!S.user) { showAuthModal(); return; }
   if (!checkApproved()) return;
   document.getElementById('publishModal').classList.add('active');
   updatePublishCategories();
+  // v1.18.0：首次发布显示安全须知条
+  const tip = document.getElementById('safetyTipBar');
+  if (tip) tip.style.display = localStorage.getItem('hust_safety_tip_seen') ? 'none' : 'block';
+  checkPublishPrice();
   // 绑定草稿自动保存（发布/关闭均保留，成功发布才清）
   if (!window._publishDraftBound) {
     window._publishDraftBound = true;
@@ -4535,12 +4808,14 @@ function updatePublishCategories() {
   const bountyGroup = document.getElementById('bountyGroup');
   const bountyEnable = document.getElementById('bountyEnable');
   const bountyInput = document.getElementById('publishBounty');
+  const handoffGroup = document.getElementById('handoffGroup');
   if (t === 'qa' || t === 'find') {
     priceGroup.style.display = 'none';
     payGroup.style.display = 'none';
     locGroup.style.display = 'none';
     urgencyGroup.style.display = 'none';
     deadlineGroup.style.display = 'none';
+    if (handoffGroup) handoffGroup.style.display = 'none';
     document.getElementById('publishPrice').required = false; // 问答/找人无报酬，移除必填，否则隐藏的 required 字段会静默拦截提交
     if (t === 'qa') {
       bountyGroup.style.display = 'block';
@@ -4562,6 +4837,7 @@ function updatePublishCategories() {
     urgencyGroup.style.display = 'block';
     deadlineGroup.style.display = 'block';
     document.getElementById('publishPrice').required = true;
+    if (handoffGroup) handoffGroup.style.display = (t === 'task') ? 'block' : 'none';  // v1.18.0 交接码仅跑腿类
     bountyGroup.style.display = 'none';
     bountyEnable.checked = false;
     bountyInput.style.display = 'none';
@@ -4577,6 +4853,23 @@ function toggleBountyInput() {
   input.style.display = enable ? 'block' : 'none';
   input.required = enable;
   if (!enable) input.value = '';
+}
+
+// ---- v1.18.0 金额上限提示（仅跑腿类 task）----
+function checkPublishPrice() {
+  const type = document.getElementById('publishType').value;
+  const warn = document.getElementById('publishPriceWarn');
+  if (!warn) return;
+  if (type !== 'task') { warn.style.display = 'none'; return; }
+  const v = parseFloat(document.getElementById('publishPrice').value);
+  if (!v || v <= 0) { warn.style.display = 'none'; return; }
+  if (v > 500) {
+    warn.textContent = '🚫 大额跑腿单（>¥500）风险过高，请降低金额或分次发布。';
+    warn.style.color = '#dc2626'; warn.style.display = 'block';
+  } else if (v > 200) {
+    warn.textContent = '⚠️ 大额跑腿单（>¥200）风险高，建议分次或当面交易。';
+    warn.style.color = '#b45309'; warn.style.display = 'block';
+  } else { warn.style.display = 'none'; }
 }
 
 async function handlePublish(e) {
@@ -4601,6 +4894,12 @@ async function handlePublish(e) {
   const urgency = document.getElementById('publishUrgency').value;
   const deadline = document.getElementById('publishDeadline').value.trim();
   const payment = document.getElementById('publishPayment').value.trim();
+  // v1.18.0 交接码（仅跑腿类）
+  const handoffCode = (type === 'task') ? (document.getElementById('publishHandoffCode').value || '').trim() : '';
+  if (handoffCode && !/^\d{4}$/.test(handoffCode)) {
+    err.textContent = '交接码需为 4 位数字（或留空不启用）';
+    err.style.display = 'block'; return;
+  }
   // 问答悬赏（可选）：仅 qa 且勾选了悬赏时读取金额
   const bountyEnableEl = document.getElementById('bountyEnable');
   const bountyVal = document.getElementById('publishBounty').value.trim();
@@ -4645,6 +4944,11 @@ async function handlePublish(e) {
     }
   }
   if (type !== 'qa' && !price) { err.textContent = '请填写报酬金额'; err.style.display = 'block'; return; }
+  // v1.18.0 大额跑腿单硬拦截（管理员豁免；二手/借物不限）
+  if (type === 'task' && price > 500 && !isAdminUser()) {
+    err.textContent = '大额跑腿单（>¥500）风险过高，请降低金额或分次发布。';
+    err.style.display = 'block'; return;
+  }
   // 校验截止时间必须大于当前时间
   if (deadline) {
     const dl = new Date(deadline);
@@ -4679,6 +4983,7 @@ async function handlePublish(e) {
     type, category: cat, title, description: desc, price: price || 0,
     bounty: bounty || 0,
     location: loc, urgency, deadline, payment,
+    handoff_code: handoffCode || null,   // v1.18.0 交接码
     images: images,
     search_keywords: (window._publishOcr && window._publishOcr.chips && window._publishOcr.chips.length)
       ? window._publishOcr.chips.slice(0, 10) : [],
@@ -4704,6 +5009,7 @@ async function handlePublish(e) {
     const prefix = type === 'qa' ? '[问答] ' : (type === 'borrow' ? '[借物] ' : '[订单] ');
     await ghCreateIssue(prefix + title, JSON.stringify(order), [label, type, cat]);
     toast('发布成功！', 'success');
+    try { localStorage.setItem('hust_safety_tip_seen', '1'); } catch(e) {}
     clearPublishDraft();
     resetOcrState();
     closePublishModal();
@@ -5942,6 +6248,40 @@ async function checkOverdueOrders(issues) {
   } finally { _overdueBusy = false; }
 }
 
+// ---- v1.18.0：发布者 48h 未确认 → 自动确认完成 ----
+let _awaitConfirmBusy = false;
+async function checkAwaitingConfirmOrders(issues) {
+  if (!S.user || !issues || !Array.isArray(issues) || _awaitConfirmBusy) return;
+  const now = Date.now();
+  const targets = [];
+  for (const i of issues) {
+    let o; try { o = JSON.parse(i.body); o._num = i.number; } catch(e) { continue; }
+    if (o.status !== 'awaiting_confirm' || !o.awaiting_confirm_at) continue;
+    const t = new Date(o.awaiting_confirm_at).getTime();
+    if (!isNaN(t) && now - t > AWAIT_CONFIRM_TIMEOUT) targets.push(o);
+  }
+  if (!targets.length) return;
+  _awaitConfirmBusy = true;
+  try {
+    for (const o of targets) {
+      try {
+        const fres = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + o._num, { headers: {} });
+        const fresh = JSON.parse((await fres.json()).body);
+        if (!fresh || fresh.status !== 'awaiting_confirm') continue; // fresh 拉取防并发重复
+        fresh.status = 'completed';
+        delete fresh.awaiting_confirm_at;
+        await ghUpdateIssue(o._num, JSON.stringify(fresh));
+        deleteAllComments(o._num).catch(()=>{});
+        if (fresh.taker_id && !isAdminUser()) updateCreditScore(fresh.taker_id, 1, '完成订单：' + (fresh.title || '')).catch(()=>{});
+        const uid = S.user._issue_number || S.user.student_id;
+        const isPub = (fresh.publisher_id == uid || fresh.publisher_student_id == S.user.student_id);
+        if (isPub) sendNotify('✅ 订单已自动确认', '你未在 48h 内确认，「' + (fresh.title || '') + '」已自动完成', { icon: '✅', link: 'my' });
+        else sendNotify('✅ 订单已确认完成', '发布者 48h 未确认，系统已自动确认订单「' + (fresh.title || '') + '」完成，信用分 +1', { icon: '✅', link: 'my' });
+      } catch(e) { /* 单条失败不阻断 */ }
+    }
+  } finally { _awaitConfirmBusy = false; }
+}
+
 // --- 订单状态变化检测（接收已拉数据，不额外请求） ---
 function checkOrderNotifications(issues) {
   if (!S.user || !issues) return;
@@ -5957,6 +6297,14 @@ function checkOrderNotifications(issues) {
     const prev = _knownOrders[key];
     if (prev !== undefined && prev.status !== o.status) {
       const isPublisher = (o.publisher_id == uid || o.publisher_student_id == sid);
+      // v1.18.0：交接码双向确认状态通知
+      if (o.status === 'awaiting_confirm' && prev.status === 'taken') {
+        if (isPublisher) sendNotify('📦 接单人已完成', '接单人「' + (o.taker_name || '对方') + '」已完成订单「' + (o.title || '') + '」，请确认收到', {icon:'📦', link:'my'});
+      }
+      if (o.status === 'completed' && prev.status === 'awaiting_confirm') {
+        if (isPublisher) sendNotify('✅ 订单已确认完成', '你已确认收到，订单「' + (o.title || '') + '」完成，已结算信用分', {icon:'✅', link:'my'});
+        else if (o.taker_id == uid || o.taker_student_id == sid) sendNotify('✅ 订单已确认完成', '发布者已确认收到，订单「' + (o.title || '') + '」完成，信用分 +1', {icon:'✅', link:'my'});
+      }
       if (isPublisher) {
         if (o.status === 'taken' && prev.status === 'open')
           sendNotify('📢 有人接单了', (o.taker_name || '同学') + ' 接取了你的订单「' + (o.title || '无标题') + '」', {icon:'📢', link:'my'});
@@ -6044,6 +6392,7 @@ async function runNotificationCheck() {
     checkChatNotifications(issues);
     checkRecommendedOrders(issues);
     checkOverdueOrders(issues);
+    checkAwaitingConfirmOrders(issues);   // v1.18.0 交接码 48h 自动确认
     await checkAnnouncementNotifications();
   } catch(e) {}
 }
