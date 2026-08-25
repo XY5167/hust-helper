@@ -547,7 +547,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
     </div>
     <!-- 搜索和排序 -->
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap" id="taskSearchBar">
-      <input type="text" id="taskSearchInput" placeholder="🔍 搜索标题/描述/地点..." style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card)" oninput="resetTaskPageAndApply()">
+      <input type="text" id="taskSearchInput" placeholder="🔍 搜索标题/描述/地点..." style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card)" oninput="resetTaskPageAndApply()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchEnterFeedback(this);}">
       <select id="taskDormFilter" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card);cursor:pointer" onchange="resetTaskPageAndApply()">
         <option value="">📍 全部区域</option>
         <option value="紫菘">紫菘</option>
@@ -1069,7 +1069,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.17.0';
+const APP_VERSION = '1.17.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1361,11 +1361,13 @@ async function loadOrders(type, cat) {
   _taskCurrentPage = 1;
   updateRecOnlyBtn();
 
-  // 清空搜索
-  const searchInput = document.getElementById('taskSearchInput');
-  const sortSelect = document.getElementById('taskSortSelect');
-  if (searchInput) searchInput.value = '';
-  if (sortSelect) sortSelect.value = 'newest';
+  // 仅在切换 tab（type 变化）时清空搜索/排序；同 tab 内刷新保留用户输入
+  if (_cachedType !== type) {
+    const searchInput = document.getElementById('taskSearchInput');
+    const sortSelect = document.getElementById('taskSortSelect');
+    if (searchInput) searchInput.value = '';
+    if (sortSelect) sortSelect.value = 'newest';
+  }
 
   // 1. 先尝试显示缓存数据（秒开）
   const cacheKey = 'orders_' + type;
@@ -1522,6 +1524,24 @@ function renderTaskPager(pager, totalPages, totalCount) {
 
 function gotoTaskPage(n) { _taskCurrentPage = n; applySearchAndSort(); }
 function resetTaskPageAndApply() { _taskCurrentPage = 1; applySearchAndSort(); }
+
+// 搜索框回车反馈：避免用户感觉"没反应"，给出匹配条数提示
+function searchEnterFeedback(input) {
+  const kw = (input.value || '').trim();
+  if (!kw) { toast('🔍 请输入关键词', 'info'); input.blur(); return; }
+  const k = kw.toLowerCase();
+  const orders = _cachedOrders || [];
+  const n = orders.filter(o => {
+    return (o.title || '').toLowerCase().includes(k)
+      || (o.description || '').toLowerCase().includes(k)
+      || (o.location || '').toLowerCase().includes(k)
+      || (o.publisher_name || '').toLowerCase().includes(k)
+      || (o.publisher_dorm || '').toLowerCase().includes(k)
+      || (Array.isArray(o.search_keywords) && o.search_keywords.some(x => (x || '').toLowerCase().includes(k)));
+  }).length;
+  toast('🔍 关键词「' + kw + '」匹配 ' + n + ' 条' + (n ? '' : '，可换个词试试'), n ? 'success' : 'info');
+  input.blur();
+}
 
 function applySearchAndSort() {
   if (!_cachedOrders) return;
