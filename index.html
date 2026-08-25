@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.18.0">
+<meta name="version" content="1.19.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -711,7 +711,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
       </div>
       <div class="form-group">
         <label>子分类</label>
-        <select id="publishCategory"></select>
+        <select id="publishCategory" onchange="updateFoodPublishTip()"></select>
       </div>
       <div class="form-group">
         <label>标题</label>
@@ -765,6 +765,10 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
         <label>交接码（选填，4 位数字）</label>
         <input type="text" id="publishHandoffCode" maxlength="4" placeholder="如：1234" inputmode="numeric" pattern="[0-9]*">
         <p class="form-hint">设置后，接单人点"确认完成"时需输入交接码，你再点"确认收到"，订单才真正完成。留空则不启用。</p>
+      </div>
+      <div id="foodPublishTip" style="display:none;background:#fefce8;border:1px solid #bef264;color:#3f6212;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:.82rem;line-height:1.7">
+        🍱 <strong>外卖配送建议</strong>：设置交接码并当面验收（包装/封签破损可拒收并投诉）。食品卫生由商家负责，运输损坏由骑手负责，验收后责任转移。
+        <button type="button" class="btn btn-sm" style="margin-left:8px;padding:2px 10px;font-size:.75rem;background:var(--bg-card);border:1px solid var(--border);border-radius:6px" onclick="autoGenHandoffCode()">🎲 自动生成交接码</button>
       </div>
       <div class="form-group">
         <label>图片（选填，最多6张，二手交易建议上传）</label>
@@ -898,6 +902,9 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
     <button class="modal-close" onclick="closeEstimateModal()">&times;</button>
     <h3 style="margin-bottom:6px">⏰ 预计完成时间</h3>
     <p style="font-size:.8rem;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-bottom:14px">🔒 安全提醒：请在公共地点当面交接，不预付押金，交易沟通优先使用站内私信。</p>
+    <p id="estFoodTip" style="display:none;font-size:.8rem;color:#3f6212;background:#f7fee7;border:1px solid #bef264;border-radius:8px;padding:8px 10px;margin-bottom:14px">
+      🍱 外卖配送提醒：请保持包装完整、防挤压，建议当面交付并提醒对方当面验收（封签破损可拒收并投诉）。
+    </p>
     <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:14px">接单后请在承诺时间内完成任务，超时将扣除信用分并通知双方。</p>
     <div id="estimateOptions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
       <label class="est-opt"><input type="radio" name="estPick" value="1h"> ⚡ 1 小时内</label>
@@ -930,6 +937,25 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
   </div>
 </div>
 
+<!-- 食品验收确认 Modal（v1.19.0） -->
+<div class="modal-overlay" id="acceptanceModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAcceptanceModal()">&times;</button>
+    <h3 style="margin-bottom:16px">🍱 当面验收确认</h3>
+    <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:14px">请当面检查外卖包装与封签是否完好，确认后再提交完成：</p>
+    <div style="margin-bottom:12px;padding:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:.9rem;color:#15803d">
+      ✅ 已当面验收，包装/封签完好
+    </div>
+    <p style="font-size:.8rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-bottom:14px">
+      ⚠️ 包装/封签破损可拒收并投诉。<br>食品卫生由商家负责，运输损坏由骑手负责，验收后责任转移。
+    </p>
+    <p class="form-error" id="acceptanceError" style="display:none"></p>
+    <button class="btn btn-primary btn-block" onclick="confirmFoodAcceptance()">✅ 已当面验收，确认提交</button>
+    <button class="btn btn-block" style="margin-top:8px;background:var(--bg);color:var(--text-secondary);border:1px solid var(--border)" onclick="showFoodReport()">⚠️ 包装/封签破损，去投诉</button>
+    <button class="btn btn-block" style="margin-top:8px;background:var(--bg);color:var(--text-secondary);border:1px solid var(--border)" onclick="closeAcceptanceModal()">取消</button>
+  </div>
+</div>
+
 <!-- Report Modal -->
 <div class="modal-overlay" id="reportModal">
   <div class="modal">
@@ -938,14 +964,38 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
     <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:16px">投诉对象：<strong id="reportTarget"></strong>｜订单：<strong id="reportOrderTitle"></strong></p>
     <div class="form-group">
       <label>投诉原因</label>
-      <select id="reportReason">
+      <select id="reportReason" onchange="onReportReasonChange()">
         <option value="付款金额不对">付款金额不对</option>
         <option value="付款后失联">付款后失联</option>
         <option value="未完成约定任务">未完成约定任务</option>
+        <option value="食品/质量问题">食品/质量问题</option>
         <option value="态度恶劣">态度恶劣</option>
         <option value="虚假信息">虚假信息</option>
         <option value="其他">其他</option>
       </select>
+    </div>
+    <div class="form-group" id="reportFoodGroup" style="display:none">
+      <p style="font-size:.85rem;color:#3f6212;background:#f7fee7;border:1px solid #bef264;border-radius:8px;padding:8px 10px;margin:0 0 10px">
+        🍱 食品/质量问题：食品卫生由商家负责，运输损坏由骑手负责，验收后责任转移。请尽量补充以下证据，便于快速处理：
+      </p>
+      <ul style="font-size:.8rem;color:var(--text-secondary);padding-left:18px;margin:6px 0 10px">
+        <li>📸 拍摄问题食品与包装照片（可在描述中附图片链接）</li>
+        <li>🏪 填写商家名称</li>
+        <li>📦 确认包装/封签是否破损</li>
+      </ul>
+      <div class="form-group">
+        <label>商家名称</label>
+        <input type="text" id="reportMerchantName" maxlength="50" placeholder="如：韵苑三楼 XX 窗口 / 麦当劳外卖">
+      </div>
+      <div class="form-group">
+        <label>包装/封签是否破损</label>
+        <select id="reportPackageDamaged">
+          <option value="">请选择</option>
+          <option value="yes">是，包装破损</option>
+          <option value="no">否，包装完好</option>
+          <option value="unknown">不确定</option>
+        </select>
+      </div>
     </div>
     <div class="form-group">
       <label>详细说明</label>
@@ -1095,7 +1145,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.18.0';
+const APP_VERSION = '1.19.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1853,7 +1903,7 @@ async function showDetail(issueNum) {
       : '';
     // 接单人的收款码（仅发单人可见）
     let takerPayHTML = '';
-    if ((o.status === 'taken' || o.status === 'completed') && S.user) {
+    if ((o.status === 'taken' || o.status === 'completed' || o.status === 'awaiting_confirm') && S.user) {
       const uid = S.user._issue_number || S.user.student_id;
       const sid = S.user.student_id;
       const isPublisher = (o.publisher_id == uid) || (o.publisher_id == sid) || (o.publisher_student_id == uid) || (o.publisher_student_id == sid);
@@ -2374,6 +2424,17 @@ function stopCommentPolling() {
 // ============ REPORT SYSTEM ============
 let _reportIssueNum = null;
 
+// v1.19.0：投诉原因切换 → 食品证据引导区显隐 + 描述模板
+function onReportReasonChange() {
+  const isFood = document.getElementById('reportReason').value === '食品/质量问题';
+  const g = document.getElementById('reportFoodGroup');
+  if (g) g.style.display = isFood ? 'block' : 'none';
+  const d = document.getElementById('reportDesc');
+  if (d) d.placeholder = isFood
+    ? '请描述：何时何地收到外卖、食品具体问题（变质/异物/异味/缺漏等）、是否已当场拍照留证，可粘贴图片链接…'
+    : '请详细描述问题...';
+}
+
 function showReportModal(issueNum) {
   if (!S.user) { showAuthModal(); return; }
   _reportIssueNum = issueNum;
@@ -2394,6 +2455,11 @@ function showReportModal(issueNum) {
 function closeReportModal() {
   document.getElementById('reportModal').classList.remove('active');
   _reportIssueNum = null;
+  // v1.19.0：复位食品投诉字段
+  const g = document.getElementById('reportFoodGroup'); if (g) g.style.display = 'none';
+  const mn = document.getElementById('reportMerchantName'); if (mn) mn.value = '';
+  const pd = document.getElementById('reportPackageDamaged'); if (pd) pd.value = '';
+  const d = document.getElementById('reportDesc'); if (d) d.placeholder = '请详细描述问题...';
 }
 
 async function submitReport() {
@@ -2428,13 +2494,26 @@ async function submitReport() {
       status: 'open'
     };
 
+    // ---- v1.19.0：食品投诉证据字段 ----
+    let foodExtra = '';
+    if (reason === '食品/质量问题') {
+      const mn = document.getElementById('reportMerchantName').value.trim();
+      const pd = document.getElementById('reportPackageDamaged').value;
+      const pdLabel = { yes: '是，包装破损', no: '否，包装完好', unknown: '不确定' }[pd] || '未填写';
+      foodExtra = '\n【食品投诉证据】商家：' + (mn || '未填写') + '；包装/封签破损：' + pdLabel;
+      report.food_issue = true;
+      report.merchant_name = mn || '';
+      report.package_damaged = pd || '';
+    }
+    report.description = desc + foodExtra;
+
     // ---- v1.17.0 AI 预审：先让 AI 判断，高置信自动处理，否则转人工 ----
     report.ai_review = null;
     let aiMsg = '';
     try {
       const ar = await ghApi('/api/ai/review', 'POST', {
         reason: reason || '未选择',
-        description: desc,
+        description: report.description,   // v1.19.0：AI 可见食品证据行
         order_title: o.title || '',
         target_name: targetName || '',
         reporter_name: S.user.name || ''
@@ -3691,6 +3770,7 @@ async function loadReportManagement() {
         + '</div>'
         + '<div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:4px">'
         + '📌 ' + esc(r.reason) + ' · 订单：' + esc(r.order_title || '无标题')
+        + (r.food_issue ? ' <span style="font-size:.7rem;color:#fff;background:#f59e0b;border-radius:99px;padding:1px 7px;margin-left:4px">🍱 食品问题</span>' : '')
         + '</div>'
         + '<div style="font-size:.82rem;color:var(--text-muted);margin-bottom:4px;white-space:pre-wrap">' + esc(r.description || '') + '</div>'
         + (r.ai_review ? aiReviewCardHTML(r, isOpen) : '')
@@ -3723,7 +3803,7 @@ async function loadReportManagement() {
           + '<div><strong>' + esc(r.target_name) + '</strong> <span style="font-size:.82rem;color:var(--text-muted)">被 ' + esc(r.reporter_name) + ' 投诉</span></div>'
           + '<span style="font-size:.8rem">' + statusLabel + '</span>'
           + '</div>'
-          + '<div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:4px">📌 ' + esc(r.reason) + ' · 订单：' + esc(r.order_title || '无标题') + '</div>'
+          + '<div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:4px">📌 ' + esc(r.reason) + ' · 订单：' + esc(r.order_title || '无标题') + (r.food_issue ? ' <span style="font-size:.7rem;color:#fff;background:#f59e0b;border-radius:99px;padding:1px 7px;margin-left:4px">🍱 食品问题</span>' : '') + '</div>'
           + '<div style="font-size:.82rem;color:var(--text-muted);margin-bottom:4px;white-space:pre-wrap">' + esc(r.description || '') + '</div>'
           + (r.resolution_note ? '<div style="font-size:.82rem;color:var(--text-secondary);margin-bottom:6px;background:#f8fafc;padding:8px;border-radius:6px;border-left:3px solid var(--primary)">📝 ' + esc(r.resolution_note) + '</div>' : '')
           + '<div style="font-size:.75rem;color:var(--text-muted)">' + timeAgo(r.created_at) + '</div>'
@@ -3917,13 +3997,23 @@ async function takeOrder(inum) {
 // ---- 预计完成时间选择（v1.17.0）----
 let _pendingTakeNum = null;
 
-function openEstimateModal() {
+async function openEstimateModal() {
   const m = document.getElementById('estimateModal');
   if (!m) { confirmTakeOrder(); return; } // 兜底：找不到弹窗则直接按默认 1 天接单
   document.getElementById('estimateError').style.display = 'none';
   document.getElementById('estimateOptions').style.display = 'flex';
   const r1 = document.querySelector('input[name=estPick][value="1day"]');
   if (r1) r1.checked = true;
+  // v1.19.0：外卖订单显示食品配送提示（拉取失败不阻断接单）
+  const tip = document.getElementById('estFoodTip');
+  if (tip) {
+    tip.style.display = 'none';
+    try {
+      const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + _pendingTakeNum, { headers: {} });
+      const o = JSON.parse((await res.json()).body);
+      tip.style.display = isFoodOrder(o) ? 'block' : 'none';
+    } catch(e) {}
+  }
   m.classList.add('active');
 }
 
@@ -4030,31 +4120,74 @@ const AWAIT_CONFIRM_TIMEOUT = 48 * 60 * 60 * 1000; // 发布者 48h 未确认自
 let _pendingCompleteNum = null;                 // 待完成的订单 issue number
 let _handoffAttemptCount = 0;                   // 会话内输错次数
 
+// ---- v1.19.0 外卖食品验收 ----
+function isFoodOrder(o) { return !!(o && o.type === 'task' && o.category === 'food'); }
+let _pendingAcceptanceNum = null;   // 待验收的外卖订单 issue number
+
 async function completeOrder(inum) {
   if (!S.user) { showAuthModal(); return; }
-  if (!confirm('确认订单已完成？')) return;
   try {
     const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, { headers: {} });
     const o = JSON.parse((await res.json()).body);
     if (o.status !== 'taken') { toast('订单状态不正确', 'error'); return; }
     if (o.taker_id != (S.user._issue_number || S.user.student_id)) { toast('只有接单人可确认完成', 'error'); return; }
-    if (o.handoff_code) {
-      _pendingCompleteNum = inum;
-      _handoffAttemptCount = 0;
-      const hInput = document.getElementById('handoffCodeInput');
-      if (hInput) hInput.value = '';
-      const hErr = document.getElementById('handoffError');
-      if (hErr) hErr.style.display = 'none';
-      document.getElementById('handoffModal').classList.add('active');
-    } else {
-      await submitCompleteOrder(inum, false);
+    // v1.19.0：外卖单先当面验收（跳过原生 confirm，验收弹窗即确认）
+    if (isFoodOrder(o)) {
+      _pendingAcceptanceNum = inum;
+      openAcceptanceModal();
+      return;
     }
+    if (!confirm('确认订单已完成？')) return;
+    if (o.handoff_code) openHandoffModal(inum);
+    else await submitCompleteOrder(inum, false);
   } catch(e) { toast(e.message, 'error'); }
 }
 
 function closeHandoffModal() {
   document.getElementById('handoffModal').classList.remove('active');
   _pendingCompleteNum = null;
+}
+
+// ---- v1.19.0 外卖当面验收 ----
+function openHandoffModal(inum) {
+  _pendingCompleteNum = inum;
+  _handoffAttemptCount = 0;
+  const hInput = document.getElementById('handoffCodeInput');
+  if (hInput) hInput.value = '';
+  const hErr = document.getElementById('handoffError');
+  if (hErr) hErr.style.display = 'none';
+  document.getElementById('handoffModal').classList.add('active');
+}
+function openAcceptanceModal() {
+  const m = document.getElementById('acceptanceModal');
+  if (m) m.classList.add('active');
+}
+function closeAcceptanceModal() {
+  const m = document.getElementById('acceptanceModal');
+  if (m) m.classList.remove('active');
+  _pendingAcceptanceNum = null;
+}
+function confirmFoodAcceptance() {
+  const inum = _pendingAcceptanceNum;
+  if (!inum) { closeAcceptanceModal(); return; }
+  closeAcceptanceModal();
+  completeAfterAcceptance(inum);
+}
+// 验收通过 → 继续原完成流程（有交接码走交接码，无则直接完成）
+async function completeAfterAcceptance(inum) {
+  try {
+    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, { headers: {} });
+    const o = JSON.parse((await res.json()).body);
+    if (o.status !== 'taken') { toast('订单状态不正确', 'error'); return; }
+    if (o.handoff_code) openHandoffModal(inum);
+    else await submitCompleteOrder(inum, false);
+  } catch(e) { toast(e.message, 'error'); }
+}
+// 破损拒收 → 直接打开投诉弹窗
+function showFoodReport() {
+  const inum = _pendingAcceptanceNum;
+  closeAcceptanceModal();
+  if (inum) showReportModal(inum);
 }
 
 async function confirmHandoffCode() {
@@ -4844,6 +4977,19 @@ function updatePublishCategories() {
     bountyInput.value = '';
     bountyInput.required = false;
   }
+  updateFoodPublishTip();   // v1.19.0：外卖发布提示显隐
+}
+
+// ---- v1.19.0 发布弹窗外卖提示（task + food 时显示）----
+function updateFoodPublishTip() {
+  const t = document.getElementById('publishType').value;
+  const c = document.getElementById('publishCategory').value;
+  const tip = document.getElementById('foodPublishTip');
+  if (tip) tip.style.display = (t === 'task' && c === 'food') ? 'block' : 'none';
+}
+function autoGenHandoffCode() {
+  const el = document.getElementById('publishHandoffCode');
+  if (el) el.value = String(Math.floor(1000 + Math.random() * 9000));
 }
 
 // 问答悬赏开关：勾选后显示金额输入框
