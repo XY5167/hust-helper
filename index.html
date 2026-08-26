@@ -258,6 +258,40 @@ html[data-theme="dark"] .modal { color: var(--text); }
 .empty-state-icon{font-size:2.8rem;margin-bottom:14px}
 .empty-state p{font-size:.9rem}
 .empty-state .btn{margin-top:18px}
+/* ===== 我的页 redesign (v1.23.0) ===== */
+.my-usercard{display:flex;align-items:center;gap:14px;background:var(--primary);background-image:linear-gradient(135deg,rgba(255,255,255,.20),rgba(255,255,255,0) 60%);color:#fff;border-radius:var(--radius);padding:18px;margin-bottom:16px;cursor:pointer;position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent}
+.my-usercard:active{transform:scale(.99)}
+.my-avatar{width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;flex:0 0 auto;border:2px solid rgba(255,255,255,.5)}
+.my-userinfo{flex:1 1 auto;min-width:0}
+.my-username{font-size:1.15rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.my-userbadges{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.ub{font-size:.68rem;padding:2px 8px;border-radius:99px;background:rgba(255,255,255,.22);color:#fff;font-weight:600}
+.ub-vip{background:#f59e0b;color:#fff}
+.ub-runner{background:#0ea5e9;color:#fff}
+.my-credit{flex:0 0 auto;text-align:center;padding-left:6px}
+.my-credit-num{font-size:1.5rem;font-weight:800;line-height:1}
+.my-credit-label{font-size:.7rem;opacity:.85;margin-top:2px}
+.my-arrow{position:absolute;right:14px;top:14px;font-size:1.2rem;transition:transform .2s}
+.my-profile{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.my-orders-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.my-orders-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.my-orders-title{font-size:1rem;font-weight:700}
+.my-orders-all{font-size:.8rem;color:var(--primary);text-decoration:none}
+.my-status-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.my-status-chip{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:10px 4px;cursor:pointer;transition:.15s;color:var(--text-secondary);font-family:inherit}
+.my-status-chip:active{transform:scale(.96)}
+.my-status-chip.active{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 10%,var(--bg-card));color:var(--primary)}
+.my-chip-ic{font-size:1.25rem;line-height:1}
+.my-chip-label{font-size:.72rem;font-weight:600}
+.my-chip-num{font-size:.7rem;font-weight:700;color:var(--primary);background:color-mix(in srgb,var(--primary) 14%,transparent);border-radius:99px;padding:0 7px;min-width:18px;text-align:center}
+.my-status-chip.active .my-chip-num{background:var(--primary);color:#fff}
+.my-invite{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fde68a;border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.my-invite-left{flex:1 1 200px;min-width:0}
+.my-invite-title{font-weight:700;color:#92400e;font-size:.95rem}
+.my-invite-desc{font-size:.78rem;color:#92400e;opacity:.85;margin-top:4px}
+.my-invite-link{width:100%;font-size:.72rem;color:#92400e;opacity:.7;word-break:break-all;margin-top:2px}
+.my-runner{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.my-apply-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 /* 骨架屏 */
 .skeleton{background:linear-gradient(90deg,var(--bg-hover) 25%,var(--bg-card) 50%,var(--bg-hover) 75%);background-size:200% 100%;animation:sk-shimmer 1.4s ease-in-out infinite;border-radius:6px}
 @keyframes sk-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -818,11 +852,20 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
 
 <section class="page" id="page-my" style="display:none">
   <div class="container">
-    <div class="page-header">
-      <h2>👤 我的</h2>
-      <p>管理个人信息、收款方式和订单。</p>
+    <!-- 用户卡片 -->
+    <div class="my-usercard" id="myUserCard" onclick="toggleMyProfile()" role="button" tabindex="0" aria-label="展开或收起个人资料" onkeydown="if(event.key==='Enter'||event.key===' ')toggleMyProfile()">
+      <div class="my-avatar" id="myAvatar">?</div>
+      <div class="my-userinfo">
+        <div class="my-username" id="myUserName">未登录</div>
+        <div class="my-userbadges" id="myUserBadges"></div>
+      </div>
+      <div class="my-credit">
+        <div class="my-credit-num" id="myCreditNum">100</div>
+        <div class="my-credit-label">信用分</div>
+      </div>
+      <span class="my-arrow" id="myArrow">⌄</span>
     </div>
-    <div id="myProfile" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;display:none">
+    <div id="myProfile" class="my-profile" style="display:none">
       <h3 style="font-size:1.1rem;margin-bottom:16px">个人信息 <span id="myVipBadge" style="display:none;color:#f59e0b;font-size:.85rem">⭐ 会员</span></h3>
       <div class="form-group">
         <label>微信收款码 / 支付宝收款信息</label>
@@ -844,13 +887,32 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
       <p class="form-error" id="myNicknameError" style="display:none"></p>
       <div id="myPaymentPreview" style="margin-top:12px"></div>
     </div>
-    <div id="inviteCard" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px">
-      <h3 style="font-size:1.05rem;margin-bottom:6px">📢 邀请同学</h3>
-      <p class="form-hint" style="margin-bottom:10px">把华科校园互助分享给同学：代取快递/外卖、二手教材、有问必答都能用，同楼栋优先派单。</p>
-      <button type="button" class="btn btn-primary btn-sm" onclick="copyInviteText()">📋 复制邀请文案</button>
-      <p class="form-hint" style="margin-top:8px;word-break:break-all">邀请链接：https://xy5167.github.io/hust-helper/</p>
+    <!-- 我的订单 -->
+    <div class="my-orders-card">
+      <div class="my-orders-head">
+        <span class="my-orders-title">我的订单</span>
+        <a href="javascript:void(0)" class="my-orders-all" onclick="setMyStatusFilter('all');return false">全部订单 ›</a>
+      </div>
+      <div class="my-status-row" id="myStatusRow">
+        <button class="my-status-chip active" data-st="all" onclick="setMyStatusFilter('all')"><span class="my-chip-ic">📋</span><span class="my-chip-label">全部</span><span class="my-chip-num" id="cnt-all">0</span></button>
+        <button class="my-status-chip" data-st="open" onclick="setMyStatusFilter('open')"><span class="my-chip-ic">📝</span><span class="my-chip-label">待接单</span><span class="my-chip-num" id="cnt-open">0</span></button>
+        <button class="my-status-chip" data-st="taken" onclick="setMyStatusFilter('taken')"><span class="my-chip-ic">🛵</span><span class="my-chip-label">进行中</span><span class="my-chip-num" id="cnt-taken">0</span></button>
+        <button class="my-status-chip" data-st="awaiting_confirm" onclick="setMyStatusFilter('awaiting_confirm')"><span class="my-chip-ic">✅</span><span class="my-chip-label">待确认</span><span class="my-chip-num" id="cnt-awaiting_confirm">0</span></button>
+        <button class="my-status-chip" data-st="completed" onclick="setMyStatusFilter('completed')"><span class="my-chip-ic">📦</span><span class="my-chip-label">已完成</span><span class="my-chip-num" id="cnt-completed">0</span></button>
+      </div>
     </div>
-    <div id="runnerTakePanel" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;display:none">
+    <div id="myOrdersList">
+      <p style="color:var(--text-secondary)">请先登录...</p>
+    </div>
+    <div id="inviteCard" class="my-invite">
+      <div class="my-invite-left">
+        <div class="my-invite-title">📢 邀请同学</div>
+        <div class="my-invite-desc">把华科校园互助分享给同学：代取快递/外卖、二手教材、有问必答都能用，同楼栋优先派单。</div>
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" onclick="copyInviteText()">📋 复制</button>
+      <div class="my-invite-link">邀请链接：https://xy5167.github.io/hust-helper/</div>
+    </div>
+    <div id="runnerTakePanel" class="my-runner" style="display:none">
       <h3 style="font-size:1.05rem;margin-bottom:6px">🛵 跑腿接单设置<span id="runnerAvailDot" class="runner-avail-dot" style="display:none"></span></h3>
       <p class="form-hint" style="margin-bottom:14px">亮起绿灯后，系统会按你的接单喜好智能匹配新订单，并通过站内通知推送给你。</p>
       <label class="runner-avail-toggle">
@@ -896,22 +958,10 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
         <p class="form-error" id="takePrefsError" style="display:none"></p>
       </div>
     </div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
-      <button class="btn btn-outline btn-sm" onclick="showVipApply()" style="display:none" id="btnVipApply">⭐ 申请开通会员</button>
-      <button class="btn btn-outline btn-sm" onclick="showRunnerApply()" style="display:none" id="btnRunnerApply">🛵 申请跑腿认证</button>
+    <div class="my-apply-row">
+      <button class="btn btn-outline btn-sm" onclick="showVipApply()" style="display:none" id="btnVipApply">⭐ 开通会员</button>
+      <button class="btn btn-outline btn-sm" onclick="showRunnerApply()" style="display:none" id="btnRunnerApply">🛵 跑腿认证</button>
       <button class="btn btn-outline btn-sm" onclick="showReportsView()" style="display:none" id="btnReports">📋 反馈中心</button>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0" id="myOrderTabs">
-      <button class="tab-btn active" data-mytab="all" onclick="switchMyTab('all')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:600;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px">全部</button>
-      <button class="tab-btn" data-mytab="published" onclick="switchMyTab('published')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px">我发布的</button>
-      <button class="tab-btn" data-mytab="taken" onclick="switchMyTab('taken')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px">我接单的</button>
-    </div>
-    <div id="myPublishedSubTabs" style="display:none;gap:8px;margin-bottom:12px;margin-top:-8px;padding-left:8px">
-      <button class="sub-tab-btn" data-subtab="order" onclick="switchMyPublishedSubTab('order')" style="background:none;border:none;padding:6px 14px;font-size:.85rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-radius:99px;border:1px solid var(--border)">普通订单</button>
-      <button class="sub-tab-btn" data-subtab="chat" onclick="switchMyPublishedSubTab('chat')" style="background:none;border:none;padding:6px 14px;font-size:.85rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-radius:99px;border:1px solid var(--border)">私信对话</button>
-    </div>
-    <div id="myOrdersList">
-      <p style="color:var(--text-secondary)">请先登录...</p>
     </div>
   </div>
 </section>
@@ -1175,7 +1225,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.22.0';
+const APP_VERSION = '1.23.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -4198,7 +4248,7 @@ function optimisticUpdateMyOrder(inum, newStatus) {
     if (idx >= 0) {
       if (newStatus) _cachedMyOrders[idx].status = newStatus;
       else _cachedMyOrders.splice(idx, 1);
-      renderMyOrders(_cachedMyOrders, S.myTab, S.myPublishedSubTab);
+      renderMyOrdersWithFilter();
     }
   }
   if (_cachedOrders) {
@@ -5459,7 +5509,7 @@ async function loadMyOrders(myTab) {
     return;
   }
 
-  if (profile) profile.style.display = 'block';
+  /* myProfile 默认收起，由顶部用户卡片点击展开，不在此强制显示 */
   if (tabsEl) tabsEl.style.display = 'flex';
   if (btnReports) btnReports.style.display = 'inline-flex';
   // VIP 标识
@@ -5474,9 +5524,10 @@ async function loadMyOrders(myTab) {
     btnRunnerApply.style.display = (S.user.status === 'approved' && !S.user.runner_verified) ? 'inline-flex' : 'none';
   }
 
-  const tab = myTab || S.myTab || 'all';
-  S.myTab = tab;
-  const subTab = S.myPublishedSubTab || 'order';
+  const tab = 'all';
+  S.myTab = 'all';
+  if (!S.myPublishedSubTab) S.myPublishedSubTab = 'order';
+  const subTab = S.myPublishedSubTab;
 
   // 显示当前收款信息
   const paymentInput = document.getElementById('myPaymentInfo');
@@ -5554,11 +5605,13 @@ async function loadMyOrders(myTab) {
   if (cached && cached.length > 0) {
     _cachedMyOrders = cached;
     _cachedMyTab = tab;
-    renderMyOrders(cached, tab, subTab);
+    updateMyStatusCounts(cached);
+    fillMyUserCard();
+    renderMyOrdersWithFilter();
   }
   if (!cached) {
     // 无localStorage缓存：若内存有乐观更新缓存则先用，否则显示加载中
-    if (_cachedMyOrders) renderMyOrders(_cachedMyOrders, tab, subTab);
+    if (_cachedMyOrders) { updateMyStatusCounts(_cachedMyOrders); fillMyUserCard(); renderMyOrdersWithFilter(); }
     else listEl.innerHTML = skeletonCards(4);
   }
 
@@ -5610,7 +5663,9 @@ async function loadMyOrders(myTab) {
     _cachedMyOrders = orders;
     _cachedMyTab = tab;
     cacheSet(cacheKey, orders);
-    renderMyOrders(orders, tab, subTab);
+    updateMyStatusCounts(orders);
+    fillMyUserCard();
+    renderMyOrdersWithFilter();
   } catch(e) {
     if (!cached) listEl.innerHTML = '<p style="color:var(--danger)">加载失败：' + esc(e.message) + '</p>';
   }
@@ -5624,6 +5679,68 @@ function switchMyTab(tab) {
 function switchMyPublishedSubTab(sub) {
   S.myPublishedSubTab = sub;
   loadMyOrders('published');
+}
+
+// ============ 我的页 redesign (v1.23.0)：用户卡片 + 订单状态快捷入口 ============
+function fillMyUserCard() {
+  const u = S.user; if (!u) return;
+  const name = u.nickname || u.name || u.student_id || '我';
+  const nameEl = document.getElementById('myUserName');
+  if (nameEl) nameEl.textContent = name;
+  const av = document.getElementById('myAvatar');
+  if (av) av.textContent = (name || '?').slice(0, 1);
+  const credit = (u.credit_score != null) ? u.credit_score : 100;
+  const cEl = document.getElementById('myCreditNum');
+  if (cEl) cEl.textContent = credit;
+  const badges = [];
+  if (u.status === 'approved' || u.name) badges.push('<span class="ub ub-verified">已实名</span>');
+  if (isVIP()) badges.push('<span class="ub ub-vip">⭐ 会员</span>');
+  if (u.runner_verified) badges.push('<span class="ub ub-runner">🛵 认证跑腿</span>');
+  const bEl = document.getElementById('myUserBadges');
+  if (bEl) bEl.innerHTML = badges.join('');
+}
+
+function updateMyStatusCounts(orders) {
+  const c = { all: orders.length, open: 0, taken: 0, awaiting_confirm: 0, completed: 0 };
+  orders.forEach(o => {
+    if (!o || o.type === 'chat') return;
+    if (c[o.status] !== undefined) c[o.status]++;
+  });
+  ['all', 'open', 'taken', 'awaiting_confirm', 'completed'].forEach(k => {
+    const el = document.getElementById('cnt-' + k);
+    if (el) el.textContent = c[k] || 0;
+  });
+}
+
+function updateMyStatusChips() {
+  const f = S.myStatusFilter || 'all';
+  document.querySelectorAll('#myStatusRow .my-status-chip').forEach(b => {
+    b.classList.toggle('active', b.dataset.st === f);
+  });
+}
+
+function renderMyOrdersWithFilter() {
+  if (_cachedMyOrders == null) return;
+  const f = S.myStatusFilter || 'all';
+  let list = _cachedMyOrders;
+  if (f !== 'all') list = list.filter(o => o && o.type !== 'chat' && o.status === f);
+  renderMyOrders(list, 'all', S.myPublishedSubTab || 'order');
+  updateMyStatusChips();
+}
+
+function setMyStatusFilter(st) {
+  S.myStatusFilter = st;
+  if (_cachedMyOrders != null) renderMyOrdersWithFilter();
+  else updateMyStatusChips();
+}
+
+function toggleMyProfile() {
+  const p = document.getElementById('myProfile');
+  if (!p) return;
+  const open = p.style.display === 'block';
+  p.style.display = open ? 'none' : 'block';
+  const arrow = document.getElementById('myArrow');
+  if (arrow) arrow.style.transform = open ? '' : 'rotate(180deg)';
 }
 
 async function saveMyPayment() {
