@@ -1348,7 +1348,7 @@ const APP_VERSION = '1.24.2';
     }).catch(()=>{});
 })();
 
-const CACHE_TTL = { orders: 60000, stats: 120000, users: 120000, myorders: 60000 };
+const CACHE_TTL = { orders: 60000, stats: 120000, users: 120000, myorders: 60000, statspage: 60000 };
 function cacheGet(key) {
   try {
     const item = localStorage.getItem('hust_c_' + key);
@@ -1583,10 +1583,16 @@ async function loadStats() {
 }
 
 // ===== v1.22.0 运营数据看板（借鉴暖坞组"量化验证判据"）=====
-async function loadStatsPage() {
+async function loadStatsPage(forceFresh) {
   const cards = document.getElementById('statsCards');
   const detail = document.getElementById('statsDetail');
   if (!cards || !detail) return;
+  if (!forceFresh) {
+    const cached = cacheGet('statspage');
+    if (cached) { renderStatsPage(cached); return; }
+  } else {
+    cacheBust('statspage');
+  }
   cards.innerHTML = '<p class="form-hint">加载中…</p>';
   detail.innerHTML = '<p class="form-hint">加载中…</p>';
   let users = 0;
@@ -1617,6 +1623,8 @@ async function loadStatsPage() {
   };
   const inProgress = (stat.state.taken || 0) + (stat.state.awaiting_confirm || 0);
   cards.innerHTML = statCard(users, '注册用户') + statCard(stat.total, '总订单') + statCard(inProgress, '进行中') + statCard(stat.state.completed || 0, '已完成');
+  // 收集原始订单列表用于"清理过期/取消"按钮
+  stat._rawOrders = orderList || [];
   const barRow = function(label, num, pct) {
     return '<div style="margin-bottom:12px">'
       + '<div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--text-secondary);margin-bottom:4px"><span>' + esc(label) + '</span><span>' + num + ' · ' + pct + '%</span></div>'
@@ -1638,8 +1646,137 @@ async function loadStatsPage() {
   h += barRow('推荐没用', stat.rec.down, totalFb ? Math.round(stat.rec.down / totalFb * 100) : 0);
   h += '<p class="form-hint" style="margin-top:8px">采纳率 ' + acc + '%（共 ' + totalFb + ' 条反馈）· 数据说话，决定下一步先做哪个功能</p>';
   detail.innerHTML = h;
+  // 写缓存（60 秒内重复打开秒开）
+  try { cacheSet('statspage', { users, stat, ts: Date.now() }); } catch(e) {}
+  _statsLastUsers = users;
+  _statsLastStat = stat;
+}
+
+function renderStatsPage(payload) {
+  const cards = document.getElementById('statsCards');
+  const detail = document.getElementById('statsDetail');
+  if (!cards || !detail) return;
+  const users = payload.users || 0;
+  const stat = payload.stat || { cat: {}, state: {}, total: 0, rec: { up: 0, down: 0 } };
+  _statsLastUsers = users;
+  _statsLastStat = stat;
+  const statCard = function(num, label) {
+    return '<div style="flex:1;min-width:110px;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center">'
+      + '<div style="font-size:1.5rem;font-weight:700;color:var(--primary)">' + num + '</div>'
+      + '<div style="font-size:.75rem;color:var(--text-secondary);margin-top:4px">' + label + '</div></div>';
+  };
+  const inProgress = (stat.state.taken || 0) + (stat.state.awaiting_confirm || 0);
+  cards.innerHTML = statCard(users, '注册用户') + statCard(stat.total, '总订单') + statCard(inProgress, '进行中') + statCard(stat.state.completed || 0, '已完成');
+  const catMap = { task: '跑腿代办', secondhand: '出售转让', borrow: '短期租借', qa: '有问必答', find: '找人组队', express: '代拿快递', food: '代取外卖', buy: '帮买帮送', print: '帮忙打印', repair: '维修', book: '教材书籍', electronic: '电子产品', daily: '生活用品', team: '竞赛组队', carpool: '出行拼车', survey: '问卷招募' };
+  const stateMap = { open: '待接单', taken: '进行中', awaiting_confirm: '待确认', completed: '已完成', cancelled: '已取消', expired: '已过期' };
+  const barRow = function(label, num, pct) {
+    return '<div style="margin-bottom:12px">'
+      + '<div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--text-secondary);margin-bottom:4px"><span>' + esc(label) + '</span><span>' + num + ' · ' + pct + '%</span></div>'
+      + '<div style="height:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:99px;overflow:hidden"><div style="height:100%;width:' + Math.max(2, pct) + '%;background:var(--primary);border-radius:99px"></div></div>'
+      + '</div>';
+  };
+  let h = '<h3 style="font-size:1rem;margin-bottom:12px">品类分布</h3>';
+  for (const k in stat.cat) h += barRow(catMap[k] || k, stat.cat[k], stat.total ? Math.round(stat.cat[k] / stat.total * 100) : 0);
+  h += '<h3 style="font-size:1rem;margin:16px 0 12px">状态分布</h3>';
+  for (const k in stat.state) h += barRow(stateMap[k] || k, stat.state[k], stat.total ? Math.round(stat.state[k] / stat.total * 100) : 0);
+  const totalFb = (stat.rec && stat.rec.up || 0) + (stat.rec && stat.rec.down || 0);
+  const acc = totalFb ? Math.round((stat.rec.up || 0) / totalFb * 100) : 0;
+  h += '<h3 style="font-size:1rem;margin:16px 0 12px">智能推单采纳率 <span class="form-hint" style="display:inline;font-size:.75rem">（本机数据）</span></h3>';
+  h += barRow('推荐有用', stat.rec.up || 0, totalFb ? Math.round((stat.rec.up || 0) / totalFb * 100) : 0);
+  h += barRow('推荐没用', stat.rec.down || 0, totalFb ? Math.round((stat.rec.down || 0) / totalFb * 100) : 0);
+  h += '<p class="form-hint" style="margin-top:8px">采纳率 ' + acc + '%（共 ' + totalFb + ' 条反馈）· 数据说话，决定下一步先做哪个功能</p>';
+  // 管理员专属操作区
+  if (isAdminUser()) {
+    const garbage = (stat.state.expired || 0) + (stat.state.cancelled || 0);
+    h += '<hr style="border:none;border-top:1px solid var(--border);margin:18px 0">'
+      + '<h3 style="font-size:1rem;margin-bottom:8px">🛠️ 管理员操作</h3>'
+      + '<p class="form-hint" style="margin-bottom:10px">检测到 <strong style="color:#d97706">' + garbage + '</strong> 条已过期/已取消的"垃圾"订单。可一键关闭（在 GitHub Issues 里标记为 closed，下一次同步即从列表消失）。<br>'
+      + '⚠️ <strong>关闭后不可逆</strong>，且会一并清除这些订单下面的所有评论/私信。如不确定，先导出一份标题清单留底。</p>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      + '<button class="btn btn-outline btn-sm" onclick="exportStaleOrdersList()">📋 导出清单留底</button>'
+      + '<button class="btn btn-sm" style="background:#dc2626;color:#fff;border-color:#dc2626" onclick="cleanupStaleOrders()">🗑️ 清理过期/取消订单</button>'
+      + '<button class="btn btn-outline btn-sm" onclick="loadStatsPage(true)">🔄 强制刷新数据</button>'
+      + '</div>';
+  }
+  detail.innerHTML = h;
 }
 window.loadStatsPage = loadStatsPage;
+
+// v1.24.3 数据看板辅助：缓存上次统计/原始订单，给清理功能用
+let _statsLastUsers = 0;
+let _statsLastStat = null;
+window._statsLastStat = null;  // 给清理按钮全局访问
+
+// 导出"过期/取消"订单清单到剪贴板（管理员留底用）
+async function exportStaleOrdersList() {
+  if (!isAdminUser()) { toast('仅管理员可用', 'error'); return; }
+  const stat = window._statsLastStat;
+  if (!stat || !stat._rawOrders) { toast('暂无缓存数据，请先刷新看板', 'error'); return; }
+  const list = (stat._rawOrders || []).map(i => {
+    let o = null; try { o = JSON.parse(i.body); } catch(e) {}
+    const st = (o && o.status) || '?';
+    return `[#${i.number}] [${st}] ${(o && o.title) || i.title || '(无标题)'} — ${(o && o.created_at) || i.created_at || ''}`;
+  });
+  const garbage = list.filter(l => /\[(expired|cancelled)\]/.test(l));
+  const dtStr = new Date().toLocaleString('zh-CN');
+  const lines = [
+    '# HUST-Helper 过期/取消订单留底清单 - 生成于 ' + dtStr,
+    '',
+    '总订单数: ' + (window._statsLastStat.total || 0) + '  待清理(过期+取消): ' + garbage.length,
+    ''
+  ];
+  for (let k = 0; k < garbage.length; k++) lines.push(garbage[k]);
+  lines.push('', '----', '完整订单列表(留作对照):');
+  for (let k = 0; k < list.length; k++) lines.push(list[k]);
+  const text = lines.join('\n');
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      toast('已复制 ' + garbage.length + ' 条过期/取消订单清单到剪贴板', 'success');
+    } else { throw new Error('no clipboard'); }
+  } catch (e) {
+    if (typeof showTextModal === 'function') {
+      showTextModal('过期/取消订单清单（' + garbage.length + ' 条）', text);
+    } else {
+      alert('已生成 ' + garbage.length + ' 条清单（无法复制到剪贴板）。请查看 console。');
+      console.log(text);
+    }
+  }
+}
+
+// 一键清理过期/取消订单（管理员）
+async function cleanupStaleOrders() {
+  if (!isAdminUser()) { toast('仅管理员可用', 'error'); return; }
+  const stat = window._statsLastStat;
+  if (!stat || !stat._rawOrders) { toast('暂无缓存数据，请先刷新看板', 'error'); return; }
+  const targets = (stat._rawOrders || []).filter(i => {
+    let o = null; try { o = JSON.parse(i.body); } catch (e) {}
+    return o && (o.status === 'expired' || o.status === 'cancelled');
+  });
+  if (targets.length === 0) { toast('没有需要清理的过期/取消订单', 'success'); return; }
+  // 二次确认（confirm 不可逆警告）
+  const ok = confirm('即将关闭 ' + targets.length + ' 条过期/取消订单（这些 issue 会被标记为 closed，下次同步即从列表消失）。\n\n关闭后不可逆！如不确定，请先点 [导出清单留底]。\n\n确认执行？');
+  if (!ok) return;
+  // 分批关闭（每批 5 个，限速防 API 限流）
+  let okN = 0, failN = 0;
+  const btn = document.querySelector('button[onclick="cleanupStaleOrders()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '清理中… 0/' + targets.length; }
+  for (let i = 0; i < targets.length; i++) {
+    try {
+      await ghCloseIssue(targets[i].number);
+      okN++;
+    } catch (e) {
+      console.error('close #' + targets[i].number + ' failed', e);
+      failN++;
+    }
+    if (btn) btn.textContent = '清理中… ' + (i + 1) + '/' + targets.length;
+    if ((i + 1) % 5 === 0) await new Promise(r => setTimeout(r, 800));
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '🗑️ 清理过期/取消订单'; }
+  toast('清理完成：成功 ' + okN + '，失败 ' + failN, failN ? 'error' : 'success');
+  cacheBust('statspage');
+  loadStatsPage(true);
+}
 
 // ============ ORDERS ============
 let _cachedOrders = null;
