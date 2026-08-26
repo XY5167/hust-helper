@@ -455,6 +455,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
   <a href="#" class="bottom-nav-item active" data-page="home" onclick="navigate('home');return false"><span class="bi">🏠</span><span>首页</span></a>
   <a href="#" class="bottom-nav-item" data-page="task" onclick="navigate('task');return false"><span class="bi">📋</span><span>任务</span></a>
   <a href="#" class="bottom-nav-item" data-page="my" onclick="navigate('my');return false"><span class="bi">👤</span><span>我的</span></a>
+  <a href="#" class="bottom-nav-item" data-page="stats" onclick="navigate('stats');return false"><span class="bi">📊</span><span>数据</span></a>
 </nav>
 
 <div class="notify-panel" id="notifyPanel">
@@ -720,6 +721,19 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
         <input type="text" id="publishTitle" required maxlength="50" placeholder="简要描述你的需求" oninput="updateCharCount('publishTitle','titleCount',50)">
         <span class="char-count" id="titleCount">0/50</span>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>报酬 (¥)</label>
+          <input type="number" id="publishPrice" required placeholder="金额" step="0.01" min="1" oninput="checkPublishPrice()">
+          <p class="form-hint" id="publishPriceWarn" style="display:none"></p>
+        </div>
+        <div class="form-group">
+          <label>地点</label>
+          <input type="text" id="publishLocation" placeholder="如：韵苑/紫菘/东校区">
+        </div>
+      </div>
+      <details id="publishMore" style="margin-top:12px">
+        <summary style="cursor:pointer;user-select:none;color:var(--text-secondary);font-size:.85rem;padding:6px 0">⚙️ 详细描述 / 图片 / 更多选项（选填，传图可自动识别关键词）</summary>
       <div class="form-group">
         <label>详细描述</label>
         <textarea id="publishDesc" rows="3" maxlength="500" placeholder="详细说明需求、地点等" oninput="updateCharCount('publishDesc','descCount',500)"></textarea>
@@ -732,17 +746,6 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
         </label>
         <input type="number" id="publishBounty" placeholder="悬赏金额 ¥" step="0.01" min="0.01" style="display:none">
         <p class="form-hint">悬赏金额会展示在问题卡片上。采纳最佳答案后，赏金通过站内收款信息线下支付（与跑腿收款方式一致）。</p>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>报酬 (¥)</label>
-          <input type="number" id="publishPrice" required placeholder="金额" step="0.01" min="1" oninput="checkPublishPrice()">
-          <p class="form-hint" id="publishPriceWarn" style="display:none"></p>
-        </div>
-        <div class="form-group">
-          <label>地点</label>
-          <input type="text" id="publishLocation" placeholder="如：韵苑/紫菘/东校区">
-        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -791,6 +794,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
           </details>
         </div>
       </div>
+      </details>
       <p class="form-hint" id="publishFeeHint" style="display:none"></p>
       <p class="form-error" id="publishError"></p>
       <button type="submit" class="btn btn-primary btn-block">发布</button>
@@ -798,6 +802,19 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
   </div>
 </div>
 
+
+<section class="page" id="page-stats" style="display:none">
+  <div class="container">
+    <div class="page-header">
+      <h2>📊 数据看板</h2>
+      <p>平台运营数据一览，用数据驱动迭代。</p>
+    </div>
+    <div id="statsCards" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px"></div>
+    <div id="statsDetail" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px">
+      <p class="form-hint">加载中…</p>
+    </div>
+  </div>
+</section>
 
 <section class="page" id="page-my" style="display:none">
   <div class="container">
@@ -826,6 +843,12 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
       <button class="btn btn-outline btn-sm" onclick="saveMyNickname()">保存昵称</button>
       <p class="form-error" id="myNicknameError" style="display:none"></p>
       <div id="myPaymentPreview" style="margin-top:12px"></div>
+    </div>
+    <div id="inviteCard" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px">
+      <h3 style="font-size:1.05rem;margin-bottom:6px">📢 邀请同学</h3>
+      <p class="form-hint" style="margin-bottom:10px">把华科校园互助分享给同学：代取快递/外卖、二手教材、有问必答都能用，同楼栋优先派单。</p>
+      <button type="button" class="btn btn-primary btn-sm" onclick="copyInviteText()">📋 复制邀请文案</button>
+      <p class="form-hint" style="margin-top:8px;word-break:break-all">邀请链接：https://xy5167.github.io/hust-helper/</p>
     </div>
     <div id="runnerTakePanel" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;display:none">
       <h3 style="font-size:1.05rem;margin-bottom:6px">🛵 跑腿接单设置<span id="runnerAvailDot" class="runner-avail-dot" style="display:none"></span></h3>
@@ -1152,7 +1175,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.21.2';
+const APP_VERSION = '1.22.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1392,6 +1415,7 @@ function navigate(page) {
   if (page === 'home') loadStats();
   else if (page === 'my') loadMyOrders();
   else if (page === 'task') refreshCurrentTab();
+  else if (page === 'stats') loadStatsPage();
 }
 
 // 骨架屏占位（列表加载时使用）
@@ -1423,6 +1447,65 @@ async function loadStats() {
     document.getElementById('statOrders').textContent = '?';
   }
 }
+
+// ===== v1.22.0 运营数据看板（借鉴暖坞组"量化验证判据"）=====
+async function loadStatsPage() {
+  const cards = document.getElementById('statsCards');
+  const detail = document.getElementById('statsDetail');
+  if (!cards || !detail) return;
+  cards.innerHTML = '<p class="form-hint">加载中…</p>';
+  detail.innerHTML = '<p class="form-hint">加载中…</p>';
+  let users = 0;
+  try {
+    const res = await ghApi('/api/stats', 'GET');
+    if (res.ok) { const d = await res.json(); users = d.users || 0; }
+  } catch(e) {}
+  const catMap = { task: '跑腿代办', secondhand: '出售转让', borrow: '短期租借', qa: '有问必答', find: '找人组队', express: '代拿快递', food: '代取外卖', buy: '帮买帮送', print: '帮忙打印', repair: '维修', book: '教材书籍', electronic: '电子产品', daily: '生活用品', team: '竞赛组队', carpool: '出行拼车', survey: '问卷招募' };
+  const stateMap = { open: '待接单', taken: '进行中', awaiting_confirm: '待确认', completed: '已完成', cancelled: '已取消', expired: '已过期' };
+  const stat = { cat: {}, state: {}, total: 0, rec: { up: 0, down: 0 } };
+  try {
+    const orderList = await ghIssues('order', 'all') || [];
+    stat.total = orderList.length;
+    for (const i of orderList) {
+      let o; try { o = JSON.parse(i.body); } catch(e) { continue; }
+      if (!o || typeof o !== 'object') continue;
+      const c = o.category || o.type || 'other';
+      stat.cat[c] = (stat.cat[c] || 0) + 1;
+      const s = o.status || 'unknown';
+      stat.state[s] = (stat.state[s] || 0) + 1;
+    }
+  } catch(e) {}
+  try { stat.rec = JSON.parse(localStorage.getItem('hust_rec_feedback') || '{"up":0,"down":0}'); } catch(e) {}
+  const statCard = function(num, label) {
+    return '<div style="flex:1;min-width:110px;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center">'
+      + '<div style="font-size:1.5rem;font-weight:700;color:var(--primary)">' + num + '</div>'
+      + '<div style="font-size:.75rem;color:var(--text-secondary);margin-top:4px">' + label + '</div></div>';
+  };
+  const inProgress = (stat.state.taken || 0) + (stat.state.awaiting_confirm || 0);
+  cards.innerHTML = statCard(users, '注册用户') + statCard(stat.total, '总订单') + statCard(inProgress, '进行中') + statCard(stat.state.completed || 0, '已完成');
+  const barRow = function(label, num, pct) {
+    return '<div style="margin-bottom:12px">'
+      + '<div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--text-secondary);margin-bottom:4px"><span>' + esc(label) + '</span><span>' + num + ' · ' + pct + '%</span></div>'
+      + '<div style="height:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:99px;overflow:hidden"><div style="height:100%;width:' + Math.max(2, pct) + '%;background:var(--primary);border-radius:99px"></div></div>'
+      + '</div>';
+  };
+  let h = '<h3 style="font-size:1rem;margin-bottom:12px">品类分布</h3>';
+  for (const k in stat.cat) {
+    h += barRow(catMap[k] || k, stat.cat[k], stat.total ? Math.round(stat.cat[k] / stat.total * 100) : 0);
+  }
+  h += '<h3 style="font-size:1rem;margin:16px 0 12px">状态分布</h3>';
+  for (const k in stat.state) {
+    h += barRow(stateMap[k] || k, stat.state[k], stat.total ? Math.round(stat.state[k] / stat.total * 100) : 0);
+  }
+  const totalFb = stat.rec.up + stat.rec.down;
+  const acc = totalFb ? Math.round(stat.rec.up / totalFb * 100) : 0;
+  h += '<h3 style="font-size:1rem;margin:16px 0 12px">智能推单采纳率 <span class="form-hint" style="display:inline;font-size:.75rem">（本机数据）</span></h3>';
+  h += barRow('推荐有用', stat.rec.up, totalFb ? Math.round(stat.rec.up / totalFb * 100) : 0);
+  h += barRow('推荐没用', stat.rec.down, totalFb ? Math.round(stat.rec.down / totalFb * 100) : 0);
+  h += '<p class="form-hint" style="margin-top:8px">采纳率 ' + acc + '%（共 ' + totalFb + ' 条反馈）· 数据说话，决定下一步先做哪个功能</p>';
+  detail.innerHTML = h;
+}
+window.loadStatsPage = loadStatsPage;
 
 // ============ ORDERS ============
 let _cachedOrders = null;
@@ -4992,6 +5075,9 @@ function updatePublishCategories() {
     bountyInput.value = '';
     bountyInput.required = false;
   }
+  // v1.22.0：二手类型默认展开"更多选项"（描述/图片对二手重要）
+  const pm = document.getElementById('publishMore');
+  if (pm) pm.open = (t === 'secondhand');
   updateFoodPublishTip();   // v1.19.0：外卖发布提示显隐
 }
 
@@ -6039,15 +6125,31 @@ function copyOcrFullText() {
   const text = (window._publishOcr && window._publishOcr.text) || '';
   if (!text.trim()) { if (window.toast) toast('暂无识别文字'); return; }
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(function(){ if (window.toast) toast('已复制识别全文，可粘贴搜索'); }, function(){ _fallbackCopy(text); });
-  } else { _fallbackCopy(text); }
+    navigator.clipboard.writeText(text).then(function(){ if (window.toast) toast('已复制识别全文，可粘贴搜索'); }, function(){ _fallbackCopy(text, '已复制识别全文，可粘贴搜索'); });
+  } else { _fallbackCopy(text, '已复制识别全文，可粘贴搜索'); }
 }
-function _fallbackCopy(text) {
+// v1.22.0：通用剪贴板（供邀请文案/识别全文复用）
+function copyText(text, okMsg) {
+  if (!text || !text.trim()) { if (window.toast) toast('无内容可复制'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function(){ if (window.toast) toast(okMsg || '已复制'); }, function(){ _fallbackCopy(text, okMsg || '已复制'); });
+  } else { _fallbackCopy(text, okMsg || '已复制'); }
+}
+window.copyText = copyText;
+// v1.22.0：生成邀请文案并复制（定向冷启动素材）
+function copyInviteText() {
+  const name = (S.user && (S.user.nickname || S.user.name)) || '同学';
+  const url = 'https://xy5167.github.io/hust-helper/';
+  const txt = '我用华科校园互助：代取快递/外卖、二手教材、有问必答都能发，同楼栋优先派单！' + name + ' 邀请你一起用，点链接注册：' + url;
+  copyText(txt, '已复制邀请文案，快去发给同学吧');
+}
+window.copyInviteText = copyInviteText;
+function _fallbackCopy(text, okMsg) {
   try {
     const ta = document.createElement('textarea'); ta.value = text;
     ta.style.position = 'fixed'; ta.style.left = '-9999px'; document.body.appendChild(ta);
     ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-    if (window.toast) toast('已复制识别全文，可粘贴搜索');
+    if (window.toast) toast(okMsg || '已复制');
   } catch (e) { if (window.toast) toast('复制失败，请长按选中文字'); }
 }
 
@@ -6523,17 +6625,41 @@ function renderNotifyPanel() {
     list.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:32px 0">🔔 暂无通知</div>';
     return;
   }
-  list.innerHTML = _notifications.map((n, i) =>
-    '<div class="notify-item' + (n.read ? '' : ' unread') + '" onclick="openNotifyLink(' + i + ')">' +
+  list.innerHTML = _notifications.map((n, i) => {
+    let fbBtns = '';
+    if (n.icon === '🎯') {
+      fbBtns = n.fb
+        ? '<div class="notify-item-fb" style="font-size:.72rem;color:var(--text-secondary);margin-top:4px">已反馈：' + (n.fb === 'up' ? '👍 有用' : '👎 没用') + '</div>'
+        : '<div style="display:flex;gap:8px;margin-top:6px">'
+          + '<button type="button" class="btn btn-outline btn-sm" style="font-size:.72rem;padding:2px 10px" onclick="event.stopPropagation();recFeedback(' + i + ',&#39;up&#39;)">👍 有用</button>'
+          + '<button type="button" class="btn btn-outline btn-sm" style="font-size:.72rem;padding:2px 10px" onclick="event.stopPropagation();recFeedback(' + i + ',&#39;down&#39;)">👎 没用</button>'
+          + '</div>';
+    }
+    return '<div class="notify-item' + (n.read ? '' : ' unread') + '" onclick="openNotifyLink(' + i + ')">' +
       '<div class="notify-item-icon">' + (n.icon || '🔔') + '</div>' +
       '<div class="notify-item-body">' +
         '<div class="notify-item-title">' + esc(n.title) + '</div>' +
         '<div class="notify-item-desc">' + esc(n.body) + '</div>' +
-        '<div class="notify-item-time">' + timeAgo(n.time) + '</div>' +
+        '<div class="notify-item-time">' + timeAgo(n.time) + '</div>' + fbBtns +
       '</div>' +
-    '</div>'
-  ).join('');
+    '</div>';
+  }).join('');
 }
+
+// v1.22.0：智能推单反馈（本机统计采纳率，攒数据为后续接模型）
+function recFeedback(idx, val) {
+  const n = _notifications[idx];
+  if (!n || n.icon !== '🎯' || n.fb) return;
+  n.fb = val;
+  saveNotifications(); updateNavBadge(); renderNotifyPanel();
+  let rec = { up: 0, down: 0 };
+  try { rec = JSON.parse(localStorage.getItem('hust_rec_feedback') || '{"up":0,"down":0}'); } catch(e) {}
+  rec[val] = (rec[val] || 0) + 1;
+  localStorage.setItem('hust_rec_feedback', JSON.stringify(rec));
+  if (window.toast) toast(val === 'up' ? '👍 已记录：推荐有用' : '👎 已记录：推荐没用');
+}
+window.recFeedback = recFeedback;
+
 function toggleNotifyPanel() {
   const panel = document.getElementById('notifyPanel');
   if (!panel) return;
