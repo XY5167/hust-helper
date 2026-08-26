@@ -784,6 +784,11 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
             <button type="button" class="btn btn-outline btn-sm" onclick="addOcrChipFromInput()">添加</button>
           </div>
           <p class="form-hint" id="publishOcrStatus" style="margin:6px 0 0"></p>
+          <details id="publishOcrFullTextBox" style="margin-top:6px;font-size:.82rem;color:var(--text-secondary)" hidden>
+            <summary style="cursor:pointer;user-select:none;color:var(--text-secondary)">📋 查看识别全文（点此展开，让 AI/自己挑书名）</summary>
+            <div id="publishOcrFullTextContent" style="margin-top:6px;padding:8px;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius-xs);white-space:pre-wrap;max-height:180px;overflow:auto;font-size:.78rem;line-height:1.5"></div>
+            <button type="button" class="btn btn-outline btn-sm" style="margin-top:6px;font-size:.78rem" onclick="copyOcrFullText()">📋 一键复制全文</button>
+          </details>
         </div>
       </div>
       <p class="form-hint" id="publishFeeHint" style="display:none"></p>
@@ -1147,7 +1152,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.21.1';
+const APP_VERSION = '1.21.2';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -5951,14 +5956,17 @@ function compressImage(file, maxWidth = 1920, quality = 0.85) {
 }
 
 // ============ 发布图片预览 + AI 识图（OCR）关键词（v1.16.0） ============
-window._publishOcr = { chips: [], text: '', busy: false };   // 本次发布的 OCR 状态
+window._publishOcr = { chips: [], text: '', busy: false, files: [], ocrDone: [] };   // 本次发布的 OCR 状态（files=累积文件列表，ocrDone=已识别文件快照）
 
 function resetOcrState() {
-  window._publishOcr = { chips: [], text: '', busy: false };
+  window._publishOcr = { chips: [], text: '', busy: false, files: [], ocrDone: [] };
   const box = document.getElementById('publishOcrBox'); if (box) box.style.display = 'none';
   const chips = document.getElementById('publishOcrChips'); if (chips) chips.innerHTML = '';
   const st = document.getElementById('publishOcrStatus'); if (st) st.textContent = '';
   const prev = document.getElementById('publishImagePreview'); if (prev) prev.innerHTML = '';
+  const ftb = document.getElementById('publishOcrFullTextBox'); if (ftb) { ftb.hidden = true; ftb.open = false; }
+  const ftc = document.getElementById('publishOcrFullTextContent'); if (ftc) ftc.textContent = '';
+  const inp = document.getElementById('publishImage'); if (inp) inp.value = '';
 }
 window.resetOcrState = resetOcrState;
 
@@ -5995,6 +6003,7 @@ window.removeOcrChip = removeOcrChip; window.addOcrChipFromInput = addOcrChipFro
 function renderImagePreviews(files) {
   const prev = document.getElementById('publishImagePreview'); if (!prev) return;
   prev.innerHTML = '';
+  const ocrDone = (window._publishOcr && window._publishOcr.ocrDone) || [];
   Array.prototype.slice.call(files).slice(0, 6).forEach(function(f, i) {
     const img = document.createElement('img');
     img.className = 'ocr-thumb'; img.alt = f.name || '图片';
@@ -6004,10 +6013,42 @@ function renderImagePreviews(files) {
     wrap.appendChild(img);
     if (i < 3) {   // 只有前 3 张会做 OCR，角标提示状态
       const b = document.createElement('span'); b.className = 'ocr-badge'; b.id = 'ocrBadge' + i;
-      b.textContent = '⏳'; wrap.appendChild(b);
+      const done = ocrDone.some(k => k.name === f.name && k.size === f.size && k.lastModified === f.lastModified);
+      b.textContent = done ? '✓' : '⏳';
+      wrap.appendChild(b);
     }
     prev.appendChild(wrap);
   });
+}
+
+// v1.21.2：把识别全文同步到折叠面板，让用户能看到 OCR 实际识出了什么（方便自己挑书名/商品名）
+function updateFullTextView() {
+  const box = document.getElementById('publishOcrFullTextBox');
+  const content = document.getElementById('publishOcrFullTextContent');
+  const text = (window._publishOcr && window._publishOcr.text) || '';
+  if (!box || !content) return;
+  if (text && text.trim()) {
+    box.hidden = false;
+    content.textContent = text.length > 1500 ? text.slice(0, 1500) + '\n...（已截断显示前 1500 字）' : text;
+  } else {
+    box.hidden = true;
+  }
+}
+// v1.21.2：一键复制识别全文，方便用户粘贴到搜索/对话框查书名
+function copyOcrFullText() {
+  const text = (window._publishOcr && window._publishOcr.text) || '';
+  if (!text.trim()) { if (window.toast) toast('暂无识别文字'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function(){ if (window.toast) toast('已复制识别全文，可粘贴搜索'); }, function(){ _fallbackCopy(text); });
+  } else { _fallbackCopy(text); }
+}
+function _fallbackCopy(text) {
+  try {
+    const ta = document.createElement('textarea'); ta.value = text;
+    ta.style.position = 'fixed'; ta.style.left = '-9999px'; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    if (window.toast) toast('已复制识别全文，可粘贴搜索');
+  } catch (e) { if (window.toast) toast('复制失败，请长按选中文字'); }
 }
 
 // ===== v1.21.0 本地 OCR 兜底（Tesseract.js，纯浏览器，不耗后端额度）=====
@@ -6091,6 +6132,7 @@ async function localOcrFallback(file, idx, badge, st, reason) {
     // 本地识别成功：出关键词 + 文本并入 AI 润色输入（与后端成功分支一致，但不扣额度）
     localWords.forEach(k => addOcrChip(k));
     window._publishOcr.text += (window._publishOcr.text ? '\n' : '') + localText.slice(0, 500);
+    updateFullTextView();
     const t = document.getElementById('aiAssistInput');
     if (t) t.value = (t.value.trim() ? t.value.trim() + '\n' : '') + '[图片文字] ' + localText.slice(0, 400);
     if (badge) badge.textContent = '✓';
@@ -6164,6 +6206,7 @@ async function ocrImageFile(file, idx) {
       (d.keywords || []).forEach(k => addOcrChip(k));
       if (d.text) {
         window._publishOcr.text += (window._publishOcr.text ? '\n' : '') + d.text;
+        updateFullTextView();
         // 识别文本自动并入 AI 润色输入（用户可编辑/删除）
         const t = document.getElementById('aiAssistInput');
         if (t) t.value = (t.value.trim() ? t.value.trim() + '\n' : '') + '[图片文字] ' + d.text.slice(0, 400);
@@ -6182,27 +6225,46 @@ async function ocrImageFile(file, idx) {
   }
 }
 
-// publishImage change 入口：预览 + 逐张串行 OCR（只做前 3 张，保护 1000 次/月额度）
+// publishImage change 入口：v1.21.2 累加多张（之前每次选择会清空旧预览），只对新增文件触发 OCR
 async function handlePublishImageChange() {
-  const files = this.files;
-  if (!files || files.length === 0) { resetOcrState(); return; }
-  renderImagePreviews(files);
-  window._publishOcr = { chips: window._publishOcr.chips, text: '', busy: true };
+  const newFiles = Array.prototype.slice.call(this.files || []);
+  this.value = '';                                              // 先清空，允许再次选相同文件不冲突
+  if (!window._publishOcr) window._publishOcr = { chips: [], text: '', busy: false };
+  if (!window._publishOcr.files) window._publishOcr.files = [];
+  if (!window._publishOcr.ocrDone) window._publishOcr.ocrDone = [];
+  if (newFiles.length === 0) return;                            // 用户取消选择，保留已有预览
+  // 合并去重（同名+同 size+同 lastModified 视为重复，最多 6 张）
+  let added = 0;
+  for (const f of newFiles) {
+    if (window._publishOcr.files.length >= 6) break;
+    const dup = window._publishOcr.files.some(x => x.name === f.name && x.size === f.size && x.lastModified === f.lastModified);
+    if (!dup) { window._publishOcr.files.push(f); added++; }
+  }
+  if (added === 0) { if (window.toast) toast('已添加过这张图片'); return; }
+  if (window._publishOcr.files.length >= 6 && window.toast) toast('最多 6 张图，已达上限');
+  renderImagePreviews(window._publishOcr.files);
   const box = document.getElementById('publishOcrBox'); if (box) box.style.display = '';
-  const list = Array.prototype.slice.call(files).slice(0, 3);
-  for (let i = 0; i < list.length; i++) {
+  // OCR：只对未识别过的文件做（前 3 张）
+  const list = window._publishOcr.files;
+  window._publishOcr.busy = true;
+  for (let i = 0; i < list.length && i < 3; i++) {
+    const f = list[i];
+    const done = window._publishOcr.ocrDone.some(k => k.name === f.name && k.size === f.size && k.lastModified === f.lastModified);
+    if (done) continue;
     if (window.aiQuotaLeft && aiQuotaLeft() <= 0) {
       const st = document.getElementById('publishOcrStatus');
       if (st) st.textContent = '今日 AI 次数已用完，尝试本地识别（不耗额度）…';
       const badge = document.getElementById('ocrBadge' + i); if (badge) badge.textContent = '⏳';
-      await localOcrFallback(list[i], i, badge, st, 'AI 次数用完');
-      continue;                                        // 配额不足：本地兜底后继续下一张，不阻断
+      await localOcrFallback(f, i, badge, st, 'AI 次数用完');
+    } else {
+      await ocrImageFile(f, i);
     }
-    await ocrImageFile(list[i], i);
+    window._publishOcr.ocrDone.push(f);
   }
   window._publishOcr.busy = false;
   renderOcrChips();
-  if (window._publishOcr.chips.length && window.toast) toast('🔍 已识别关键词，这些词将进入搜索范围');
+  updateFullTextView();
+  if (added > 0 && window._publishOcr.chips.length && window.toast) toast('🔍 已识别关键词，这些词将进入搜索范围');
 }
 window.handlePublishImageChange = handlePublishImageChange;
 
