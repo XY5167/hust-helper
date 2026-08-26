@@ -529,7 +529,6 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
   <a href="#" class="bottom-nav-item active" data-page="home" onclick="navigate('home');return false"><span class="bi">🏠</span><span>首页</span></a>
   <a href="#" class="bottom-nav-item" data-page="task" onclick="navigate('task');return false"><span class="bi">📋</span><span>任务</span></a>
   <a href="#" class="bottom-nav-item" data-page="my" onclick="navigate('my');return false"><span class="bi">👤</span><span>我的</span></a>
-  <a href="#" class="bottom-nav-item" data-page="stats" onclick="navigate('stats');return false"><span class="bi">📊</span><span>数据</span></a>
 </nav>
 
 <div class="notify-panel" id="notifyPanel">
@@ -907,7 +906,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
 <section class="page" id="page-stats" style="display:none">
   <div class="container">
     <div class="page-header">
-      <h2>📊 数据看板</h2>
+      <h2>📊 数据看板 <a href="javascript:void(0)" onclick="navigate('my')" style="float:right;font-size:.85rem;color:var(--text-secondary);font-weight:400">← 返回我的</a></h2>
       <p>平台运营数据一览，用数据驱动迭代。</p>
     </div>
     <div id="statsCards" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px"></div>
@@ -1029,6 +1028,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
       <button class="btn btn-outline btn-sm" onclick="showVipApply()" style="display:none" id="btnVipApply">⭐ 开通会员</button>
       <button class="btn btn-outline btn-sm" onclick="showRunnerApply()" style="display:none" id="btnRunnerApply">🛵 跑腿认证</button>
       <button class="btn btn-outline btn-sm" onclick="showReportsView()" style="display:none" id="btnReports">📋 反馈中心</button>
+      <button class="btn btn-outline btn-sm" onclick="navigate('stats')" style="display:none" id="btnStats">📊 平台数据</button>
     </div>
   </div>
 </section>
@@ -1292,7 +1292,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.24.1';
+const APP_VERSION = '1.24.2';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -5571,6 +5571,7 @@ async function loadMyOrders(myTab) {
   const btnReports = document.getElementById('btnReports');
   const btnRunnerApply = document.getElementById('btnRunnerApply');
   const btnVipApply = document.getElementById('btnVipApply');
+  const btnStats = document.getElementById('btnStats');
 
   if (!S.user) {
     if (profile) profile.style.display = 'none';
@@ -5578,6 +5579,7 @@ async function loadMyOrders(myTab) {
     if (btnReports) btnReports.style.display = 'none';
     if (btnRunnerApply) btnRunnerApply.style.display = 'none';
     if (btnVipApply) btnVipApply.style.display = 'none';
+    if (btnStats) btnStats.style.display = 'none';
     if (listEl) listEl.innerHTML = '<p style="color:var(--text-secondary)">请先登录...</p>';
     return;
   }
@@ -5589,6 +5591,7 @@ async function loadMyOrders(myTab) {
     if (btnReports) btnReports.style.display = 'none';
     if (btnRunnerApply) btnRunnerApply.style.display = 'none';
     if (btnVipApply) btnVipApply.style.display = 'none';
+    if (btnStats) btnStats.style.display = 'none';
     if (listEl) listEl.innerHTML = '<p style="color:var(--danger)">用户信息不完整，请退出后重新登录。</p>';
     return;
   }
@@ -5596,6 +5599,8 @@ async function loadMyOrders(myTab) {
   /* myProfile 默认收起，由顶部用户卡片点击展开，不在此强制显示 */
   if (tabsEl) tabsEl.style.display = 'flex';
   if (btnReports) btnReports.style.display = 'inline-flex';
+  // 平台数据看板：仅管理员可见（普通用户不展示）
+  if (btnStats) btnStats.style.display = isAdminUser() ? 'inline-flex' : 'none';
   // VIP 标识
   const vipBadge = document.getElementById('myVipBadge');
   if (vipBadge) vipBadge.style.display = isVIP() ? 'inline' : 'none';
