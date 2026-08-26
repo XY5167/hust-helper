@@ -66,6 +66,12 @@
   --t-fast: .15s var(--ease);
   --t: .2s var(--ease);
   --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;
+  --brand: #185FA5;
+  --brand-ink: #ffffff;
+  --cat-task: #185FA5;
+  --cat-goods: #3B6D11;
+  --cat-qa: #BA7517;
+  --cat-carpool: #534AB7;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:16px;-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
@@ -128,6 +134,9 @@ html[data-theme="dark"] {
 html[data-theme="dark"] .hero { background: linear-gradient(180deg,#172033 0%,var(--bg) 100%); }
 html[data-theme="dark"] .header { background: rgba(15,23,42,.85); }
 html[data-theme="dark"] .modal { color: var(--text); }
+html[data-theme="dark"] .home-hero{background:var(--brand)}
+html[data-theme="dark"] .home-search{background:var(--bg-card)}
+html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 
 /* Hero */
 .hero{padding:70px 0 50px;text-align:center;background:linear-gradient(180deg,#eff6ff 0%,var(--bg) 100%)}
@@ -139,6 +148,32 @@ html[data-theme="dark"] .modal { color: var(--text); }
 .stat-num{font-size:1.8rem;font-weight:700;color:var(--primary)}
 .stat-label{font-size:.82rem;color:var(--text-muted);margin-top:4px}
 .hero-actions{display:flex;justify-content:center;gap:12px}
+
+/* ===== 首页改版 v1.24.0 方案B：品牌 hero + 图标行 ===== */
+.home-hero{position:relative;background:var(--brand);color:var(--brand-ink);padding:18px 0 34px}
+.home-hero-inner{padding:0 20px}
+.home-hero-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.home-hero-brand{font-size:15px;font-weight:500;color:#fff}
+.home-hero-avatar{width:34px;height:34px;border-radius:99px;border:none;background:rgba(255,255,255,.18);color:#fff;font-size:14px;font-weight:500;cursor:pointer}
+.home-hero-title{font-size:16px;font-weight:500;color:#fff;margin:0 0 6px;letter-spacing:.2px}
+.home-hero-sub{font-size:12px;color:rgba(255,255,255,.72);margin:0}
+.home-search-wrap{position:relative;margin-top:-18px;z-index:2}
+.home-search{display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--border);border-radius:99px;padding:10px 16px;box-shadow:var(--shadow-md);cursor:text}
+.home-search-ico{font-size:14px;opacity:.6}
+.home-search-input{flex:1;border:none;outline:none;background:transparent;font-size:.9rem;color:var(--text)}
+.home-search-input::placeholder{color:var(--text-muted)}
+.home-icon-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:22px 0 4px}
+.home-cat{display:flex;flex-direction:column;align-items:center;gap:8px;background:none;border:none;cursor:pointer;padding:4px 0}
+.home-cat-icon{width:48px;height:48px;border-radius:14px;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;box-shadow:var(--shadow-sm,0 1px 2px rgba(0,0,0,.12))}
+.home-cat-icon.cat-task{background:var(--cat-task)}
+.home-cat-icon.cat-goods{background:var(--cat-goods)}
+.home-cat-icon.cat-qa{background:var(--cat-qa)}
+.home-cat-icon.cat-carpool{background:var(--cat-carpool)}
+.home-cat-label{font-size:12px;color:var(--text-secondary)}
+.home-cta-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0 6px}
+.btn-brand{background:var(--brand);color:#fff}
+.btn-brand:hover{background:#134c86;box-shadow:var(--shadow-md)}
+.home-announce{display:none;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin:14px auto 8px}
 
 /* Sections */
 .section{padding:56px 0}
@@ -501,35 +536,59 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
 </div>
 
 <section class="page" id="page-home">
-  <div class="hero">
-    <div class="container">
-      <div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin-bottom:6px">HUST互助</div>
-      <h1 class="hero-title">校园生活，<span class="highlight">互相帮忙</span></h1>
-      <p class="hero-subtitle">代拿快递、代取外卖、二手交易、帮打印…华科学子的校园互助平台</p>
-      <div class="hero-stats" id="heroStats">
-        <div class="stat-item"><span class="stat-num" id="statOrders">0</span><span class="stat-label">未完成订单</span></div>
-        <div class="stat-item"><span class="stat-num" id="statUsers">0</span><span class="stat-label">实名用户</span></div>
+
+  <!-- 1. 品牌 hero 区（实色 #185FA5 非渐变，移动端满宽） -->
+  <div class="home-hero">
+    <div class="container home-hero-inner">
+      <div class="home-hero-top">
+        <span class="home-hero-brand">HUST互助</span>
+        <button class="home-hero-avatar" onclick="navigate('my')" aria-label="我的主页">我</button>
       </div>
-      <div class="hero-actions">
-        <button class="btn btn-primary btn-lg" onclick="showPublishModal()">发布任务</button>
-        <button class="btn btn-outline btn-lg" onclick="navigate('task')">我要接单</button>
+      <h1 class="home-hero-title">校园生活，互相帮忙</h1>
+      <p class="home-hero-sub"><span id="statUsers">0</span> 位同学在用 · <span id="statOrders">0</span> 单待互助</p>
+    </div>
+    <!-- 2. 搜索框浮在 hero 下沿（负 margin 上移叠住 hero） -->
+    <div class="container home-search-wrap">
+      <div class="home-search" onclick="document.getElementById('homeSearchInput').focus()">
+        <span class="home-search-ico">🔍</span>
+        <input type="text" id="homeSearchInput" class="home-search-input"
+               placeholder="搜索任务、闲置、问答"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();homeSearchSubmit();}">
       </div>
     </div>
   </div>
 
-  <!-- 公告横幅（首页顶部，管理员发布后展示） -->
+  <!-- 3. 一排圆形彩色图标入口（grid 4 列） -->
   <div class="container">
-    <div id="announceBanner" style="display:none;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:12px;padding:12px 16px;margin:0 auto 8px;max-width:920px"></div>
-  </div>
-
-  <div class="container">
-    <div class="section" style="padding-top:24px">
-      <div class="hero-actions" style="margin:0">
-        <button class="btn btn-primary btn-lg" onclick="navigate('task')">浏览任务大厅</button>
-        <button class="btn btn-outline btn-lg" onclick="navigate('task');setTimeout(()=>switchTaskTab('goods'),100)">逛逛物品流转</button>
-      </div>
+    <div class="home-icon-row">
+      <button class="home-cat" onclick="homeGo('task')">
+        <span class="home-cat-icon cat-task">跑</span><span class="home-cat-label">跑腿</span>
+      </button>
+      <button class="home-cat" onclick="homeGo('goods')">
+        <span class="home-cat-icon cat-goods">二</span><span class="home-cat-label">二手</span>
+      </button>
+      <button class="home-cat" onclick="homeGo('qa')">
+        <span class="home-cat-icon cat-qa">问</span><span class="home-cat-label">问答</span>
+      </button>
+      <button class="home-cat" onclick="homeGo('find','carpool')">
+        <span class="home-cat-icon cat-carpool">拼</span><span class="home-cat-label">拼车</span>
+      </button>
     </div>
   </div>
+
+  <!-- 4. 两个 CTA 按钮（grid 2 列） -->
+  <div class="container">
+    <div class="home-cta-row">
+      <button class="btn btn-brand btn-lg btn-block" onclick="showPublishModal()">发布任务</button>
+      <button class="btn btn-outline btn-lg btn-block" onclick="navigate('task')">我要接单</button>
+    </div>
+  </div>
+
+  <!-- 5. 公告条：复用现有 #announceBanner 逻辑，仅套新样式容器（浅灰卡） -->
+  <div class="container">
+    <div id="announceBanner" class="home-announce"></div>
+  </div>
+
 </section>
 
 <section class="page" id="page-task" style="display:none">
@@ -1225,7 +1284,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.23.0';
+const APP_VERSION = '1.24.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1466,6 +1525,23 @@ function navigate(page) {
   else if (page === 'my') loadMyOrders();
   else if (page === 'task') refreshCurrentTab();
   else if (page === 'stats') loadStatsPage();
+}
+
+// ===== v1.24.0 首页改版：统一入口跳转 =====
+function homeGo(type, cat) {
+  navigate('task');                 // 切到任务页（会触发 refreshCurrentTab）
+  // 等 navigate 的内部刷新落定后再切 tab / 子筛选，避免被覆盖
+  setTimeout(function () {
+    switchTaskTab(type);            // 切到对应板块（task/goods/qa/find）
+    if (cat) filterOrders(type, cat); // 若有子分类（如拼车 carpool）则筛选
+  }, 60);
+}
+// 首页搜索框：复用任务页既有搜索逻辑（#taskSearchInput + resetTaskPageAndApply）
+function homeSearchSubmit() {
+  var v = (document.getElementById('homeSearchInput').value || '').trim();
+  navigate('task');
+  var inp = document.getElementById('taskSearchInput');
+  if (inp) { inp.value = v; resetTaskPageAndApply(); }
 }
 
 // 骨架屏占位（列表加载时使用）
