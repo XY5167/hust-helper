@@ -1147,7 +1147,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.20.1';
+const APP_VERSION = '1.21.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -6010,6 +6010,105 @@ function renderImagePreviews(files) {
   });
 }
 
+// ===== v1.21.0 本地 OCR 兜底（Tesseract.js，纯浏览器，不耗后端额度）=====
+// 动态加载：jsdelivr → unpkg → cdnjs 依次尝试，成功缓存全局 Tesseract
+let _tesseractPromise = null;
+function loadTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  if (_tesseractPromise) return _tesseractPromise;
+  const urls = [
+    'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+    'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js'
+  ];
+  _tesseractPromise = new Promise(function(resolve, reject) {
+    let i = 0;
+    function tryNext() {
+      if (i >= urls.length) { reject(new Error('TESSERACT_CDN_FAIL')); return; }
+      const s = document.createElement('script');
+      s.src = urls[i++]; s.async = true;
+      s.onload = function() { if (window.Tesseract) resolve(window.Tesseract); else tryNext(); };
+      s.onerror = function() { if (s.parentNode) s.parentNode.removeChild(s); tryNext(); };
+      document.head.appendChild(s);
+    }
+    tryNext();
+  });
+  return _tesseractPromise;
+}
+
+// 本地 OCR：识别图片文字（首次需下载中文模型约 10-15MB，IndexedDB 缓存，二次快）
+async function localOcrText(file, onProgress) {
+  const T = await loadTesseract();
+  let worker = null;
+  try {
+    worker = await T.createWorker('chi_sim', 1, {
+      logger: function(m) { if (typeof onProgress === 'function') onProgress(m); }
+    });
+    const ret = await worker.recognize(file);
+    return ((ret && ret.data && ret.data.text) || '').trim();
+  } finally {
+    if (worker) { try { await worker.terminate(); } catch (e) {} }
+  }
+}
+
+// 从 OCR 识别文本中提取关键词（前端本地规则，不依赖后端混元）
+const _ocrStopWords = new Set(['的','了','是','在','和','与','及','为','之','或','而','以','于','有','就','都','这','那','不','也','要','被','把','对','从','到','并','等','还','又','很','能','会','可','已','过','着','中','上','下','后','前','里','外','时','处','一个','一种','我们','你们','他们','可以','自己','什么','这个','那个','多少','以及','不是','没有','还是','因为','所以','如果','但是','现在','时候','东西','应该','需要','的话','就是','已经','进行','通过','同时','其中','由于','因此','然后','而且','或者','对于','关于','根据','按照','随着','作为']);
+function keywordsFromText(text) {
+  if (!text) return [];
+  const seen = {}, out = [];
+  const parts = String(text).split(/[\s,，。;；:：!！?？、()（）【】\[\]《》"'"'“”‘’\-—_/\\|]+/);
+  for (let i = 0; i < parts.length && out.length < 6; i++) {
+    const w = (parts[i] || '').trim().slice(0, 10);
+    if (w.length < 2 || w.length > 10) continue;
+    if (/^\d+$/.test(w)) continue;
+    if (_ocrStopWords.has(w)) continue;
+    if (seen[w]) continue;
+    seen[w] = 1;
+    if (typeof checkContactLeak === 'function' && checkContactLeak(w)) continue;
+    out.push(w);
+  }
+  return out;
+}
+
+// 本地 OCR 兜底总入口：后端失败 / 额度不足时调用（纯浏览器，不耗额度）
+// 成功返回 true（关键词已出 + 文本并入润色），失败返回 false（已退回文件名/手动引导）
+async function localOcrFallback(file, idx, badge, st, reason) {
+  if (st) st.textContent = '第 ' + (idx + 1) + ' 张' + (reason ? '（' + reason + '）' : '') + '，尝试本地识别…';
+  let localText = '', localErr = '';
+  try {
+    localText = await localOcrText(file, function(m) {
+      if (!st || !m || typeof m.progress !== 'number') return;
+      if (m.status === 'recognizing text') st.textContent = '第 ' + (idx + 1) + ' 张本地识别中 ' + Math.round(m.progress * 100) + '%…';
+      else if (/download|load|init/i.test(m.status || '')) st.textContent = '本地识别模型' + (m.status || '加载中') + ' ' + Math.round(m.progress * 100) + '%…';
+    });
+  } catch (le) { localErr = (le && le.message) ? le.message : 'LOCAL_OCR_FAIL'; }
+  const localWords = localText ? keywordsFromText(localText) : [];
+  if (localWords.length) {
+    // 本地识别成功：出关键词 + 文本并入 AI 润色输入（与后端成功分支一致，但不扣额度）
+    localWords.forEach(k => addOcrChip(k));
+    window._publishOcr.text += (window._publishOcr.text ? '\n' : '') + localText.slice(0, 500);
+    const t = document.getElementById('aiAssistInput');
+    if (t) t.value = (t.value.trim() ? t.value.trim() + '\n' : '') + '[图片文字] ' + localText.slice(0, 400);
+    if (badge) badge.textContent = '✓';
+    if (st) st.textContent = '第 ' + (idx + 1) + ' 张已用本地识别（未耗额度），可编辑/补充关键词';
+    return true;
+  }
+  // 本地也没识别出 → 退回文件名兜底 + 手动输入引导
+  const fallbackWords = mockOcrKeywords(file);
+  fallbackWords.forEach(k => addOcrChip(k));
+  const hint = ocrFallbackHint();
+  if (st) {
+    if (localErr === 'TESSERACT_CDN_FAIL') {
+      st.textContent = '第 ' + (idx + 1) + ' 张识别失败：本地识别模型下载失败（网络），请检查网络后手动输入关键词（如：' + hint + '）';
+    } else if (fallbackWords.length) {
+      st.textContent = '第 ' + (idx + 1) + ' 张识别失败（' + reason + '），本地也未能识别，已用文件名识别，可手动补充关键词（如：' + hint + '）';
+    } else {
+      st.textContent = '第 ' + (idx + 1) + ' 张识别失败（' + reason + '），本地未识别出文字。请手动输入关键词：' + hint;
+    }
+  }
+  return false;
+}
+
 // 后端未部署新版 / 调用失败时的本地兜底：从文件名提取关键词
 // 过滤无意义文件名（纯数字、UUID、时间戳），避免把 1787711316900.jpg 当成关键词
 function mockOcrKeywords(file) {
@@ -6073,17 +6172,8 @@ async function ocrImageFile(file, idx) {
     // 解析后端返回的错误码（兼容旧版只有 message 的情况）
     const code = e.code || e.message || '';
     const reason = code === 'HTTP 404' ? '服务未更新' : (/QUOTA|LIMIT|额度|次数/.test(code) ? 'AI 额度/次数用完' : '网络或服务异常');
-    // 降级：先用文件名提取；无意义文件名则不生成空关键词，直接引导手动输入
-    const fallbackWords = mockOcrKeywords(file);
-    fallbackWords.forEach(k => addOcrChip(k));
-    const hint = ocrFallbackHint();
-    if (st) {
-      if (fallbackWords.length) {
-        st.textContent = '第 ' + (idx + 1) + ' 张 AI 识别失败（' + reason + '），已用文件名识别，可手动补充关键词（如：' + hint + '）';
-      } else {
-        st.textContent = '第 ' + (idx + 1) + ' 张 AI 识别失败（' + reason + '），照片未识别出文字。请手动输入关键词：' + hint;
-      }
-    }
+    // v1.21.0：后端失败 → 自动本地 OCR 兜底（Tesseract.js，纯浏览器，不耗额度）
+    await localOcrFallback(file, idx, badge, st, reason);
     return;
   }
 }
@@ -6099,9 +6189,10 @@ async function handlePublishImageChange() {
   for (let i = 0; i < list.length; i++) {
     if (window.aiQuotaLeft && aiQuotaLeft() <= 0) {
       const st = document.getElementById('publishOcrStatus');
-      if (st) st.textContent = '今日 AI 次数已用完，可手动输入关键词';
-      const badge = document.getElementById('ocrBadge' + i); if (badge) badge.textContent = '⏭';
-      continue;                                        // 配额不足：跳过该张，不阻断
+      if (st) st.textContent = '今日 AI 次数已用完，尝试本地识别（不耗额度）…';
+      const badge = document.getElementById('ocrBadge' + i); if (badge) badge.textContent = '⏳';
+      await localOcrFallback(list[i], i, badge, st, 'AI 次数用完');
+      continue;                                        // 配额不足：本地兜底后继续下一张，不阻断
     }
     await ocrImageFile(list[i], i);
   }
