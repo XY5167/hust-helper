@@ -1147,7 +1147,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.21.0';
+const APP_VERSION = '1.21.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -6044,6 +6044,8 @@ async function localOcrText(file, onProgress) {
     worker = await T.createWorker('chi_sim', 1, {
       logger: function(m) { if (typeof onProgress === 'function') onProgress(m); }
     });
+    // v1.21.1：PSM=11 稀疏文字模式更适合书封面/海报（默认 3 在大图案+大字混排时切碎识别）
+    try { await worker.setParameters({ tessedit_pageseg_mode: '11' }); } catch (e) {}
     const ret = await worker.recognize(file);
     return ((ret && ret.data && ret.data.text) || '').trim();
   } finally {
@@ -6052,7 +6054,7 @@ async function localOcrText(file, onProgress) {
 }
 
 // 从 OCR 识别文本中提取关键词（前端本地规则，不依赖后端混元）
-const _ocrStopWords = new Set(['的','了','是','在','和','与','及','为','之','或','而','以','于','有','就','都','这','那','不','也','要','被','把','对','从','到','并','等','还','又','很','能','会','可','已','过','着','中','上','下','后','前','里','外','时','处','一个','一种','我们','你们','他们','可以','自己','什么','这个','那个','多少','以及','不是','没有','还是','因为','所以','如果','但是','现在','时候','东西','应该','需要','的话','就是','已经','进行','通过','同时','其中','由于','因此','然后','而且','或者','对于','关于','根据','按照','随着','作为']);
+const _ocrStopWords = new Set(['的','了','是','在','和','与','及','为','之','或','而','以','于','有','就','都','这','那','不','也','要','被','把','对','从','到','并','等','还','又','很','能','会','可','已','过','着','中','上','下','后','前','里','外','时','处','一个','一种','我们','你们','他们','可以','自己','什么','这个','那个','多少','以及','不是','没有','还是','因为','所以','如果','但是','现在','时候','东西','应该','需要','的话','就是','已经','进行','通过','同时','其中','由于','因此','然后','而且','或者','对于','关于','根据','按照','随着','作为','一','二','三','四','五','六','七','八','九','十','人','方','元','法','口','日','月','年','大','小','多','少','长','好','坏','对','错','几','个','事','它','他','她','一','一一','二人','三人','一人','二者','三者','其一','其二','其中','人民','工人','同一','不同','全部','部分','本页','本次','这些','那些','某个','某些','怎么','如此','这样','那样','上册','下册','要么','虽然']);
 function keywordsFromText(text) {
   if (!text) return [];
   const seen = {}, out = [];
@@ -6062,6 +6064,8 @@ function keywordsFromText(text) {
     if (w.length < 2 || w.length > 10) continue;
     if (/^\d+$/.test(w)) continue;
     if (_ocrStopWords.has(w)) continue;
+    // v1.21.1：必须含中文字符，过滤 Tesseract 误识的纯字母/符号噪音（如 em/Pe/LE）
+    if (!/[\u4e00-\u9fa5]/.test(w)) continue;
     if (seen[w]) continue;
     seen[w] = 1;
     if (typeof checkContactLeak === 'function' && checkContactLeak(w)) continue;
