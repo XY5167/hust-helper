@@ -558,6 +558,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
       </select>
       <select id="taskSortSelect" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card);cursor:pointer" onchange="resetTaskPageAndApply()">
         <option value="newest">🕐 最新发布</option>
+        <option value="dorm_first">🏠 同楼栋优先</option>
         <option value="oldest">🕐 最早发布</option>
         <option value="price_high">💰 价格从高到低</option>
         <option value="price_low">💰 价格从低到高</option>
@@ -598,6 +599,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
         </div>
         <div class="form-group">
           <label>宿舍位置</label>
+          <small style="display:block;color:var(--text-muted);font-size:.72rem;margin-top:2px">填写后可获得「同楼栋优先」的订单推荐</small>
           <select id="authDorm">
             <option value="">请选择宿舍区域（选填）</option>
             <optgroup label="紫菘">
@@ -1145,7 +1147,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.19.0';
+const APP_VERSION = '1.20.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1557,6 +1559,7 @@ function renderOrders(orders) {
     // 智能派单：匹配当前用户接单喜好的订单加推荐标（v1.15.5）
     const isMine = !!(S.user && o.publisher_student_id === S.user.student_id);
     const recTag = (!isMine && matchOrderToPrefs(o)) ? '<span class="rec-chip">🎯 为你推荐</span>' : '';
+    const dormTag = (!isMine && S.user && S.user.dorm && dormTier(o, S.user) === 0) ? '<span class="rec-chip" style="background:#dcfce7;color:#15803d">🏠 同楼栋</span>' : '';
     // 缩略图预览
     const imgList = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     const thumbHTML = imgList.length > 0
@@ -1564,7 +1567,7 @@ function renderOrders(orders) {
       : '';
     return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
       + '<div class="order-card-header">'
-      + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + recTag
+      + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + recTag + dormTag
       + '<span class="order-card-status status-' + o.status + '">' + (o.type === 'qa' || o.type === 'find' || o.type === 'academic' ? (o.solved ? '✅ 已解决' : (o.type === 'find' ? '🔍 寻找中' : '💬 待解答')) : sl[o.status]) + '</span>'
       + '</div>'
       + thumbHTML
@@ -1665,6 +1668,13 @@ function applySearchAndSort() {
       break;
     case 'price_low':
       orders.sort((a, b) => (a.price || 0) - (b.price || 0));
+      break;
+    case 'dorm_first':
+      orders.sort((a, b) => {
+        const ta = dormTier(a, S.user), tb = dormTier(b, S.user);
+        if (ta !== tb) return ta - tb;                 // 同楼栋(0)→同区(1)→同校区(2)→其他(3)
+        return new Date(b.created_at) - new Date(a.created_at); // 层内按时间倒序
+      });
       break;
     default: // newest
       orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -5240,6 +5250,9 @@ async function syncCurrentUser() {
     localStorage.setItem('hust_current_user', JSON.stringify(S.user));
     setAuthCookies();
     updateUI();
+    // 已填楼栋的用户默认按同楼栋优先排序（v1.20.0）；用户若已手动切换过其他排序则不覆盖
+    const _sel = document.getElementById('taskSortSelect');
+    if (_sel && S.user && S.user.dorm && _sel.value === 'newest') _sel.value = 'dorm_first';
   } catch(e) { console.warn('syncCurrentUser failed', e); }
 }
 
@@ -5683,6 +5696,32 @@ async function saveTakePrefs() {
   }
 }
 
+// ============ 宿舍楼栋分层（v1.20.0）============
+// 解析楼栋字符串的"区"（紫菘/韵苑/沁苑/东校区…）与"校区"
+function dormZone(d){ if(!d) return ''; const m=String(d).match(/^[一-龥]+/); return m?m[0]:''; }
+function dormCampus(d){
+  const z=dormZone(d);
+  if(['紫菘','韵苑','沁苑','留学生公寓','博士生公寓'].includes(z)) return '主校区';
+  return z||'其他';
+}
+// 相对当前用户的楼栋层级：0同楼栋 1同宿舍区 2同校区 3其他/无楼栋
+function dormTier(order, user){
+  const u=user&&user.dorm, o=order&&order.publisher_dorm;
+  if(!u||!o) return 3;
+  if(u===o) return 0;
+  if(dormZone(u)===dormZone(o)) return 1;
+  if(dormCampus(u)===dormCampus(o)) return 2;
+  return 3;
+}
+// 给智能推单通知用的简短距离标签
+function dormLabel(u, o){
+  const t=dormTier({publisher_dorm:o}, {dorm:u});
+  if(t===0) return '同楼栋';
+  if(t===1) return '同区·'+dormZone(o);
+  if(t===2) return '同校区';
+  return '异地';
+}
+
 // 订单是否匹配当前用户接单喜好
 function matchOrderToPrefs(o) {
   if (!S.user || !S.user.runner_verified || !S.user.takePrefs || !o) return false;
@@ -5725,7 +5764,8 @@ function checkRecommendedOrders(issues) {
     _knownRecOrders[key] = true;
     if (!isNew) continue;
     if (!matchOrderToPrefs(o)) continue;
-    sendNotify('🎯 为你推荐新订单', '「' + (o.title || '新订单') + '」 ¥' + (o.price || 0).toFixed(2) + (o.location ? ' · ' + o.location : '') + '，符合你的接单喜好', { icon: '🎯', link: 'task' });
+    const _dt = (S.user && o.publisher_dorm) ? (' · ' + dormLabel(S.user.dorm, o.publisher_dorm)) : (o.location ? ' · ' + o.location : '');
+    sendNotify('🎯 为你推荐新订单', '「' + (o.title || '新订单') + '」 ¥' + (o.price || 0).toFixed(2) + _dt + '，符合你的接单喜好', { icon: '🎯', link: 'task' });
   }
 }
 
@@ -5971,9 +6011,25 @@ function renderImagePreviews(files) {
 }
 
 // 后端未部署新版 / 调用失败时的本地兜底：从文件名提取关键词
+// 过滤无意义文件名（纯数字、UUID、时间戳），避免把 1787711316900.jpg 当成关键词
 function mockOcrKeywords(file) {
-  return (file.name || '').replace(/\.[a-z0-9]+$/i, '')
-    .split(/[\s_\-·,，.。()（）【】\[\]]+/).filter(w => w.length >= 2 && w.length <= 10).slice(0, 4);
+  const raw = (file.name || '').replace(/\.[a-z0-9]+$/i, '').trim();
+  // 长度小于 3、纯数字、UUID、16位以上时间戳 都视为无意义
+  if (!raw || raw.length < 3 || /^\d+$/.test(raw) || /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(raw) || /^\d{15,}$/.test(raw)) {
+    return [];
+  }
+  return raw.split(/[\s_\-·,，.。()（）【】\[\]]+/).filter(w => w.length >= 2 && w.length <= 10).slice(0, 4);
+}
+
+// 根据发布类型给出手动输入关键词示例，帮用户补全"工程制图"这类信息
+function ocrFallbackHint() {
+  const typeMap = { secondhand: '书名/商品名、品牌、版本、成色', express: '快递点、物品类型', food: '食堂/商家、楼层', print: '打印店、单双面', qa: '课程名、题型', find: '物品名称、地点', other: '物品名、地点、需求' };
+  const typeEl = document.getElementById('publishType');
+  const subtypeEl = document.getElementById('publishSubtype');
+  const subtype = subtypeEl ? subtypeEl.value : '';
+  let key = (typeEl ? typeEl.value : '') || 'other';
+  if (key === 'task' && (subtype === 'express' || subtype === 'food' || subtype === 'print')) key = subtype;
+  return typeMap[key] || typeMap.other;
 }
 
 // 单张图片 OCR（压缩到 1280/0.8 足够识别，省流量与 SCF 请求体）
@@ -5991,7 +6047,14 @@ async function ocrImageFile(file, idx) {
     if (!b64) throw new Error('READ_FAILED');
     if (b64.length > 4.5 * 1024 * 1024) { if (badge) badge.textContent = '⏭'; if (st) st.textContent = '第 ' + (idx + 1) + ' 张图片过大已跳过识别'; return; }
     const res = await ghApi('/api/ai/ocr', 'POST', { image: b64 });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) {
+      let errBody = null;
+      try { errBody = await res.json(); } catch (e) {}
+      const errMsg = (errBody && errBody.error) || ('HTTP ' + res.status);
+      const err = new Error(errMsg);
+      err.code = (errBody && errBody.code) || ('HTTP_' + res.status);
+      throw err;
+    }
     const d = await res.json();
     if (d && d.ok) {
       if (window.aiQuotaUse) aiQuotaUse();              // 仅成功才扣 AI 次数
@@ -6007,9 +6070,20 @@ async function ocrImageFile(file, idx) {
     } else { throw new Error((d && d.error) || 'OCR_FAILED'); }
   } catch (e) {
     if (badge) badge.textContent = '✕';
-    // 降级：不重试，用文件名关键词兜底，提示手动输入
-    mockOcrKeywords(file).forEach(k => addOcrChip(k));
-    if (st) st.textContent = '第 ' + (idx + 1) + ' 张 AI 识别失败（' + (e.message === 'HTTP 404' ? '服务未更新' : '网络/额度') + '），已用文件名识别，可手动补充关键词';
+    // 解析后端返回的错误码（兼容旧版只有 message 的情况）
+    const code = e.code || e.message || '';
+    const reason = code === 'HTTP 404' ? '服务未更新' : (/QUOTA|LIMIT|额度|次数/.test(code) ? 'AI 额度/次数用完' : '网络或服务异常');
+    // 降级：先用文件名提取；无意义文件名则不生成空关键词，直接引导手动输入
+    const fallbackWords = mockOcrKeywords(file);
+    fallbackWords.forEach(k => addOcrChip(k));
+    const hint = ocrFallbackHint();
+    if (st) {
+      if (fallbackWords.length) {
+        st.textContent = '第 ' + (idx + 1) + ' 张 AI 识别失败（' + reason + '），已用文件名识别，可手动补充关键词（如：' + hint + '）';
+      } else {
+        st.textContent = '第 ' + (idx + 1) + ' 张 AI 识别失败（' + reason + '），照片未识别出文字。请手动输入关键词：' + hint;
+      }
+    }
     return;
   }
 }
@@ -6849,7 +6923,7 @@ if ('serviceWorker' in navigator) {
   window.aiPolish = aiPolish;
 
   // ===== 语音智能输入（Web Speech API，类 YOYO 语音发单）=====
-  let _recognition = null, _voiceOn = false;
+  let _recognition = null, _voiceOn = false, _voiceBuffer = '';
   function initVoiceSupport(){
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const micBtn = document.getElementById('aiAssistMicBtn');
@@ -6858,33 +6932,53 @@ if ('serviceWorker' in navigator) {
       _recognition = new SR();
       _recognition.lang = 'zh-CN';
       _recognition.interimResults = true;
-      _recognition.continuous = false;
+      _recognition.continuous = true;
       _recognition.maxAlternatives = 1;
       _recognition.onresult = function(ev){
-        let txt = '';
-        for(let i=ev.resultIndex;i<ev.results.length;i++){ txt += ev.results[i][0].transcript; }
+        let final = '', interim = '';
+        for(let i=ev.resultIndex; i<ev.results.length; i++){
+          if(ev.results[i].isFinal) final += ev.results[i][0].transcript;
+          else interim += ev.results[i][0].transcript;
+        }
+        if(final) _voiceBuffer += final;
         const inp = document.getElementById('aiAssistInput');
-        if(inp) inp.value = txt;
+        if(inp) inp.value = (_voiceBuffer + interim).trim();
       };
       _recognition.onerror = function(ev){
         const st = document.getElementById('aiAssistStatus');
-        if(st) st.textContent = (ev.error==='not-allowed') ? '麦克风权限被拒绝' : '语音识别失败，请打字';
+        if(st){
+          if(ev.error==='not-allowed') st.textContent = '麦克风权限被拒绝';
+          else if(ev.error==='no-speech') st.textContent = '没听到声音，继续说吧…';
+          else if(ev.error==='network') st.textContent = '网络波动，请重试';
+          else st.textContent = '语音识别失败，请打字';
+        }
+        if((ev.error==='no-speech' || ev.error==='audio-capture') && _voiceOn) return;
         stopVoiceUI();
       };
-      _recognition.onend = function(){ stopVoiceUI(); const inp = document.getElementById('aiAssistInput'); if(inp && inp.value.trim()){ try{ aiPolish(); }catch(e){} } };
+      _recognition.onend = function(){
+        if(_voiceOn){
+          // 浏览器自动断开（Chrome 常见），用户没点停止则自动续听
+          try{ setTimeout(function(){ if(_voiceOn && _recognition) _recognition.start(); }, 120); }catch(e){ stopVoiceUI(); }
+          return;
+        }
+        stopVoiceUI();
+        const st = document.getElementById('aiAssistStatus');
+        if(st) st.textContent = '识别完成，可编辑后点击"AI 帮我写"';
+      };
       micBtn.style.display = '';
     }catch(e){ if(micBtn) micBtn.style.display = 'none'; }
   }
   function toggleVoiceInput(){
     const micBtn = document.getElementById('aiAssistMicBtn');
-    if(_voiceOn){ if(_recognition) _recognition.stop(); return; }
+    if(_voiceOn){ _voiceOn = false; if(_recognition) _recognition.stop(); return; }
     if(!_recognition){ if(window.toast) toast('当前浏览器不支持语音输入，请直接打字'); return; }
     try{
+      _voiceBuffer = '';
       _recognition.start();
       _voiceOn = true;
       if(micBtn){ micBtn.classList.add('recording'); micBtn.textContent = '⏹ 停止'; }
       const st = document.getElementById('aiAssistStatus');
-      if(st) st.textContent = '聆听中…请清晰说出你的需求';
+      if(st) st.textContent = '聆听中…说完后点"停止"，再点"AI 帮我写"';
     }catch(e){ if(window.toast) toast('无法启动语音，请直接打字'); }
   }
   function stopVoiceUI(){
