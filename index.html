@@ -1292,7 +1292,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.24.2';
+const APP_VERSION = '1.24.4';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1603,8 +1603,10 @@ async function loadStatsPage(forceFresh) {
   const catMap = { task: '跑腿代办', secondhand: '出售转让', borrow: '短期租借', qa: '有问必答', find: '找人组队', express: '代拿快递', food: '代取外卖', buy: '帮买帮送', print: '帮忙打印', repair: '维修', book: '教材书籍', electronic: '电子产品', daily: '生活用品', team: '竞赛组队', carpool: '出行拼车', survey: '问卷招募' };
   const stateMap = { open: '待接单', taken: '进行中', awaiting_confirm: '待确认', completed: '已完成', cancelled: '已取消', expired: '已过期' };
   const stat = { cat: {}, state: {}, total: 0, rec: { up: 0, down: 0 } };
+  // v1.24.4 修复：orderList 必须在 try 外声明（const 块级作用域，后面 stat._rawOrders 引用会 ReferenceError 导致看板卡死）
+  let orderList = [];
   try {
-    const orderList = await ghIssues('order', 'all') || [];
+    orderList = await ghIssues('order', 'all') || [];
     stat.total = orderList.length;
     for (const i of orderList) {
       let o; try { o = JSON.parse(i.body); } catch(e) { continue; }
@@ -1623,31 +1625,41 @@ async function loadStatsPage(forceFresh) {
   };
   const inProgress = (stat.state.taken || 0) + (stat.state.awaiting_confirm || 0);
   cards.innerHTML = statCard(users, '注册用户') + statCard(stat.total, '总订单') + statCard(inProgress, '进行中') + statCard(stat.state.completed || 0, '已完成');
-  // 收集原始订单列表用于"清理过期/取消"按钮
-  stat._rawOrders = orderList || [];
-  const barRow = function(label, num, pct) {
-    return '<div style="margin-bottom:12px">'
-      + '<div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--text-secondary);margin-bottom:4px"><span>' + esc(label) + '</span><span>' + num + ' · ' + pct + '%</span></div>'
-      + '<div style="height:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:99px;overflow:hidden"><div style="height:100%;width:' + Math.max(2, pct) + '%;background:var(--primary);border-radius:99px"></div></div>'
+  // v1.24.4 兜底：把整段渲染+缓存写入包到 try/catch，再有错误时 detail 也显示明确提示而不是永远卡"加载中…"
+  try {
+    // 收集原始订单列表用于"清理过期/取消"按钮
+    stat._rawOrders = orderList || [];
+    const barRow = function(label, num, pct) {
+      return '<div style="margin-bottom:12px">'
+        + '<div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--text-secondary);margin-bottom:4px"><span>' + esc(label) + '</span><span>' + num + ' · ' + pct + '%</span></div>'
+        + '<div style="height:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:99px;overflow:hidden"><div style="height:100%;width:' + Math.max(2, pct) + '%;background:var(--primary);border-radius:99px"></div></div>'
+        + '</div>';
+    };
+    let h = '<h3 style="font-size:1rem;margin-bottom:12px">品类分布</h3>';
+    for (const k in stat.cat) {
+      h += barRow(catMap[k] || k, stat.cat[k], stat.total ? Math.round(stat.cat[k] / stat.total * 100) : 0);
+    }
+    h += '<h3 style="font-size:1rem;margin:16px 0 12px">状态分布</h3>';
+    for (const k in stat.state) {
+      h += barRow(stateMap[k] || k, stat.state[k], stat.total ? Math.round(stat.state[k] / stat.total * 100) : 0);
+    }
+    const totalFb = stat.rec.up + stat.rec.down;
+    const acc = totalFb ? Math.round(stat.rec.up / totalFb * 100) : 0;
+    h += '<h3 style="font-size:1rem;margin:16px 0 12px">智能推单采纳率 <span class="form-hint" style="display:inline;font-size:.75rem">（本机数据）</span></h3>';
+    h += barRow('推荐有用', stat.rec.up, totalFb ? Math.round(stat.rec.up / totalFb * 100) : 0);
+    h += barRow('推荐没用', stat.rec.down, totalFb ? Math.round(stat.rec.down / totalFb * 100) : 0);
+    h += '<p class="form-hint" style="margin-top:8px">采纳率 ' + acc + '%（共 ' + totalFb + ' 条反馈）· 数据说话，决定下一步先做哪个功能</p>';
+    detail.innerHTML = h;
+    // 写缓存（60 秒内重复打开秒开）
+    try { cacheSet('statspage', { users, stat, ts: Date.now() }); } catch(e) {}
+  } catch (e) {
+    console.error('[loadStatsPage] render failed', e);
+    detail.innerHTML = '<div style="padding:14px 16px;background:#fef2f2;border:1.5px solid #dc2626;border-radius:8px;color:#7f1d1d">'
+      + '<p style="margin:0 0 8px;font-weight:600">📊 数据看板渲染失败</p>'
+      + '<p style="margin:0 0 10px;font-size:.85rem;color:#991b1b">' + esc(e && e.message || String(e)) + '</p>'
+      + '<button class="btn btn-outline btn-sm" onclick="loadStatsPage(true)">🔄 重试</button>'
       + '</div>';
-  };
-  let h = '<h3 style="font-size:1rem;margin-bottom:12px">品类分布</h3>';
-  for (const k in stat.cat) {
-    h += barRow(catMap[k] || k, stat.cat[k], stat.total ? Math.round(stat.cat[k] / stat.total * 100) : 0);
   }
-  h += '<h3 style="font-size:1rem;margin:16px 0 12px">状态分布</h3>';
-  for (const k in stat.state) {
-    h += barRow(stateMap[k] || k, stat.state[k], stat.total ? Math.round(stat.state[k] / stat.total * 100) : 0);
-  }
-  const totalFb = stat.rec.up + stat.rec.down;
-  const acc = totalFb ? Math.round(stat.rec.up / totalFb * 100) : 0;
-  h += '<h3 style="font-size:1rem;margin:16px 0 12px">智能推单采纳率 <span class="form-hint" style="display:inline;font-size:.75rem">（本机数据）</span></h3>';
-  h += barRow('推荐有用', stat.rec.up, totalFb ? Math.round(stat.rec.up / totalFb * 100) : 0);
-  h += barRow('推荐没用', stat.rec.down, totalFb ? Math.round(stat.rec.down / totalFb * 100) : 0);
-  h += '<p class="form-hint" style="margin-top:8px">采纳率 ' + acc + '%（共 ' + totalFb + ' 条反馈）· 数据说话，决定下一步先做哪个功能</p>';
-  detail.innerHTML = h;
-  // 写缓存（60 秒内重复打开秒开）
-  try { cacheSet('statspage', { users, stat, ts: Date.now() }); } catch(e) {}
   _statsLastUsers = users;
   _statsLastStat = stat;
 }
