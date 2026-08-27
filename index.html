@@ -427,6 +427,14 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .ai-quick{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 6px}
 .ai-quick button{font-size:.78rem;padding:5px 10px;border:1px solid var(--border);background:var(--bg-card);border-radius:99px;cursor:pointer;color:var(--text-secondary)}
 .ai-quick button:hover{border-color:var(--primary);color:var(--primary)}
+/* v1.25.0 智能客服菜单（菜单式 FAQ，横向滚动） */
+.ai-menu{display:flex;gap:6px;overflow-x:auto;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg-card);scrollbar-width:thin}
+.ai-menu::-webkit-scrollbar{height:4px}
+.ai-menu::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+.ai-menu button{flex:0 0 auto;font-size:.76rem;padding:6px 11px;border:1px solid var(--primary);background:var(--bg);border-radius:99px;cursor:pointer;color:var(--primary);white-space:nowrap;transition:background .15s,color .15s}
+.ai-menu button:hover{background:var(--primary);color:#fff}
+.ai-menu button[data-faq="contact"],.ai-menu button[data-faq="human"]{border-color:#d97706;color:#d97706}
+.ai-menu button[data-faq="contact"]:hover,.ai-menu button[data-faq="human"]:hover{background:#d97706;color:#fff}
 .ai-input-row{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);background:var(--bg-card)}
 .ai-input-row input{flex:1;border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;font-size:.88rem;background:var(--bg);color:var(--text,#1a202c)}
 .ai-input-row input:focus{outline:none;border-color:var(--primary);box-shadow:var(--ring)}
@@ -862,6 +870,16 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
           <p class="form-hint">留空则不限时，订单不会自动过期。</p>
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>期望接单人性别（选填）</label>
+          <select id="publishGenderLimit">
+            <option value="any">不限</option>
+            <option value="male">仅限男生</option>
+            <option value="female">仅限女生</option>
+          </select>
+        </div>
+      </div>
       <div class="form-group">
         <label>支付方式（接单人完成后来支付）</label>
         <input type="text" id="publishPayment" placeholder="如：微信 xxx / 支付宝 xxx / 面付">
@@ -893,6 +911,12 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
             <button type="button" class="btn btn-outline btn-sm" style="margin-top:6px;font-size:.78rem" onclick="copyOcrFullText()">📋 一键复制全文</button>
           </details>
         </div>
+      </div>
+      <div class="form-group">
+        <label>附件（选填，最多 3 个，单个 &lt;5MB）</label>
+        <input type="file" id="publishAttachment" multiple onchange="const h=document.getElementById('publishAttachmentHint'); if(h){ if(this.files.length){ h.textContent='已选择 '+this.files.length+' 个附件（发布时上传）'; h.style.display='block'; } else { h.style.display='none'; } }">
+        <p class="form-hint" id="publishAttachmentHint" style="display:none"></p>
+        <p class="form-hint">非图片附件（PDF、Word、压缩包等）将上传到后端仓库。需重新部署 SCF 后端后可用。</p>
       </div>
       </details>
       <p class="form-hint" id="publishFeeHint" style="display:none"></p>
@@ -1292,7 +1316,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.24.4';
+const APP_VERSION = '1.25.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1606,7 +1630,9 @@ async function loadStatsPage(forceFresh) {
   // v1.24.4 修复：orderList 必须在 try 外声明（const 块级作用域，后面 stat._rawOrders 引用会 ReferenceError 导致看板卡死）
   let orderList = [];
   try {
-    orderList = await ghIssues('order', 'all') || [];
+    // v1.25.0 修复：只统计 GitHub 仍为 open 的订单，与任务大厅一致。
+    // 之前用 'all' 会把已清理(closed)的过期/取消单也算进总数，导致"总订单/进行中"虚高。
+    orderList = await ghIssues('order', 'open') || [];
     stat.total = orderList.length;
     for (const i of orderList) {
       let o; try { o = JSON.parse(i.body); } catch(e) { continue; }
@@ -1643,6 +1669,10 @@ async function loadStatsPage(forceFresh) {
     for (const k in stat.state) {
       h += barRow(stateMap[k] || k, stat.state[k], stat.total ? Math.round(stat.state[k] / stat.total * 100) : 0);
     }
+    // v1.25.0：状态明细说明
+    const _taken = stat.state.taken || 0, _await = stat.state.awaiting_confirm || 0;
+    h += '<p class="form-hint" style="margin-top:8px">「进行中」= 已接单(' + _taken + ') + 待确认(' + _await + ') = <strong>' + (_taken + _await) + '</strong> 单。'
+      + '若数字偏高，多为长期未完成的接单单，可在下方管理员操作区清理。</p>';
     const totalFb = stat.rec.up + stat.rec.down;
     const acc = totalFb ? Math.round(stat.rec.up / totalFb * 100) : 0;
     h += '<h3 style="font-size:1rem;margin:16px 0 12px">智能推单采纳率 <span class="form-hint" style="display:inline;font-size:.75rem">（本机数据）</span></h3>';
@@ -1691,6 +1721,10 @@ function renderStatsPage(payload) {
   for (const k in stat.cat) h += barRow(catMap[k] || k, stat.cat[k], stat.total ? Math.round(stat.cat[k] / stat.total * 100) : 0);
   h += '<h3 style="font-size:1rem;margin:16px 0 12px">状态分布</h3>';
   for (const k in stat.state) h += barRow(stateMap[k] || k, stat.state[k], stat.total ? Math.round(stat.state[k] / stat.total * 100) : 0);
+  // v1.25.0：状态明细说明，让用户看清"进行中"由哪些单构成
+  const _taken = stat.state.taken || 0, _await = stat.state.awaiting_confirm || 0;
+  h += '<p class="form-hint" style="margin-top:8px">「进行中」= 已接单(' + _taken + ') + 待确认(' + _await + ') = <strong>' + (_taken + _await) + '</strong> 单。'
+    + '若数字偏高，多为长期未完成的接单单，可在下方管理员操作区清理。</p>';
   const totalFb = (stat.rec && stat.rec.up || 0) + (stat.rec && stat.rec.down || 0);
   const acc = totalFb ? Math.round((stat.rec.up || 0) / totalFb * 100) : 0;
   h += '<h3 style="font-size:1rem;margin:16px 0 12px">智能推单采纳率 <span class="form-hint" style="display:inline;font-size:.75rem">（本机数据）</span></h3>';
@@ -1949,6 +1983,7 @@ function renderOrders(orders) {
           ? (o.bounty > 0 ? '<span class="order-card-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '</span>' : '<span style="color:var(--text-muted);font-size:.85rem">免费互助</span>')
           : (o.type === 'find' ? '' : '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>'))
       + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
+      + (o.gender_limit && o.gender_limit !== 'any' ? '<span style="font-size:.7rem;background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:99px;white-space:nowrap">👤 ' + (o.gender_limit === 'male' ? '仅限男生' : '仅限女生') + '</span>' : '')
       + (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : '')
       + '</div>'
       + '<div class="order-card-footer">'
@@ -2358,6 +2393,7 @@ async function showDetail(issueNum) {
       + (isQA ? (o.bounty > 0 ? '<div class="detail-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '（采纳最佳答案后线下支付）</div>' : '') : '<div class="detail-price">¥' + o.price.toFixed(2) + '</div>')
       + '<div class="detail-meta">'
       + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
+      + (isQA || !o.gender_limit || o.gender_limit === 'any' ? '' : '<span style="font-size:.78rem;background:#e0e7ff;color:#3730a3;padding:2px 9px;border-radius:99px">👤 性别要求：' + (o.gender_limit === 'male' ? '仅限男生' : '仅限女生') + '</span>')
       + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_real_name || o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
       + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_real_name || o.taker_name || '未知') + '</a>' + (o.taker_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>' : ''))
       + (isQA ? '' : (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期，原预计 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : ''))
@@ -2373,6 +2409,15 @@ async function showDetail(issueNum) {
           + '</div>'
         : '')
       + imageHTML
+      + (o.attachments && o.attachments.length
+        ? '<div style="margin-top:12px"><div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:8px">📎 附件（' + o.attachments.length + '）</div>'
+          + o.attachments.map(function(a){
+              const sizeText = a.size ? '(' + (a.size / 1024).toFixed(1) + 'KB)' : '';
+              return '<a href="' + esc(a.url) + '" target="_blank" download="' + esc(a.name) + '" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg-card);border:1.5px solid var(--border);border-radius:8px;font-size:.85rem;color:var(--primary);margin-right:8px;margin-bottom:8px">'
+                + esc(a.name) + ' <span style="color:var(--text-muted);font-size:.72rem">' + sizeText + '</span></a>';
+            }).join('')
+          + '</div>'
+        : '')
       + '<div class="detail-desc">' + esc(o.description || '无详细描述') + '</div>'
       + (o.type === 'qa' ? '<div style="margin-top:12px"><button type="button" class="btn btn-ai btn-sm" onclick="aiSolve()">🤖 AI 解题思路</button><div id="qaAiSolveBox" style="margin-top:10px;font-size:.88rem;color:var(--text-secondary);white-space:pre-wrap"></div></div>' : '')
       + (isQA ? '' : paymentHTML + takerPayHTML) + qaBountyHTML
@@ -5216,6 +5261,7 @@ function savePublishDraft() {
       title: g('publishTitle'), desc: g('publishDesc'),
       location: g('publishLocation'), urgency: g('publishUrgency'),
       payment: g('publishPayment'), deadline: g('publishDeadline'),
+      genderLimit: g('publishGenderLimit'),
       bountyEnable: document.getElementById('bountyEnable') ? document.getElementById('bountyEnable').checked : false,
       bounty: g('publishBounty')
     };
@@ -5233,6 +5279,7 @@ function restorePublishDraft() {
     set('publishTitle', d.title); set('publishDesc', d.desc);
     set('publishLocation', d.location); set('publishUrgency', d.urgency);
     set('publishPayment', d.payment); set('publishDeadline', d.deadline);
+    set('publishGenderLimit', d.genderLimit);
     const be = document.getElementById('bountyEnable'); if (be && d.bountyEnable) { be.checked = true; toggleBountyInput(); set('publishBounty', d.bounty); }
     updateCharCount('publishTitle', 'titleCount', 50);
     updateCharCount('publishDesc', 'descCount', 500);
@@ -5300,6 +5347,7 @@ function closePublishModal() {
   document.getElementById('publishModal').classList.remove('active');
   document.getElementById('publishError').style.display = 'none';
   document.getElementById('publishForm').reset();
+  const _attHint = document.getElementById('publishAttachmentHint'); if (_attHint) _attHint.style.display = 'none';
   if (window.resetOcrState) resetOcrState();   // v1.16.0：清掉图片预览与 OCR chips，防"幽灵预览"
 }
 
@@ -5424,6 +5472,8 @@ async function handlePublish(e) {
   const urgency = document.getElementById('publishUrgency').value;
   const deadline = document.getElementById('publishDeadline').value.trim();
   const payment = document.getElementById('publishPayment').value.trim();
+  // v1.25.0 性别限制（仅展示，不强限）
+  const genderLimit = document.getElementById('publishGenderLimit') ? document.getElementById('publishGenderLimit').value : 'any';
   // v1.18.0 交接码（仅跑腿类）
   const handoffCode = (type === 'task') ? (document.getElementById('publishHandoffCode').value || '').trim() : '';
   if (handoffCode && !/^\d{4}$/.test(handoffCode)) {
@@ -5509,12 +5559,38 @@ async function handlePublish(e) {
     }
   }
 
+  // v1.25.0 附件上传（非图片）走后端 GitHub Contents API
+  let attachments = [];
+  const attFiles = document.getElementById('publishAttachment').files;
+  if (attFiles && attFiles.length > 0) {
+    if (attFiles.length > 3) { err.textContent = '最多只能上传3个附件'; err.style.display = 'block'; return; }
+    err.textContent = '正在上传附件...';
+    err.style.display = 'block';
+    let backendMissing = false;
+    for (const f of attFiles) {
+      if (f.size > 5 * 1024 * 1024) { err.textContent = '单个附件请控制在5MB以内'; err.style.display = 'block'; return; }
+      try {
+        const att = await uploadAttachment(f);
+        attachments.push(att);
+      } catch(e) {
+        if (e.message === 'BACKEND_NOT_DEPLOYED') { backendMissing = true; break; }
+        console.error('Attachment upload failed:', e.message);
+      }
+    }
+    if (backendMissing) {
+      toast('附件功能需重新部署 SCF 后端后可用，本次将发布不带附件', 'warning');
+      attachments = [];
+    }
+  }
+
   const order = {
     type, category: cat, title, description: desc, price: price || 0,
     bounty: bounty || 0,
     location: loc, urgency, deadline, payment,
+    gender_limit: genderLimit || 'any',   // v1.25.0 性别限制（仅展示）
     handoff_code: handoffCode || null,   // v1.18.0 交接码
     images: images,
+    attachments: attachments,   // v1.25.0 附件列表（后端 /api/upload 部署后可用）
     search_keywords: (window._publishOcr && window._publishOcr.chips && window._publishOcr.chips.length)
       ? window._publishOcr.chips.slice(0, 10) : [],
     status: 'open',
@@ -6372,6 +6448,24 @@ async function uploadToImgBB(file, opts = {}) {
   if (!data.url) throw new Error('Upload failed');
   return data.url;
 }
+
+// v1.25.0 附件上传：非图片文件走 GitHub Contents API（需后端 /api/upload 部署）
+async function uploadAttachment(file) {
+  const maxSize = 5 * 1024 * 1024;
+  if (file.size > maxSize) throw new Error('附件超过 5MB');
+  const b64 = await fileToBase64(file);
+  const safeName = String(file.name).replace(/[^a-zA-Z0-9.\-_]/g, '_');
+  const res = await ghApi('/api/upload', 'POST', { filename: safeName, content: b64 });
+  if (!res.ok) {
+    if (res.status === 404) throw new Error('BACKEND_NOT_DEPLOYED');
+    throw new Error('附件上传失败：' + res.status);
+  }
+  const data = await res.json().catch(() => ({}));
+  const url = data && data.content && data.content.download_url ? data.content.download_url : (data && data.url);
+  if (!url) throw new Error('附件上传返回异常');
+  return { name: file.name, url, size: file.size };
+}
+window.uploadAttachment = uploadAttachment;
 
 function compressImage(file, maxWidth = 1920, quality = 0.85) {
   return new Promise((resolve) => {
@@ -7367,13 +7461,23 @@ if ('serviceWorker' in navigator) {
 </script>
 
 <!-- AI 互助小助手 (ai+opc) -->
-<button class="ai-fab" id="aiFab" onclick="toggleAiChat()" aria-label="AI 互助小助手" title="互助AI 小助手">🤖</button>
+<button class="ai-fab" id="aiFab" onclick="toggleAiChat()" aria-label="AI 互助小助手" title="互助AI 小助手"><img src="icons/ai-avatar.png" alt="AI" style="width:32px;height:32px;border-radius:50%;object-fit:cover"></button>
 <div class="ai-panel" id="aiPanel" role="dialog" aria-label="AI 互助小助手">
   <div class="ai-panel-header">
-    <div class="ai-avatar">🤖</div>
+    <div class="ai-avatar"><img src="icons/ai-avatar.png" alt="AI" style="width:28px;height:28px;border-radius:50%;object-fit:cover"></div>
     <h4>互助AI 小助手</h4>
     <button class="ai-clear-btn" onclick="clearAiHistory()" title="清空对话" aria-label="清空对话">🗑</button>
     <button class="ai-close" onclick="toggleAiChat(false)" aria-label="关闭">✕</button>
+  </div>
+  <div class="ai-menu" id="aiMenu">
+    <button data-faq="publish" onclick="aiFaq(this.getAttribute('data-faq'))">1.怎么发单</button>
+    <button data-faq="take" onclick="aiFaq(this.getAttribute('data-faq'))">2.怎么接单</button>
+    <button data-faq="credit" onclick="aiFaq(this.getAttribute('data-faq'))">3.信用分规则</button>
+    <button data-faq="vip" onclick="aiFaq(this.getAttribute('data-faq'))">4.会员/VIP</button>
+    <button data-faq="bounty" onclick="aiFaq(this.getAttribute('data-faq'))">5.悬赏问答</button>
+    <button data-faq="safety" onclick="aiFaq(this.getAttribute('data-faq'))">6.安全提醒</button>
+    <button data-faq="contact" onclick="aiFaq(this.getAttribute('data-faq'))">7.联系管理员</button>
+    <button data-faq="human" onclick="aiFaq(this.getAttribute('data-faq'))">8.人工客服</button>
   </div>
   <div class="ai-quick" id="aiQuick">
     <button onclick="aiQuickAsk(this)">怎么发单？</button>
@@ -7446,6 +7550,48 @@ if ('serviceWorker' in navigator) {
   }
   function aiQuickAsk(btn){ const inp = document.getElementById('aiInput'); if(inp) inp.value = btn.textContent; sendAiMessage(); }
   window.toggleAiChat = toggleAiChat; window.sendAiMessage = sendAiMessage; window.aiQuickAsk = aiQuickAsk;
+
+  // v1.25.0 智能客服：菜单式 FAQ 本地库（点菜单直接回复，不耗 AI 配额）
+  const AI_FAQ_LABEL = { publish:'怎么发单？', take:'怎么接单？', credit:'信用分规则', vip:'会员/VIP 有什么用？', bounty:'悬赏问答怎么玩？', safety:'安全提醒', contact:'联系管理员', human:'转人工客服' };
+  const AI_FAQ = {
+    publish: '📝 **怎么发单？**\n1. 点首页「发布任务」或底部「+」；\n2. 选类型（跑腿/二手/问答/找人），填标题、报酬、地点；\n3. 交易类（跑腿/二手）需先通过跑腿认证（上传学生证），每天可发 1 单，会员不限；\n4. 提交后订单进入任务大厅等待接单。',
+    take: '🤝 **怎么接单赚钱？**\n1. 进入「任务」大厅，筛选想做的类型；\n2. 点订单 → 「接单」，填写接单留言；\n3. 完成后让发布者确认，报酬线下支付（微信/支付宝/面付）；\n4. 准时完成涨信用分，信用越高接单越顺畅。',
+    credit: '⭐ **信用分规则**\n- 初始 100 分；\n- 准时完成 +2~+5，爽约/被投诉 -5~-10；\n- ≥85 优秀，<25 禁止发单；\n- 信用分影响接单权限与订单曝光。',
+    vip: '👑 **会员 / VIP**\n- 新用户注册送 7 天试用；\n- ¥1/月 开通后：无限发单、订单优先展示、专属标识；\n- 在「我的」页可开通 / 查看会员状态。',
+    bounty: '🏆 **悬赏问答**\n- 发「有问必答」时可勾选设置悬赏金额；\n- 采纳最佳答案后，赏金通过站内收款信息线下支付给答主；\n- 发布悬赏需信用分 ≥45，超时未采纳系统自动结算。',
+    safety: '🔒 **安全提醒**\n- 平台无资金托管，报酬线下支付，谨防「先付款」诈骗；\n- 交接贵重物品建议用「交接码」当面验收；\n- 遇可疑情况点「投诉」，管理员会介入仲裁。',
+    contact: '📮 **联系管理员**\n正在为你打开与管理员的私信窗口…',
+    human: '👩‍💼 **人工客服**\n正在为你转接人工客服（管理员）私信…'
+  };
+  async function aiFaq(key){
+    const panel = document.getElementById('aiPanel');
+    if(panel && !panel.classList.contains('open')) toggleAiChat(true);
+    const label = AI_FAQ_LABEL[key];
+    const text = AI_FAQ[key];
+    if(!text) return;
+    if(key === 'contact' || key === 'human'){
+      addAiMsg('me', label);
+      addAiMsg('bot', text);
+      _aiHistory.push({ role:'user', content:label });
+      _aiHistory.push({ role:'assistant', content:text });
+      saveAiHistory();
+      try {
+        if(typeof createChatOrder === 'function'){
+          await createChatOrder(ADMIN_STUDENT_ID, '平台管理员', null, '用户咨询');
+          addAiMsg('bot', '已为你创建与管理员的对话，请到「私信」中查看 👉');
+          _aiHistory.push({ role:'assistant', content:'已为你创建与管理员的对话，请到「私信」中查看' });
+          saveAiHistory();
+        }
+      } catch(e){ console.error('[aiFaq] createChatOrder failed', e); }
+      return;
+    }
+    addAiMsg('me', label);
+    addAiMsg('bot', text);
+    _aiHistory.push({ role:'user', content:label });
+    _aiHistory.push({ role:'assistant', content:text });
+    saveAiHistory();
+  }
+  window.aiFaq = aiFaq;
 
   async function callAiChat(messages){
     try{

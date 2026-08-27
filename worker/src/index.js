@@ -181,6 +181,19 @@ async function handleRequest(request, env) {
         const body = await request.json();
         ghPath = `/repos/${REPO}/issues/${num}/comments`;
         ghBody = body;
+      } else if (method === 'POST' && path === '/api/upload') {
+        // v1.25.0 附件上传：用 GitHub Contents API 把文件存到仓库 files/ 目录
+        const body = await request.json();
+        const { filename, content, branch } = body || {};
+        if (!filename || !content) {
+          return json({ error: 'filename and content required' }, 400, headers);
+        }
+        const ts = Date.now();
+        const safeName = String(filename).replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const pathInRepo = `files/${ts}_${safeName}`;
+        ghPath = `/repos/${REPO}/contents/${pathInRepo}`;
+        ghBody = { message: `Upload attachment ${filename}`, content };
+        if (branch) ghBody.branch = branch;
       } else if (method === 'PATCH' && path.startsWith('/api/issue/')) {
         const parts = path.split('/api/issue/')[1].split('/');
         const num = parts[0];
