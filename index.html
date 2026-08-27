@@ -80,7 +80,7 @@ html{font-size:16px;-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px;border:2px solid var(--bg)}
 ::-webkit-scrollbar-thumb:hover{background:var(--text-muted)}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
-body{font-family:'Inter','Noto Sans SC',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+body{font-family:'Inter','Noto Sans SC',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;min-height:100dvh}
 a{color:inherit;text-decoration:none}
 button{cursor:pointer;font-family:inherit}
 input,select,textarea{font-family:inherit;font-size:1rem}
@@ -347,7 +347,7 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
   .bottom-nav-item.active span{font-weight:700}
   .nav-links{display:none}
   body{padding-bottom:58px}
-  .page{min-height:calc(100vh - 58px)}
+  .page{min-height:calc(100vh - 58px);min-height:calc(100dvh - 58px)}
 }
 
 /* Responsive */
@@ -398,7 +398,7 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .ai-fab{position:fixed;right:20px;bottom:24px;z-index:200;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,#6366f1,#1a73e8);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
 .ai-fab:hover{transform:translateY(-3px) scale(1.05);box-shadow:var(--shadow-xl)}
 .ai-fab:active{transform:scale(.95)}
-.ai-panel{position:fixed;right:20px;bottom:92px;z-index:201;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 130px));background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);display:none;flex-direction:column;overflow:hidden}
+.ai-panel{position:fixed;right:20px;bottom:92px;z-index:201;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 130px),calc(100dvh - 130px));background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);display:none;flex-direction:column;overflow:hidden}
 .ai-panel.open{display:flex;animation:aiPop .18s var(--ease)}
 @keyframes aiPop{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
 .ai-panel-header{display:flex;align-items:center;gap:8px;padding:14px 16px;background:linear-gradient(135deg,#6366f1,#1a73e8);color:#fff}
@@ -463,7 +463,7 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}70%{box-shadow:0 0 0 8px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
 @media (max-width:768px){
   .ai-fab{bottom:84px}
-  .ai-panel{bottom:150px;right:12px;height:calc(100vh - 180px);width:calc(100vw - 24px)}
+  .ai-panel{bottom:150px;right:12px;height:calc(100vh - 180px);height:calc(100dvh - 180px);width:calc(100vw - 24px)}
 }
 #updateBanner{position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#1f2937;display:flex;align-items:center;justify-content:center;gap:12px;padding:9px 14px;font-size:.85rem;box-shadow:0 4px 12px rgba(245,158,11,.3);animation:bannerSlide .25s var(--ease)}
 #updateBanner .update-banner-text{flex:1 1 auto;text-align:center}
@@ -846,6 +846,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
         <label>详细描述</label>
         <textarea id="publishDesc" rows="3" maxlength="500" placeholder="详细说明需求、地点等" oninput="updateCharCount('publishDesc','descCount',500)"></textarea>
         <span class="char-count" id="descCount">0/500</span>
+        <p class="form-hint">🔒 请勿在描述/标题中填写手机号、微信等联系方式（公开可见）——接单后通过站内聊天互留即可</p>
       </div>
       <div class="form-group" id="bountyGroup" style="display:none">
         <label>🏆 悬赏费用（问答可选）</label>
@@ -1316,7 +1317,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.25.1';
+const APP_VERSION = '1.26.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1461,7 +1462,69 @@ function ghApi(path, method, body) {
   const tk = getToken();
   if (tk) opts.headers['Authorization'] = 'Bearer ' + tk;
   if (body) opts.body = JSON.stringify(body);
-  return fetch(PROXY_BASE + path, opts);
+  // v1.26.0 R1：15s 超时 + 429 自动重试（最多 2 次，退避 1s/2s）
+  return ghFetchWithRetry(PROXY_BASE + path, opts, 2)
+    .then(function (res) {
+      if (res.status === 429) {
+        try { if (window.toast) toast('请求过于频繁，请稍后再试', 'error'); } catch (e) {}
+      }
+      return res;
+    });
+}
+
+// v1.26.0 R1：带超时与 429 退避重试的 fetch 封装（不改变返回类型，调用方零改动）
+function ghFetchWithRetry(url, opts, retriesLeft) {
+  const controller = new AbortController();
+  const timer = setTimeout(function () { controller.abort(); }, 15000);
+  return fetch(url, Object.assign({}, opts, { signal: controller.signal }))
+    .then(function (res) {
+      clearTimeout(timer);
+      if (res.status === 429 && retriesLeft > 0) {
+        const delay = retriesLeft === 2 ? 1000 : 2000;
+        return new Promise(function (resolve, reject) {
+          setTimeout(function () {
+            ghFetchWithRetry(url, opts, retriesLeft - 1).then(resolve, reject);
+          }, delay);
+        });
+      }
+      return res;
+    })
+    .catch(function (err) {
+      clearTimeout(timer);
+      if (err && err.name === 'AbortError') {
+        if (retriesLeft > 0) return ghFetchWithRetry(url, opts, retriesLeft - 1);
+        return new Response(JSON.stringify({ error: 'timeout' }), { status: 504, headers: { 'Content-Type': 'application/json' } });
+      }
+      throw err;
+    });
+}
+
+// v1.26.0 R7：姓名/学号脱敏工具（隐私保护）
+function maskName(name, sid) {
+  const n = String(name || '').trim();
+  if (!n) return '匿名用户';
+  if (/^[\u4e00-\u9fa5]{2,}$/.test(n)) return n.charAt(0) + '**';
+  if (/^[A-Za-z]/.test(n)) return n.charAt(0).toUpperCase() + '***';
+  return n.length > 1 ? n.charAt(0) + '***' : n;
+}
+function maskSid(sid) {
+  const s = String(sid || '');
+  if (s.length <= 5) return s;
+  return s.slice(0, 2) + '****' + s.slice(-3);
+}
+// 当前用户是否可查看订单的私密信息（发布者 / 接单人 / 管理员）
+function canSeePrivate(o) {
+  if (!o) return false;
+  if (window.isAdminUser && isAdminUser()) return true;
+  if (!S.user) return false;
+  const myId = S.user._issue_number || S.user.student_id;
+  const mySid = S.user.student_id;
+  return !!(o && (
+    (o.publisher_id && (o.publisher_id == myId || o.publisher_id == mySid))
+    || (o.taker_id && (o.taker_id == myId || o.taker_id == mySid))
+    || (o.publisher_student_id && o.publisher_student_id == mySid)
+    || (o.taker_student_id && o.taker_student_id == mySid)
+  ));
 }
 
 // v1.25.1 探测后端能力（附件上传等），避免显示不可用的入口
@@ -1763,6 +1826,7 @@ function renderStatsPage(payload) {
       + '⚠️ <strong>关闭后不可逆</strong>，且会一并清除这些订单下面的所有评论/私信。如不确定，先导出一份标题清单留底。</p>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
       + '<button class="btn btn-outline btn-sm" onclick="exportStaleOrdersList()">📋 导出清单留底</button>'
+      + '<button class="btn btn-outline btn-sm" onclick="exportAllData()">💾 导出全量数据</button>'
       + '<button class="btn btn-sm" style="background:#dc2626;color:#fff;border-color:#dc2626" onclick="cleanupStaleOrders()">🗑️ 清理过期/取消订单</button>'
       + '<button class="btn btn-outline btn-sm" onclick="loadStatsPage(true)">🔄 强制刷新数据</button>'
       + '</div>';
@@ -1775,6 +1839,41 @@ window.loadStatsPage = loadStatsPage;
 let _statsLastUsers = 0;
 let _statsLastStat = null;
 window._statsLastStat = null;  // 给清理按钮全局访问
+
+// v1.26.0 R8：管理员导出全量数据（订单 + 用户）为 JSON 备份文件
+async function exportAllData() {
+  if (!isAdminUser()) { toast('仅管理员可用', 'error'); return; }
+  toast('正在拉取全量数据…', 'info', 3000);
+  try {
+    const ordersRes = await ghIssues('order', 'all');
+    const usersRes = await ghIssues('user', 'all');
+    const orders = (ordersRes || []).map(function(i) {
+      let o = {}; try { o = JSON.parse(i.body); } catch(e) {}
+      return Object.assign({ issue_number: i.number, state: i.state, created_at: i.created_at }, o);
+    });
+    const users = (usersRes || []).map(function(i) {
+      let u = {}; try { u = JSON.parse(i.body); } catch(e) {}
+      return Object.assign({ issue_number: i.number, state: i.state, created_at: i.created_at }, u);
+    });
+    const data = {
+      exported_at: new Date().toISOString(),
+      version: APP_VERSION,
+      stats: { orders: orders.length, users: users.length },
+      orders: orders,
+      users: users
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'hust-helper-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { URL.revokeObjectURL(a.href); if (a.parentNode) a.parentNode.removeChild(a); }, 1000);
+    toast('已导出 ' + orders.length + ' 条订单、' + users.length + ' 条用户数据（含隐私字段，请仅本机保存）', 'success', 6000);
+  } catch(e) {
+    toast('导出失败：' + (e.message || e), 'error');
+  }
+}
 
 // 导出"过期/取消"订单清单到剪贴板（管理员留底用）
 async function exportStaleOrdersList() {
@@ -2010,7 +2109,7 @@ function renderOrders(orders) {
       + (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : '')
       + '</div>'
       + '<div class="order-card-footer">'
-      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
+      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_name || '未知') : maskName(o.publisher_name, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
       + '<span>' + timeAgo(o.created_at) + '</span>'
       + '</div></div>';
   }).join('');
@@ -2417,8 +2516,8 @@ async function showDetail(issueNum) {
       + '<div class="detail-meta">'
       + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
       + (isQA || !o.gender_limit || o.gender_limit === 'any' ? '' : '<span style="font-size:.78rem;background:#e0e7ff;color:#3730a3;padding:2px 9px;border-radius:99px">👤 性别要求：' + (o.gender_limit === 'male' ? '仅限男生' : '仅限女生') + '</span>')
-      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.publisher_real_name || o.publisher_name || o.publisher_student_id || '未知') + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
-      + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(o.taker_real_name || o.taker_name || '未知') + '</a>' + (o.taker_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>' : ''))
+      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_real_name || o.publisher_name || maskName(o.publisher_name, o.publisher_student_id) || maskName(o.publisher_student_id, '') || '未知') : maskName(o.publisher_real_name || o.publisher_name || o.publisher_student_id, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
+      + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.taker_real_name || o.taker_name || '未知') : maskName(o.taker_real_name || o.taker_name, o.taker_student_id)) + '</a>' + (o.taker_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>' : ''))
       + (isQA ? '' : (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期，原预计 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : ''))
       + (isQA ? '' : (o.status === 'taken' && o.overdue ? '<span style="font-size:.75rem;color:#dc2626;margin-left:6px">已超时，可联系对方或投诉</span>' : ''))
       + '<span>🕐 ' + timeAgo(o.created_at) + '</span>'
@@ -2586,6 +2685,9 @@ async function loadComments(issueNum) {
           const isMe = S.user && (u.student_id === S.user.student_id);
           const isAdminMsg = u.student_id === ADMIN_STUDENT_ID;
           const isBest = order && order.solved && order.best_comment_id === c.id;
+          // v1.26.0 R7：评论区姓名脱敏（本人/管理员/订单参与者可见全名，问答公开场景他人显示"某**"）
+          const _cKnown = cId === pubSid || cId === takerSid || cId === pubId || cId === takerId;
+          const displayName = (isMe || isAdminMsg || _cKnown) ? name : maskName(name, cId);
           // 问答未解决 + (发布者或管理员) + 非发布者本人评论 → 显示采纳按钮
           let acceptBtn = '';
           if (isQA && order && !order.solved && (isPublisher || isAdmin) && cId !== pubSid && cId !== pubId) {
@@ -2595,7 +2697,7 @@ async function loadComments(issueNum) {
           return '<div style="' + boxStyle + '">'
             + (isBest ? '<div style="font-size:.75rem;color:#16a34a;font-weight:600;margin-bottom:4px">✅ 最佳答案</div>' : '')
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
-            + '<strong style="font-size:.82rem;color:' + (isMe ? 'var(--primary)' : isAdminMsg ? '#92400e' : 'var(--text)') + '">' + esc(name) + (isMe ? ' (我)' : '') + (isAdminMsg ? ' [管理员]' : '') + '</strong>'
+            + '<strong style="font-size:.82rem;color:' + (isMe ? 'var(--primary)' : isAdminMsg ? '#92400e' : 'var(--text)') + '">' + esc(displayName) + (isMe ? ' (我)' : '') + (isAdminMsg ? ' [管理员]' : '') + '</strong>'
             + '<span style="font-size:.7rem;color:var(--text-muted)">' + time + '</span></div>'
             + '<div style="font-size:.88rem">' + (text ? esc(text) : '') + (imgs ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">' + imgs.map(function(img){ return '<img src="' + img + '" style="max-width:48%;max-height:240px;border-radius:8px;object-fit:cover;border:1px solid var(--border);cursor:pointer" onclick="window.open(\'' + img + '\',\'_blank\')">'; }).join('') + '</div>' : '') + '</div>'
             + acceptBtn
@@ -2919,6 +3021,27 @@ async function submitReport() {
 
   const btn = document.querySelector('#reportModal .btn-danger');
   if (btn) { btn.disabled = true; btn.textContent = '提交中…'; }
+
+  // v1.26.0 R9：同一用户对同一订单禁止重复投诉（防刷投诉）
+  try {
+    const _myReporterId = S.user ? (S.user._issue_number || S.user.student_id) : '';
+    if (_myReporterId) {
+      const existingReports = await ghIssues('report', 'all');
+      const dup = existingReports.some(r => {
+        try {
+          const rp = JSON.parse(r.body);
+          return rp.order_issue_number == _reportIssueNum && rp.reporter_id == _myReporterId;
+        } catch(e) { return false; }
+      });
+      if (dup) {
+        errEl.textContent = '你已投诉过该订单，请勿重复提交';
+        errEl.style.display = 'block';
+        if (btn) { btn.disabled = false; btn.textContent = '提交投诉'; }
+        return;
+      }
+    }
+  } catch(e) { /* 查重失败不阻断提交 */ }
+
   // 获取订单信息以确定投诉对象
   try {
     const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + _reportIssueNum, {
@@ -2959,19 +3082,26 @@ async function submitReport() {
     // ---- v1.17.0 AI 预审：先让 AI 判断，高置信自动处理，否则转人工 ----
     report.ai_review = null;
     let aiMsg = '';
-    try {
-      const ar = await ghApi('/api/ai/review', 'POST', {
-        reason: reason || '未选择',
-        description: report.description,   // v1.19.0：AI 可见食品证据行
-        order_title: o.title || '',
-        target_name: targetName || '',
-        reporter_name: S.user.name || ''
-      });
-      if (ar.ok) {
-        const d = await ar.json();
-        if (d && d.verdict) report.ai_review = d;
-      }
-    } catch(e) { /* AI 预审失败 → 直接转人工，不阻断提交 */ }
+    // v1.26.0 R10：AI 预审纳入每日配额，配额耗尽时跳过预审直接转人工（防绕过配额）
+    const _aiReviewOk = !(window.aiQuotaLeft && aiQuotaLeft() <= 0);
+    if (_aiReviewOk) {
+      try {
+        const ar = await ghApi('/api/ai/review', 'POST', {
+          reason: reason || '未选择',
+          description: report.description,   // v1.19.0：AI 可见食品证据行
+          order_title: o.title || '',
+          target_name: targetName || '',
+          reporter_name: S.user.name || ''
+        });
+        if (ar.ok) {
+          const d = await ar.json();
+          if (d && d.verdict) {
+            report.ai_review = d;
+            if (window.aiQuotaUse) aiQuotaUse();   // v1.26.0 R10：成功调用计入配额
+          }
+        }
+      } catch(e) { /* AI 预审失败 → 直接转人工，不阻断提交 */ }
+    }
 
     if (report.ai_review && report.ai_review.verdict === 'valid' && report.ai_review.confidence >= 85) {
       report.status = 'ai_resolved';
@@ -3386,11 +3516,17 @@ async function showUserProfile(studentId) {
         + (blocked ? '✅ 取消拉黑' : '🚫 拉黑该用户') + '</button></div>';
     }
 
+    // v1.26.0 R7：资料页隐私脱敏（非本人/非管理员时隐藏真实姓名与完整学号）
+    const _isSelf = S.user && S.user.student_id === studentId;
+    const _isAdminView = S.user && isAdminUser();
+    const _profileName = (_isSelf || _isAdminView) ? (user.nickname || user.name || '未知') : (user.nickname ? user.nickname : maskName(user.name, studentId));
+    const _profileSid = (_isSelf || _isAdminView) ? (user.student_id || '') : maskSid(user.student_id);
+
     ct.innerHTML = ''
       + '<div style="text-align:center;margin-bottom:16px">'
       + '<div style="width:64px;height:64px;border-radius:50%;background:var(--primary-light);color:var(--primary);font-size:1.5rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-bottom:8px">' + ((user.nickname || user.name) || '?').charAt(0).toUpperCase() + '</div>'
-      + '<h3 style="margin:0">' + esc(user.nickname || user.name || '未知') + '</h3>'
-      + '<p style="color:var(--text-secondary);font-size:.85rem;margin:4px 0">' + esc(user.student_id) + '</p>'
+      + '<h3 style="margin:0">' + esc(_profileName) + '</h3>'
+      + '<p style="color:var(--text-secondary);font-size:.85rem;margin:4px 0">' + esc(_profileSid) + '</p>'
       + (user.email_verified ? '<span style="display:inline-block;margin-top:2px;font-size:.72rem;color:#15803d;background:#dcfce7;padding:2px 8px;border-radius:99px">📧 邮箱已验证</span>' : '')
       + '</div>'
       + chatBtnHtml
@@ -4968,6 +5104,22 @@ async function sendVerifyCode() {
     toast('发送过于频繁，请 ' + wait + ' 秒后再试', 'error');
     return;
   }
+
+  // v1.26.0 R9：每邮箱每日最多发送 10 次验证码（防刷邮件额度）
+  try {
+    const d = new Date().toISOString().slice(0, 10);
+    const vcKey = 'hust_vc_daily_' + toEmail;
+    let rec = {};
+    try { rec = JSON.parse(localStorage.getItem(vcKey) || '{}'); } catch(e) {}
+    if (rec.date !== d) rec = { date: d, count: 0 };
+    if (rec.count >= 10) {
+      toast('该邮箱今日发送次数已达上限，请明天再试或联系管理员', 'error');
+      return;
+    }
+    rec.count++;
+    localStorage.setItem(vcKey, JSON.stringify(rec));
+  } catch(e) {}
+
   const code = String(Math.floor(100000 + Math.random() * 900000));
   _emailCode = code;
   _emailCodeExpire = now + 10 * 60 * 1000; // 10分钟有效
@@ -5008,9 +5160,38 @@ function checkVerifyCode() {
     toast('验证码已过期，请重新发送', 'error');
     return;
   }
-  if (code.length === 6 && code === _emailCode) {
-    _emailVerified = true;
-    toast('邮箱验证通过 ✓', 'success');
+  // v1.26.0 R9：连续错误 5 次锁定该邮箱 10 分钟（防暴力破解）
+  const _vcLockKey = 'hust_vc_lock_' + (_emailCodeEmail || '');
+  try {
+    let lk = {};
+    try { lk = JSON.parse(localStorage.getItem(_vcLockKey) || '{}'); } catch(e) {}
+    const now = Date.now();
+    if (lk.lockedUntil && now < lk.lockedUntil) {
+      const waitMin = Math.ceil((lk.lockedUntil - now) / 60000);
+      toast('验证尝试过于频繁，已锁定，请 ' + waitMin + ' 分钟后再试', 'error');
+      return;
+    }
+    if (code.length === 6 && code === _emailCode) {
+      _emailVerified = true;
+      localStorage.removeItem(_vcLockKey);
+      toast('邮箱验证通过 ✓', 'success');
+    } else if (code.length === 6) {
+      lk.fails = (lk.fails || 0) + 1;
+      if (lk.fails >= 5) {
+        lk.lockedUntil = now + 10 * 60 * 1000;
+        lk.fails = 0;
+        toast('错误次数过多，该邮箱已锁定 10 分钟', 'error');
+      } else {
+        toast('验证码错误，还可尝试 ' + (5 - lk.fails) + ' 次', 'error');
+      }
+      localStorage.setItem(_vcLockKey, JSON.stringify(lk));
+    }
+  } catch(e) {
+    // 兜底走原有校验
+    if (code.length === 6 && code === _emailCode) {
+      _emailVerified = true;
+      toast('邮箱验证通过 ✓', 'success');
+    }
   }
 }
 
@@ -5491,6 +5672,17 @@ async function handlePublish(e) {
   const cat = document.getElementById('publishCategory').value;
   const title = document.getElementById('publishTitle').value.trim();
   const desc = document.getElementById('publishDesc').value.trim();
+
+  // v1.26.0 R9：发布频率限制（防刷屏），成功发布后由 _markPublishOk 更新时间戳
+  try {
+    const _lastPub = parseInt(localStorage.getItem('hust_last_publish') || '0', 10);
+    if (_lastPub && (Date.now() - _lastPub) < 60000) {
+      const wait = Math.ceil((60000 - (Date.now() - _lastPub)) / 1000);
+      err.textContent = '发布过于频繁，请 ' + wait + ' 秒后再试';
+      err.style.display = 'block';
+      return;
+    }
+  } catch(e) {}
   const price = (type === 'qa' || type === 'find') ? 0 : parseFloat(document.getElementById('publishPrice').value);
   const loc = document.getElementById('publishLocation').value.trim();
   const urgency = document.getElementById('publishUrgency').value;
@@ -5639,6 +5831,7 @@ async function handlePublish(e) {
     const prefix = type === 'qa' ? '[问答] ' : (type === 'borrow' ? '[借物] ' : '[订单] ');
     await ghCreateIssue(prefix + title, JSON.stringify(order), [label, type, cat]);
     toast('发布成功！', 'success');
+    try { localStorage.setItem('hust_last_publish', String(Date.now())); } catch(e) {}
     try { localStorage.setItem('hust_safety_tip_seen', '1'); } catch(e) {}
     clearPublishDraft();
     resetOcrState();
@@ -7162,6 +7355,25 @@ function requestNotifyPermission() {
   if (Notification.permission === 'default') Notification.requestPermission();
 }
 
+// v1.26.0 R11：通知权限改为顶部引导横幅（不再登录即静默弹窗，需用户点击才请求）
+function maybeShowNotifyBanner() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'default') return;
+  try {
+    if (localStorage.getItem('hust_notify_banner_closed')) return;
+    if (document.getElementById('notifyBanner')) return;
+    const b = document.createElement('div');
+    b.id = 'notifyBanner';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999;background:#185FA5;color:#fff;padding:9px 14px;font-size:.85rem;display:flex;align-items:center;justify-content:space-between;gap:10px';
+    b.innerHTML = '<span>🔔 开启通知，及时收到接单/私信提醒</span>'
+      + '<span style="display:flex;gap:8px;flex-shrink:0">'
+      + '<button onclick="requestNotifyPermission();document.getElementById(\'notifyBanner\').remove();try{localStorage.setItem(\'hust_notify_banner_closed\',\'1\')}catch(e){}" style="background:#fff;color:#185FA5;border:none;padding:4px 12px;border-radius:99px;font-size:.8rem;cursor:pointer;font-weight:600">开启</button>'
+      + '<button onclick="document.getElementById(\'notifyBanner\').remove();try{localStorage.setItem(\'hust_notify_banner_closed\',\'1\')}catch(e){}" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);padding:4px 10px;border-radius:99px;font-size:.8rem;cursor:pointer">稍后</button>'
+      + '</span>';
+    document.body.appendChild(b);
+  } catch(e) {}
+}
+
 // --- 发送通知（核心：写历史 + toast + 浏览器通知） ---
 function sendNotify(title, body, opts) {
   opts = opts || {};
@@ -7449,14 +7661,14 @@ const _origHandleAuth = handleAuth;
 handleAuth = async function(e) {
   await _origHandleAuth(e);
   if (S.user) {
-    requestNotifyPermission();
+    maybeShowNotifyBanner();
     _knownOrders = {}; _knownReports = {};
     runNotificationCheck();
   }
 };
 
 (function() {
-  if (S.user) { requestNotifyPermission(); runNotificationCheck(); }
+  if (S.user) { maybeShowNotifyBanner(); runNotificationCheck(); }
   loadAnnounceBanner();
 })();
 
@@ -7563,7 +7775,13 @@ if ('serviceWorker' in navigator) {
   async function sendAiMessage(){
     const inp = document.getElementById('aiInput'); if(!inp) return;
     const text = inp.value.trim(); if(!text) return;
-    if(aiQuotaLeft() <= 0){ addAiMsg('bot','今日 AI 次数已用完，明天再来吧～'); return; }
+    if(aiQuotaLeft() <= 0){
+      // v1.26.0 R10：配额耗尽时先尝试本地 FAQ 关键词兜底，不再只回"明天再来"
+      const localReply = aiFaqMatch(text);
+      if (localReply) { addAiMsg('bot', localReply); return; }
+      addAiMsg('bot','今日 AI 次数已用完，明天再来吧～');
+      return;
+    }
     inp.value = '';
     addAiMsg('me', text);
     _aiHistory.push({ role:'user', content:text });
@@ -7589,6 +7807,23 @@ if ('serviceWorker' in navigator) {
     contact: '📮 **联系管理员**\n正在为你打开与管理员的私信窗口…',
     human: '👩‍💼 **人工客服**\n正在为你转接人工客服（管理员）私信…'
   };
+  // v1.26.0 R10：本地 FAQ 关键词匹配（AI 配额耗尽时的免费兜底）
+  function aiFaqMatch(text){
+    const t = String(text || '').toLowerCase();
+    const rules = [
+      { keys: ['发单','发布','怎么发','发个需求','怎么发单'], faq: 'publish' },
+      { keys: ['接单','怎么接','抢单','赚钱','接活'], faq: 'take' },
+      { keys: ['信用','分数','扣分','加分','信誉'], faq: 'credit' },
+      { keys: ['会员','vip','试用'], faq: 'vip' },
+      { keys: ['悬赏','赏金','采纳','问答'], faq: 'bounty' },
+      { keys: ['安全','诈骗','骗','投诉','交接'], faq: 'safety' },
+      { keys: ['管理员','人工','客服','联系'], faq: 'contact' }
+    ];
+    for (const r of rules) {
+      if (r.keys.some(function(k){ return t.indexOf(k) >= 0; })) return AI_FAQ[r.faq] || null;
+    }
+    return null;
+  }
   async function aiFaq(key){
     const panel = document.getElementById('aiPanel');
     if(panel && !panel.classList.contains('open')) toggleAiChat(true);
