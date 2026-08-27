@@ -912,11 +912,11 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
           </details>
         </div>
       </div>
-      <div class="form-group">
+      <div class="form-group" id="publishAttachmentGroup" style="display:none">
         <label>附件（选填，最多 3 个，单个 &lt;5MB）</label>
         <input type="file" id="publishAttachment" multiple onchange="const h=document.getElementById('publishAttachmentHint'); if(h){ if(this.files.length){ h.textContent='已选择 '+this.files.length+' 个附件（发布时上传）'; h.style.display='block'; } else { h.style.display='none'; } }">
         <p class="form-hint" id="publishAttachmentHint" style="display:none"></p>
-        <p class="form-hint">非图片附件（PDF、Word、压缩包等）将上传到后端仓库。需重新部署 SCF 后端后可用。</p>
+        <p class="form-hint">非图片附件（PDF、Word、压缩包等）将上传到后端仓库。后端支持检测通过后才显示本入口。</p>
       </div>
       </details>
       <p class="form-hint" id="publishFeeHint" style="display:none"></p>
@@ -1316,7 +1316,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.25.0';
+const APP_VERSION = '1.25.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1462,6 +1462,29 @@ function ghApi(path, method, body) {
   if (tk) opts.headers['Authorization'] = 'Bearer ' + tk;
   if (body) opts.body = JSON.stringify(body);
   return fetch(PROXY_BASE + path, opts);
+}
+
+// v1.25.1 探测后端能力（附件上传等），避免显示不可用的入口
+function probeBackendFeatures() {
+  if (S._backendProbed) return Promise.resolve();
+  S._backendProbed = true;
+  S.backendUpload = false;
+  return fetch(PROXY_BASE + '/upload', { method: 'OPTIONS' })
+    .then(res => {
+      // 204/200 表示端点存在；405 表示 OPTIONS 不允许但路由存在也算支持
+      S.backendUpload = res.ok || res.status === 204 || res.status === 405;
+      console.log('[backend] upload endpoint support:', S.backendUpload, 'status:', res.status);
+    })
+    .catch(err => {
+      S.backendUpload = false;
+      console.log('[backend] upload endpoint not available:', err.message);
+    })
+    .finally(() => { updatePublishAttachmentVisibility(); });
+}
+function updatePublishAttachmentVisibility() {
+  const g = document.getElementById('publishAttachmentGroup');
+  if (!g) return;
+  g.style.display = S.backendUpload ? 'block' : 'none';
 }
 
 async function ghIssues(label, state) {
@@ -5301,6 +5324,7 @@ function showPublishModal(preType) {
   if (!checkApproved()) return;
   document.getElementById('publishModal').classList.add('active');
   updatePublishCategories();
+  updatePublishAttachmentVisibility(); // v1.25.1 根据后端能力显示附件入口
   // v1.18.0：首次发布显示安全须知条
   const tip = document.getElementById('safetyTipBar');
   if (tip) tip.style.display = localStorage.getItem('hust_safety_tip_seen') ? 'none' : 'block';
@@ -7456,6 +7480,8 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('/hust-helper/sw.js', { scope: '/hust-helper/' })
       .catch(function (e) { console.warn('SW registration failed:', e); });
+    // v1.25.1 后台探测后端能力，自动开启/隐藏对应入口
+    probeBackendFeatures();
   });
 }
 </script>
