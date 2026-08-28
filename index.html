@@ -168,6 +168,9 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 .home-cat-icon.cat-goods{background:var(--cat-goods)}
 .home-cat-icon.cat-qa{background:var(--cat-qa)}
 .home-cat-icon.cat-carpool{background:var(--cat-carpool)}
+.home-cat-icon svg{width:24px;height:24px;stroke:#fff;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.home-cat:hover .home-cat-icon{transform:translateY(-2px)}
+.home-cat-icon{transition:transform .15s ease}
 .home-cat-label{font-size:12px;color:var(--text-secondary)}
 .home-cta-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0 6px}
 .btn-brand{background:var(--brand);color:#fff}
@@ -592,16 +595,16 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
   <div class="container">
     <div class="home-icon-row">
       <button class="home-cat" onclick="homeGo('task')">
-        <span class="home-cat-icon cat-task">跑</span><span class="home-cat-label">跑腿</span>
+        <span class="home-cat-icon cat-task"><svg viewBox="0 0 24 24"><path d="M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg></span><span class="home-cat-label">跑腿</span>
       </button>
       <button class="home-cat" onclick="homeGo('goods')">
-        <span class="home-cat-icon cat-goods">二</span><span class="home-cat-label">二手</span>
+        <span class="home-cat-icon cat-goods"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><span class="home-cat-label">二手</span>
       </button>
       <button class="home-cat" onclick="homeGo('qa')">
-        <span class="home-cat-icon cat-qa">问</span><span class="home-cat-label">问答</span>
+        <span class="home-cat-icon cat-qa"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="home-cat-label">问答</span>
       </button>
       <button class="home-cat" onclick="homeGo('find','carpool')">
-        <span class="home-cat-icon cat-carpool">拼</span><span class="home-cat-label">拼车</span>
+        <span class="home-cat-icon cat-carpool"><svg viewBox="0 0 24 24"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a2 2 0 0 0-1.6-.8H9.3a2 2 0 0 0-1.6.8L5 11l-5.16.86a1 1 0 0 0-.84.99V16h3m10 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM7 16a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/></svg></span><span class="home-cat-label">拼车</span>
       </button>
     </div>
   </div>
@@ -1343,7 +1346,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.26.1';
+const APP_VERSION = '1.26.2';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
