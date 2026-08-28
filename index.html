@@ -173,11 +173,28 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 .btn-brand{background:var(--brand);color:#fff}
 
 /* 任务大厅顶部蓝色统一（与首页、我的页蓝卡呼应） */
-.task-hero{background:var(--brand);color:#fff;padding:22px 0 30px}
-.task-hero-title{color:#fff;font-size:1.4rem;font-weight:700;margin:0 0 6px}
-.task-hero-sub{color:rgba(255,255,255,.72);font-size:.9rem;margin:0}
+.task-hero{background:var(--brand);color:#fff;padding:18px 0 28px}
+.task-hero-head{display:flex;align-items:center;gap:16px;margin-bottom:10px}
+.task-hero-icon{width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
+.task-hero-icon.cat-task{background:var(--cat-task)}
+.task-hero-icon.cat-goods{background:var(--cat-goods)}
+.task-hero-icon.cat-qa{background:var(--cat-qa)}
+.task-hero-icon.cat-find{background:var(--cat-carpool)}
+.task-hero-title{color:#fff;font-size:1.35rem;font-weight:700;margin:0 0 4px}
+.task-hero-sub{color:rgba(255,255,255,.78);font-size:.88rem;margin:0}
+.task-hero-stats{display:flex;gap:10px;margin-top:12px}
+.task-hero-stat{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);color:#fff;padding:5px 12px;border-radius:99px;font-size:.8rem}
 html[data-theme="dark"] .task-hero{background:var(--brand)}
 .btn-brand:hover{background:#134c86;box-shadow:var(--shadow-md)}
+/* 任务大厅 tab 按钮：选中态按分类着色，与首页四色入口呼应 */
+.tab-bar{display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0}
+.tab-btn{background:none;border:none;padding:10px 18px;font-size:.9rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;border-radius:8px 8px 0 0}
+.tab-btn:hover{background:var(--bg-hover)}
+.tab-btn.active{font-weight:600}
+.tab-btn.active.tab-task{color:var(--cat-task);border-bottom-color:var(--cat-task);background:rgba(24,95,165,.08)}
+.tab-btn.active.tab-goods{color:var(--cat-goods);border-bottom-color:var(--cat-goods);background:rgba(59,109,17,.08)}
+.tab-btn.active.tab-qa{color:var(--cat-qa);border-bottom-color:var(--cat-qa);background:rgba(186,117,23,.08)}
+.tab-btn.active.tab-find{color:var(--cat-carpool);border-bottom-color:var(--cat-carpool);background:rgba(83,74,183,.08)}
 .home-announce{display:none;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin:14px auto 8px}
 
 /* Sections */
@@ -295,9 +312,10 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 
 /* Empty */
 .empty-state{text-align:center;padding:56px 16px;color:var(--text-muted)}
-.empty-state-icon{font-size:2.8rem;margin-bottom:14px}
-.empty-state p{font-size:.9rem}
-.empty-state .btn{margin-top:18px}
+.empty-state-icon{font-size:3.6rem;margin-bottom:18px}
+.empty-state p{font-size:1rem;font-weight:500;color:var(--text-secondary);margin-bottom:6px}
+.empty-state .hint{font-size:.85rem;color:var(--text-muted);margin-top:0;margin-bottom:18px}
+.empty-state .btn{margin-top:8px;padding:11px 28px;border-radius:99px;font-size:.95rem;font-weight:600}
 /* ===== 我的页 redesign (v1.23.0) ===== */
 .my-usercard{display:flex;align-items:center;gap:14px;background:var(--primary);background-image:linear-gradient(135deg,rgba(255,255,255,.20),rgba(255,255,255,0) 60%);color:#fff;border-radius:var(--radius);padding:18px;margin-bottom:16px;cursor:pointer;position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent}
 .my-usercard:active{transform:scale(.99)}
@@ -607,17 +625,25 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
   <!-- 蓝色顶部区：与首页 hero、我的页蓝卡统一 -->
   <div class="task-hero">
     <div class="container">
-      <h2 class="task-hero-title">📋 任务大厅</h2>
-      <p class="task-hero-sub">发布你的需求，或者浏览找活干。从拿外卖到二手交易，啥都有。</p>
+      <div class="task-hero-head">
+        <div class="task-hero-icon cat-task" id="taskHeroIcon">🏃</div>
+        <div>
+          <h2 class="task-hero-title" id="taskHeroTitle">跑腿代办</h2>
+          <p class="task-hero-sub" id="taskHeroSub">校园跑腿、代取快递、帮买帮送，找人接单</p>
+        </div>
+      </div>
+      <div class="task-hero-stats" id="taskHeroStats">
+        <span class="task-hero-stat">✨ 切换下方分类，发现校园需求</span>
+      </div>
     </div>
   </div>
   <div class="container">
     <!-- 板块 Tab -->
-    <div class="tab-bar" id="taskTabBar" style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0">
-      <button class="tab-btn active" data-tasktab="task" onclick="switchTaskTab('task')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:600;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;transition:all .2s">🏃 跑腿代办</button>
-      <button class="tab-btn" data-tasktab="goods" onclick="switchTaskTab('goods')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">📦 物品流转</button>
-      <button class="tab-btn" data-tasktab="qa" onclick="switchTaskTab('qa')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">💬 有问必答</button>
-      <button class="tab-btn" data-tasktab="find" onclick="switchTaskTab('find')" style="background:none;border:none;padding:10px 20px;font-size:.92rem;font-weight:500;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s">🔍 找人</button>
+    <div class="tab-bar" id="taskTabBar">
+      <button class="tab-btn active tab-task" data-tasktab="task" onclick="switchTaskTab('task')">🏃 跑腿代办</button>
+      <button class="tab-btn tab-goods" data-tasktab="goods" onclick="switchTaskTab('goods')">📦 物品流转</button>
+      <button class="tab-btn tab-qa" data-tasktab="qa" onclick="switchTaskTab('qa')">💬 有问必答</button>
+      <button class="tab-btn tab-find" data-tasktab="find" onclick="switchTaskTab('find')">🔍 找人</button>
     </div>
     <!-- 任务子分类 -->
     <div class="filter-bar" id="taskFilters">
@@ -1317,7 +1343,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.26.0';
+const APP_VERSION = '1.26.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2062,10 +2088,12 @@ function renderOrders(orders) {
 
   if (orders.length === 0) {
     const emptyMap = { task: '暂无跑腿订单，来做第一个发布者吧', goods: '暂无物品流转信息，快来发布吧', qa: '暂无问答，来提出你的问题吧', find: '暂无找人信息，快来发布组队/拼车/招募吧' };
+    const hintMap = { task: '成为第一个发布者，解决身边的小麻烦', goods: '让闲置物品找到新主人', qa: '提出问题，热心的学长学姐会帮你', find: '组队、拼车、招募，一键发起' };
     const actMap = { task: { label: '发布需求', fn: 'showPublishModal()' }, goods: { label: '发布物品', fn: "showPublishModal('secondhand')" }, qa: { label: '去提问', fn: "showPublishModal('qa')" }, find: { label: '发布找人', fn: "showPublishModal('find')" } };
     const act = actMap[_cachedType] || actMap.task;
     grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>' + (emptyMap[_cachedType] || '暂无匹配内容') + '</p>'
-      + '<button class="btn btn-primary" onclick="' + act.fn + '">' + act.label + '</button></div>';
+      + '<p class="hint">' + (hintMap[_cachedType] || '点击按钮立即发布') + '</p>'
+      + '<button class="btn btn-brand" onclick="' + act.fn + '">' + act.label + '</button></div>';
     if (pager) pager.innerHTML = '';
     return;
   }
@@ -2278,17 +2306,23 @@ function filterGoodsCat(cat) {
 
 function switchTaskTab(tab) {
   S.taskTab = tab;
-  document.querySelectorAll('#taskTabBar .tab-btn').forEach(b => {
-    b.style.color = 'var(--text-secondary)';
-    b.style.borderBottom = '2px solid transparent';
-    b.style.fontWeight = '500';
-  });
+  const heroMeta = {
+    task: { icon: '🏃', title: '跑腿代办', sub: '校园跑腿、代取快递、帮买帮送，找人接单', cls: 'cat-task' },
+    goods: { icon: '📦', title: '物品流转', sub: '出售转让、短期租借，闲置物品再利用', cls: 'cat-goods' },
+    qa: { icon: '💬', title: '有问必答', sub: '课程难题、校园资讯、生活经验，互帮互助', cls: 'cat-qa' },
+    find: { icon: '🔍', title: '找人', sub: '竞赛组队、出行拼车、问卷招募，快速凑人', cls: 'cat-find' }
+  };
+  const meta = heroMeta[tab] || heroMeta.task;
+  const iconEl = document.getElementById('taskHeroIcon');
+  const titleEl = document.getElementById('taskHeroTitle');
+  const subEl = document.getElementById('taskHeroSub');
+  if (iconEl) { iconEl.textContent = meta.icon; iconEl.className = 'task-hero-icon ' + meta.cls; }
+  if (titleEl) titleEl.textContent = meta.title;
+  if (subEl) subEl.textContent = meta.sub;
+
+  document.querySelectorAll('#taskTabBar .tab-btn').forEach(b => b.classList.remove('active'));
   const activeTab = document.querySelector('#taskTabBar [data-tasktab="' + tab + '"]');
-  if (activeTab) {
-    activeTab.style.color = 'var(--primary)';
-    activeTab.style.borderBottom = '2px solid var(--primary)';
-    activeTab.style.fontWeight = '600';
-  }
+  if (activeTab) activeTab.classList.add('active');
   document.getElementById('taskFilters').style.display = (tab === 'task') ? 'flex' : 'none';
   document.getElementById('goodsFilters').style.display = (tab === 'goods') ? 'flex' : 'none';
   document.getElementById('goodsCategoryFilters').style.display = (tab === 'goods') ? 'flex' : 'none';

@@ -1,0 +1,26 @@
+#!/bin/bash
+# 腾讯云 SCF Web 函数启动脚本：启动 HTTP 服务监听 9000
+cd /var/user || cd /var/user/code 2>/dev/null || true
+
+# 1) 优先从 PATH 找 node
+NODE=$(command -v node 2>/dev/null)
+
+# 2) 兜底：在常见根目录全盘搜 bin/node
+if [ -z "$NODE" ]; then
+  NODE=$(find /var/lang /opt /usr/local /usr/bin /usr /root /home -name node -type f 2>/dev/null | grep -E 'bin/node$' | head -1)
+fi
+
+if [ -n "$NODE" ] && [ -x "$NODE" ]; then
+  echo "found node at: $NODE" >&2
+  exec "$NODE" index.js
+fi
+
+# 诊断信息（输出到 SCF 错误日志）
+echo "==== SCF bootstrap diagnostic ====" >&2
+echo "PATH=$PATH" >&2
+echo "--- /var/lang ---" >&2
+ls -la /var/lang 2>/dev/null >&2
+echo "--- which node ---" >&2
+which node 2>/dev/null >&2 || echo "(which: not found)" >&2
+echo "node not found in any known path" >&2
+exit 1
