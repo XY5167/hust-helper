@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.19.0">
+<meta name="version" content="1.27.1">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -72,7 +72,8 @@
   --cat-goods: #3B6D11;
   --cat-qa: #BA7517;
   --cat-carpool: #534AB7;
-  --app-width: 560px;
+  --app-width: 1200px;
+  --app-width-mobile: 560px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:16px;-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
@@ -379,8 +380,25 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
   .page{min-height:calc(100vh - 58px);min-height:calc(100dvh - 58px)}
 }
 
+/* Desktop layout: make use of wide screens instead of a narrow phone frame */
+@media(min-width:769px){
+  .home-hero{padding:28px 0 48px}
+  .home-hero-title{font-size:1.7rem}
+  .home-hero-sub{font-size:.95rem}
+  .home-search-wrap{margin-top:-26px}
+  .home-search{padding:12px 20px}
+  .task-hero{padding:24px 0 32px}
+  .task-hero>.container{display:flex;align-items:center;justify-content:space-between;gap:40px}
+  .task-hero-head{flex:1;margin-bottom:0}
+  .task-hero-stats{margin-top:0;flex-wrap:wrap;justify-content:flex-end;max-width:360px}
+  .task-hero-title{font-size:1.6rem}
+  .task-hero-sub{font-size:.95rem}
+  #taskSearchBar{flex-wrap:nowrap}
+  #taskSearchInput{max-width:360px}
+}
 /* Responsive */
 @media(max-width:768px){
+  .container{max-width:var(--app-width-mobile);padding:0 16px}
   .card-grid{grid-template-columns:1fr}
   .hero-title{font-size:1.7rem}
   .hero-stats{gap:22px}
@@ -1355,7 +1373,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.27.0';
+const APP_VERSION = '1.27.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
