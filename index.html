@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.27.1">
+<meta name="version" content="1.28.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -272,6 +272,20 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .order-card-price{font-size:1.15rem;font-weight:700;color:var(--accent)}
 .order-card-location{font-size:.78rem;color:var(--text-muted)}
 .order-card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light);font-size:.78rem;color:var(--text-muted)}
+
+/* v1.28.0 交易状态机步骤条 */
+.trade-steps{display:flex;align-items:flex-start;margin:14px 0 6px}
+.ts-step{display:flex;flex-direction:column;align-items:center;width:58px;flex:0 0 auto}
+.ts-dot{width:24px;height:24px;border-radius:50%;background:var(--border);color:#fff;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.ts-step.done .ts-dot{background:var(--success)}
+.ts-step.current .ts-dot{background:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.ts-label{font-size:.68rem;color:var(--text-muted);margin-top:5px;white-space:nowrap}
+.ts-step.done .ts-label,.ts-step.current .ts-label{color:var(--text-secondary)}
+.ts-line{flex:1;height:2px;background:var(--border);margin:11px 2px 0}
+.ts-line.done{background:var(--success)}
+/* 平台担保说明条 */
+.guarantee-bar{display:flex;align-items:center;gap:8px;margin:12px 0 2px;padding:9px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:.78rem;color:#166534}
+.guarantee-bar .gb-ico{font-size:1rem;flex:0 0 auto}
 
 /* Modals */
 .modal-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);align-items:center;justify-content:center}
@@ -849,7 +863,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
     <button class="modal-close" onclick="closePublishModal()">&times;</button>
     <h3>发布需求</h3>
     <div id="safetyTipBar" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:.82rem;line-height:1.7">
-      🔒 <strong>安全须知</strong>：请在公共地点当面交接物品；<strong>不要预付押金/定金</strong>；优先使用站内私信沟通，避免直接泄露手机号/微信号。
+      🔒 <strong>安全须知</strong>：请在公共地点当面交接物品；<strong>不要预付押金/定金</strong>；优先使用站内私信沟通，避免直接泄露手机号/微信号。<br>本平台采用<strong>担保交易</strong>：接单人完成服务并请你确认后，才会展示其收款信息——请<strong>确认付款后再点「确认收到」</strong>。若遇纠纷可投诉，成立将扣对方信用分并封停。
       <button type="button" class="btn btn-sm" style="margin-left:8px;padding:2px 10px;font-size:.75rem;background:var(--bg-card);border:1px solid var(--border);border-radius:6px" onclick="dismissSafetyTip()">知道了</button>
     </div>
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
@@ -1373,7 +1387,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.27.1';
+const APP_VERSION = '1.28.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2493,6 +2507,25 @@ async function showDetail(issueNum) {
     }
 
     const urgencyLabels = {normal:'一般', urgent:'🔥 加急', asap:'⚡ 立刻需要'};
+    // v1.28.0 交易状态机步骤条（仅交易类订单展示，问答/找人不走此流）
+    let stepsHTML = '';
+    if (!isQA) {
+      const stepOrder = { open:0, taken:1, awaiting_confirm:2, completed:3 };
+      const cur = (o.status in stepOrder) ? stepOrder[o.status] : -1;
+      if (cur >= 0) {
+        const steps = [
+          { k:0, t:'发布' }, { k:1, t:'接单' }, { k:2, t:'待确认' }, { k:3, t:'完成' }
+        ];
+        stepsHTML = '<div class="trade-steps">' + steps.map(function(s, idx){
+          let cls = 'ts-step';
+          if (idx < cur) cls += ' done';
+          else if (idx === cur) cls += ' current';
+          const mark = idx < cur ? '✓' : (idx + 1);
+          const line = idx < steps.length - 1 ? '<span class="ts-line' + (idx < cur ? ' done' : '') + '"></span>' : '';
+          return '<div class="' + cls + '"><span class="ts-dot">' + mark + '</span><span class="ts-label">' + s.t + '</span></div>' + line;
+        }).join('') + '</div>';
+      }
+    }
     const urgencyHTML = o.urgency ? '<span>⏱️ 紧急程度：' + (urgencyLabels[o.urgency] || o.urgency) + '</span>' : '';
     const deadlineHTML = o.deadline ? '<span>⏰ 截止：' + esc(o.deadline) + '</span>' : '';
     const paymentHTML = (o.payment && S.user && (o.publisher_id == (S.user._issue_number || S.user.student_id) || o.taker_id == (S.user._issue_number || S.user.student_id)))
@@ -2505,7 +2538,18 @@ async function showDetail(issueNum) {
       : '';
     // 接单人的收款码（仅发单人可见）
     let takerPayHTML = '';
-    if ((o.status === 'taken' || o.status === 'completed' || o.status === 'awaiting_confirm') && S.user) {
+    // v1.28.0：接单阶段给发布者的占位提示（收款信息尚未解锁）
+    let takenPayHint = '';
+    if (o.status === 'taken' && S.user) {
+      const uid = S.user._issue_number || S.user.student_id;
+      const sid = S.user.student_id;
+      const isPublisher = (o.publisher_id == uid) || (o.publisher_id == sid) || (o.publisher_student_id == uid) || (o.publisher_student_id == sid);
+      if (isPublisher) {
+        takenPayHint = '<div style="margin-top:12px;padding:12px;background:#eff6ff;border-radius:8px;font-size:.83rem;color:#1d4ed8">🔒 接单人正在为你服务，完成后会请你确认。收款信息将在「待确认」阶段才显示，请务必当面/确认付款后再点「确认收到」。</div>';
+      }
+    }
+    // v1.28.0 担保交易：收款信息延迟到「待确认」阶段才解锁，避免接单即暴露收款码（诈骗入口）
+    if ((o.status === 'awaiting_confirm' || o.status === 'completed') && S.user) {
       const uid = S.user._issue_number || S.user.student_id;
       const sid = S.user.student_id;
       const isPublisher = (o.publisher_id == uid) || (o.publisher_id == sid) || (o.publisher_student_id == uid) || (o.publisher_student_id == sid);
@@ -2572,7 +2616,9 @@ async function showDetail(issueNum) {
       }
     }
 
+    const guaranteeHTML = (!isQA ? '<div class="guarantee-bar"><span class="gb-ico">🔒</span><span>平台担保交易：先服务后付款，双方确认才完成；纠纷可投诉，成立将扣信用分并封停。</span></div>' : '');
     ct.innerHTML = ''
+      + stepsHTML + guaranteeHTML
       + '<div class="detail-header"><span class="detail-type type-' + (o.category || 'other') + '">' + tl[o.type] + '</span>'
       + '<span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">' + (isQA ? (o.solved ? '✅ 已解决' : '💬 待解答') : sl[o.status]) + '</span></div>'
       + '<h3 class="detail-title">' + esc(o.title) + '</h3>'
@@ -2590,7 +2636,7 @@ async function showDetail(issueNum) {
       + (o.status === 'awaiting_confirm'
         ? '<div style="margin-top:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:.83rem;color:#92400e">'
           + (o.publisher_id === currentUid
-            ? '📦 接单人已完成配送，请点击"确认收到"完成订单（48h 内未确认将自动完成）。若有纠纷请点"拒绝确认"。'
+            ? '📦 接单人已完成服务，请先付款给对方，再点「确认收到」完成订单（48h 内未确认将自动完成）。若未收到或有纠纷，请点「拒绝确认」并投诉。'
             : '⏳ 已通知发布者确认收到，确认后订单完成。若长时间未确认，系统将自动完成。')
           + '</div>'
         : '')
@@ -2606,7 +2652,7 @@ async function showDetail(issueNum) {
         : '')
       + '<div class="detail-desc">' + esc(o.description || '无详细描述') + '</div>'
       + (o.type === 'qa' ? '<div style="margin-top:12px"><button type="button" class="btn btn-ai btn-sm" onclick="aiSolve()">🤖 AI 解题思路</button><div id="qaAiSolveBox" style="margin-top:10px;font-size:.88rem;color:var(--text-secondary);white-space:pre-wrap"></div></div>' : '')
-      + (isQA ? '' : paymentHTML + takerPayHTML) + qaBountyHTML
+      + (isQA ? '' : paymentHTML + takenPayHint + takerPayHTML) + qaBountyHTML
       + '<div class="detail-actions">' + actions + '</div>';
     // 加载评论区
     await loadComments(issueNum);
