@@ -72,6 +72,7 @@
   --cat-goods: #3B6D11;
   --cat-qa: #BA7517;
   --cat-carpool: #534AB7;
+  --app-width: 560px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:16px;-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
@@ -84,12 +85,13 @@ body{font-family:'Inter','Noto Sans SC',-apple-system,sans-serif;background:var(
 a{color:inherit;text-decoration:none}
 button{cursor:pointer;font-family:inherit}
 input,select,textarea{font-family:inherit;font-size:1rem}
-.container{max-width:1100px;margin:0 auto;padding:0 24px}
+.container{max-width:var(--app-width);margin:0 auto;padding:0 24px}
 
 /* Header */
 .header{background:rgba(255,255,255,.85);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);box-shadow:0 1px 0 var(--border),0 6px 24px rgba(15,23,42,.05);transition:box-shadow var(--t)}
 .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px;gap:20px}
 .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:1.15rem;background:linear-gradient(135deg,var(--primary),#6d28d9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--primary)}
+.brand-logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--brand);color:#fff;font-weight:600;font-size:15px;box-shadow:0 4px 12px rgba(24,95,165,.25);flex:0 0 auto}
 .nav-links{display:flex;gap:2px}
 .nav-link{padding:8px 14px;border-radius:var(--radius-xs);font-size:.88rem;font-weight:500;color:var(--text-secondary);transition:all .15s;border:none;background:none;position:relative}
 .nav-link:hover{background:var(--bg-hover);color:var(--text)}
@@ -237,6 +239,12 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .order-card:hover{border-color:var(--primary);box-shadow:var(--shadow-lg);transform:translateY(-2px)}
 .order-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
 .order-card-type{font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:99px}
+.order-card-type.type-task{background:rgba(24,95,165,.12);color:var(--cat-task)}
+.order-card-type.type-goods{background:rgba(59,109,17,.12);color:var(--cat-goods)}
+.order-card-type.type-qa{background:rgba(186,117,23,.12);color:var(--cat-qa)}
+.order-card-type.type-find{background:rgba(83,74,183,.12);color:var(--cat-carpool)}
+.order-card-type.type-carpool{background:rgba(83,74,183,.12);color:var(--cat-carpool)}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:99px;background:var(--bg-hover);color:var(--text-secondary)}
 .type-errand{background:#fef3c7;color:#92400e}
 .type-secondhand{background:#dbeafe;color:#1e40af}
 .type-skill{background:#dcfce7;color:#166534}
@@ -534,6 +542,7 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
 
 <header class="header">
   <div class="container nav-inner">
+    <a class="brand-logo" href="#" onclick="navigate('home');return false" title="HUST互助 首页">互</a>
     <nav class="nav-links" id="navLinks">
       <a href="#" class="nav-link active" data-page="home" onclick="navigate('home')">首页</a>
       <a href="#" class="nav-link" data-page="task" onclick="navigate('task')">任务大厅</a>
@@ -1346,7 +1355,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.26.2';
+const APP_VERSION = '1.27.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2121,7 +2130,7 @@ function renderOrders(orders) {
     // 缩略图预览
     const imgList = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     const thumbHTML = imgList.length > 0
-      ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList.slice(0, 3).map(img => '<img src="' + img + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList.length > 3 ? '<div style="width:80px;height:80px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList.length - 3) + '</div>' : '') + '</div>'
+      ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList.slice(0, 3).map(img => '<img src="' + safeImgSrc(img) + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList.length > 3 ? '<div style="width:80px;height:80px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList.length - 3) + '</div>' : '') + '</div>'
       : '';
     return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
       + '<div class="order-card-header">'
@@ -2474,7 +2483,7 @@ async function showDetail(issueNum) {
     // 图片显示（兼容旧字段 image 和新字段 images）
     const imgList = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     const imageHTML = imgList.length > 0
-      ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">' + imgList.map(img => '<img src="' + img + '" style="max-width:48%;max-height:250px;border-radius:8px;object-fit:cover;border:1px solid var(--border)">').join('') + '</div>'
+      ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">' + imgList.map(img => '<img src="' + safeImgSrc(img) + '" style="max-width:48%;max-height:250px;border-radius:8px;object-fit:cover;border:1px solid var(--border)">').join('') + '</div>'
       : '';
     // 接单人的收款码（仅发单人可见）
     let takerPayHTML = '';
@@ -2510,7 +2519,7 @@ async function showDetail(issueNum) {
 
         if (payInfo || payImage) {
           takerPayHTML = '<div style="margin-top:12px;padding:16px;background:#dcfce7;border-radius:8px;border:2px solid #16a34a"><strong>✅ 接单人收款信息（请向对方付款）</strong><div style="margin-top:8px;font-size:.9rem">' + esc(payInfo) + '</div>';
-          if (payImage) takerPayHTML += '<img src="' + payImage + '" style="max-width:200px;border-radius:8px;margin-top:8px;display:block">';
+          if (payImage) takerPayHTML += '<img src="' + safeImgSrc(payImage) + '" style="max-width:200px;border-radius:8px;margin-top:8px;display:block">';
           takerPayHTML += '</div>';
         } else {
           takerPayHTML = '<div style="margin-top:12px;padding:12px;background:#fee2e2;border-radius:8px;border:1.5px solid #dc2626"><strong>⚠️ 接单人未设置收款信息</strong><div style="margin-top:4px;font-size:.85rem">请联系对方：' + esc(o.taker_name || '未知') + '（' + esc(o.taker_student_id || '') + '）</div></div>';
@@ -2534,7 +2543,7 @@ async function showDetail(issueNum) {
           const ap = o.best_comment_payment_info;
           const api = o.best_comment_payment_image;
           qaBountyHTML = '<div style="margin-top:12px;padding:16px;background:#fef3c7;border-radius:8px;border:2px solid #d97706"><strong>✅ 已采纳最佳答案</strong><div style="margin-top:8px;font-size:.9rem">赏金 ¥' + o.bounty.toFixed(2) + ' 请通过以下收款方式支付给答主 ' + esc(o.best_comment_name || '') + '：' + (ap ? esc(ap) : '答主未设置收款信息，请直接联系 ' + esc(o.best_comment_name || '') + '（' + esc(answererSid || '') + '）') + '</div>'
-            + (api ? '<img src="' + esc(api) + '" style="max-width:200px;border-radius:8px;margin-top:8px;display:block">' : '')
+            + (api ? '<img src="' + safeImgSrc(api) + '" style="max-width:200px;border-radius:8px;margin-top:8px;display:block">' : '')
             + (o.auto_settled ? '<div style="margin-top:6px;font-size:.78rem;color:#92400e">⏰ 该问题已超时自动结算（你未主动采纳，信用分已扣减）</div>' : '')
             + '</div>';
         }
@@ -2736,7 +2745,7 @@ async function loadComments(issueNum) {
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
             + '<strong style="font-size:.82rem;color:' + (isMe ? 'var(--primary)' : isAdminMsg ? '#92400e' : 'var(--text)') + '">' + esc(displayName) + (isMe ? ' (我)' : '') + (isAdminMsg ? ' [管理员]' : '') + '</strong>'
             + '<span style="font-size:.7rem;color:var(--text-muted)">' + time + '</span></div>'
-            + '<div style="font-size:.88rem">' + (text ? esc(text) : '') + (imgs ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">' + imgs.map(function(img){ return '<img src="' + img + '" style="max-width:48%;max-height:240px;border-radius:8px;object-fit:cover;border:1px solid var(--border);cursor:pointer" onclick="window.open(\'' + img + '\',\'_blank\')">'; }).join('') + '</div>' : '') + '</div>'
+            + '<div style="font-size:.88rem">' + (text ? esc(text) : '') + (imgs ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">' + imgs.map(function(img){ return '<img src="' + safeImgSrc(img) + '" style="max-width:48%;max-height:240px;border-radius:8px;object-fit:cover;border:1px solid var(--border);cursor:pointer" data-src="' + escAttr(img) + '" onclick="previewImage(this)">'; }).join('') + '</div>' : '') + '</div>'
             + acceptBtn
             + '</div>';
         } catch(e) { return ''; }
@@ -2800,7 +2809,7 @@ function renderCommentImagePreview(issueNum) {
   box.innerHTML = arr.map((f, i) => {
     let url = '';
     try { url = URL.createObjectURL(f); } catch (e) { return ''; }
-    return '<div style="position:relative;display:inline-block"><img src="' + url + '" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"><button type="button" onclick="removeCommentImage(' + issueNum + ',' + i + ')" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#dc2626;color:#fff;border:none;cursor:pointer;font-size:.7rem;line-height:1">×</button></div>';
+    return '<div style="position:relative;display:inline-block"><img src="' + safeImgSrc(url) + '" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"><button type="button" onclick="removeCommentImage(' + issueNum + ',' + i + ')" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#dc2626;color:#fff;border:none;cursor:pointer;font-size:.7rem;line-height:1">×</button></div>';
   }).join('');
 }
 function removeCommentImage(issueNum, i) {
@@ -3949,7 +3958,7 @@ async function loadRunnerReviews() {
           + '<span style="font-size:.75rem;color:var(--text-muted)">' + timeAgo(a.created_at) + '</span>'
           + '</div>'
           + (a.note ? '<div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:8px">💬 ' + esc(a.note) + '</div>' : '')
-          + (a.student_card_image ? '<div style="margin-bottom:8px"><img src="' + a.student_card_image + '" style="max-width:260px;max-height:200px;border-radius:8px;border:1px solid var(--border);cursor:pointer" onclick="window.open(\'' + a.student_card_image + '\')" title="点击查看大图"></div>' : '<div style="color:var(--danger);font-size:.8rem;margin-bottom:8px">⚠️ 未上传学生证照片</div>')
+          + (a.student_card_image ? '<div style="margin-bottom:8px"><img src="' + safeImgSrc(a.student_card_image) + '" style="max-width:260px;max-height:200px;border-radius:8px;border:1px solid var(--border);cursor:pointer" data-src="' + escAttr(a.student_card_image) + '" onclick="previewImage(this)" title="点击查看大图"></div>' : '<div style="color:var(--danger);font-size:.8rem;margin-bottom:8px">⚠️ 未上传学生证照片</div>')
           + '<div style="display:flex;gap:6px">'
           + '<button class="btn btn-sm btn-success" onclick="approveRunner(' + a._num + ',\'' + esc(a.student_id) + '\')">✅ 通过认证</button>'
           + '<button class="btn btn-sm btn-danger" onclick="rejectRunner(' + a._num + ',\'' + esc(a.student_id) + '\')">❌ 拒绝</button>'
@@ -4506,7 +4515,7 @@ function isVIP() {
 }
 
 function isAdminUser() {
-  return S.user && S.user.student_id === ADMIN_STUDENT_ID;
+  return !!(S.user && (S.user.role === 'admin' || S.user.student_id === ADMIN_STUDENT_ID));
 }
 
 // ============ VIP 申请（用户端） ============
@@ -4526,7 +4535,7 @@ async function showVipApply() {
       const adminData = JSON.parse(adminUser.body);
       const qrImage = adminData.payment_image || '';
       if (qrImage) {
-        qrContainer.innerHTML = '<img src="' + qrImage + '" style="max-width:220px;border-radius:8px;border:1px solid var(--border)" alt="收款码">';
+        qrContainer.innerHTML = '<img src="' + safeImgSrc(qrImage) + '" style="max-width:220px;border-radius:8px;border:1px solid var(--border)" alt="收款码">';
       } else {
         qrContainer.innerHTML = '<div style="padding:30px;background:var(--bg);border-radius:8px;color:var(--text-muted);font-size:.85rem">📷 管理员暂未上传收款码<br><span style="font-size:.75rem">请联系管理员 ' + ADMIN_STUDENT_ID + ' 转账 ¥1</span></div>';
       }
@@ -6032,7 +6041,7 @@ function renderMyOrders(orders, tab, subTab) {
     // 缩略图
     const imgList2 = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     const thumbHTML2 = imgList2.length > 0
-      ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList2.slice(0, 3).map(img => '<img src="' + img + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList2.length > 3 ? '<div style="width:80px;height:80px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList2.length - 3) + '</div>' : '') + '</div>'
+      ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList2.slice(0, 3).map(img => '<img src="' + safeImgSrc(img) + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList2.length > 3 ? '<div style="width:80px;height:80px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList2.length - 3) + '</div>' : '') + '</div>'
       : '';
     return '<div class="order-card" style="margin-bottom:12px' + (isChat ? ';border-left:3px solid #8b5cf6' : '') + '" onclick="showDetail(' + o._issue_number + ')">'
       + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span><span class="order-card-status status-' + o.status + '">' + (o.type === 'qa' || o.type === 'academic' ? (o.solved ? '✅ 已解决' : '💬 待解答') : sl[o.status]) + '</span></div>'
@@ -6117,7 +6126,7 @@ async function loadMyOrders(myTab) {
     }
   }
   if (paymentPreview && S.user.payment_image) {
-    paymentPreview.innerHTML = '<img src="' + S.user.payment_image + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
+    paymentPreview.innerHTML = '<img src="' + safeImgSrc(S.user.payment_image) + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
   }
 
   // 跑腿接单设置面板：仅已认证用户可见（v1.15.5）
@@ -6382,7 +6391,7 @@ async function saveMyPayment() {
     toast('收款信息已保存', 'success');
     const preview = document.getElementById('myPaymentPreview');
     if (preview && imageData) {
-      preview.innerHTML = '<img src="' + imageData + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
+      preview.innerHTML = '<img src="' + safeImgSrc(imageData) + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
     }
   } catch(e) {
     errEl.textContent = '保存到云端失败：' + e.message + '。请检查网络后重试。';
@@ -7271,6 +7280,20 @@ document.addEventListener('keydown', (e) => {
 
 // ============ HELPERS ============
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function safeImgSrc(s) {
+  if (!s) return '';
+  s = String(s).trim();
+  if (/^https?:\/\//i.test(s) || /^data:image\//i.test(s)) return escAttr(s);
+  return '';
+}
+function previewImage(el) {
+  const src = el && el.dataset ? el.dataset.src : el;
+  if (src) window.open(encodeURI(String(src)), '_blank');
+}
 
 function timeAgo(ds) {
   if (!ds) return '';

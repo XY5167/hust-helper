@@ -1,0 +1,33 @@
+# Netlify 站点配置（hust-helper 迁移草案，未启用）
+# 参考：https://docs.netlify.com/configure-builds/file-based-configuration/
+
+[build]
+  # 前端 index.html 在项目根目录，无需构建步骤
+  publish = "."
+  # 若未来需要构建（如打包器），在此指定命令与输出目录
+  # command = "npm run build"
+  # publish = "dist"
+
+[functions]
+  # Netlify Functions 目录
+  directory = "netlify/functions"
+  # Node 版本尽量与线上 SCF 对齐（SCF 为 Node 18；可按需调整）
+  node_bundler = "esbuild"
+
+# 把前端的所有 /api/* 与 /gh/* 请求转发到 proxy 函数
+# 这样前端 PROXY_BASE 只需改成同源路径，无需硬编码 Function URL
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/proxy/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/gh/*"
+  to = "/.netlify/functions/proxy/gh/:splat"
+  status = 200
+
+# SPA 兜底：未知路径回退到 index.html（如需）
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

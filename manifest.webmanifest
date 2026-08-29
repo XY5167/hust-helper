@@ -5,8 +5,8 @@
   "start_url": "/hust-helper/",
   "scope": "/hust-helper/",
   "display": "standalone",
-  "background_color": "#1a73e8",
-  "theme_color": "#1a73e8",
+  "background_color": "#185FA5",
+  "theme_color": "#185FA5",
   "icons": [
     {
       "src": "/hust-helper/icons/icon-192.png",

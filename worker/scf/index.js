@@ -41,12 +41,12 @@ const HUNYUAN_SECRET_KEY = process.env.HUNYUAN_SECRET_KEY || '';
 const HUNYUAN_MODEL = process.env.HUNYUAN_MODEL || 'hunyuan-lite';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.17.1';
+const VERSION = '1.17.2';
 
 // 白名单：仅放行本仓库的 issues（含子路径 /comments），拒绝其它仓库/敏感路径
 const REPO_ESC = REPO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const GH_WHITELIST = new RegExp('^/repos/' + REPO_ESC + '/issues(/|\\?|$)');
-const TOKEN_TTL = 12 * 3600 * 1000; // 12 小时
+const TOKEN_TTL = 4 * 3600 * 1000; // 4 小时（缩短泄露窗口，P1 安全修复）
 const RATE_LIMIT = 10;               // 每 IP 每分钟最多 10 次登录/查重
 const RATE_WINDOW = 60 * 1000;
 
