@@ -41,7 +41,7 @@ const HUNYUAN_SECRET_KEY = process.env.HUNYUAN_SECRET_KEY || '';
 const HUNYUAN_MODEL = process.env.HUNYUAN_MODEL || 'hunyuan-lite';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.17.0';
+const VERSION = '1.17.1';
 
 // 白名单：仅放行本仓库的 issues（含子路径 /comments），拒绝其它仓库/敏感路径
 const REPO_ESC = REPO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -146,6 +146,20 @@ function desensitizeIssue(data) {
     try {
       const body = JSON.parse(data.body);
       return Object.assign({}, data, { body: JSON.stringify(desensitizeUser(body)) });
+    } catch (e) { /* 解析失败原样返回 */ }
+  }
+  return data;
+}
+// 强脱敏：user 类 issue 剥离真实身份字段（学号/姓名/手机号/宿舍/邮箱等），纵深防御
+const PRIVATE_FIELDS = ['student_id', 'name', 'phone', 'dorm', 'email', 'real_name', 'wechat', 'qq'];
+function desensitizeIssuePrivate(data) {
+  if (Array.isArray(data)) return data.map(desensitizeIssuePrivate);
+  if (issueHasUserLabel(data)) {
+    try {
+      const body = JSON.parse(data.body);
+      const c = Object.assign({}, body);
+      PRIVATE_FIELDS.forEach(f => delete c[f]);
+      return Object.assign({}, data, { body: JSON.stringify(c) });
     } catch (e) { /* 解析失败原样返回 */ }
   }
   return data;
@@ -403,8 +417,13 @@ const server = http.createServer(async (req, res) => {
         if (userMatch) {
           const tk = bearerPayload(req);
           if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED' }, headers);
+          const sid = decodeURIComponent(userMatch[1]);
+          // 越权防护：仅本人或管理员可读取他人用户资料
+          if (tk.role !== 'admin' && tk.sid !== sid) {
+            return sendJSON(res, 403, { error: 'FORBIDDEN' }, headers);
+          }
           const all = await ghIssuesAll('user', 'all');
-          const issue = findUserBySid(all, decodeURIComponent(userMatch[1]));
+          const issue = findUserBySid(all, sid);
           if (!issue) return sendJSON(res, 404, { error: 'NOT_FOUND' }, headers);
           const u = desensitizeUser(JSON.parse(issue.body));
           u._issue_number = issue.number;
@@ -745,9 +764,32 @@ const server = http.createServer(async (req, res) => {
     try {
       const { status, data } = await ghProxy(ghPath, method, body);
       if (method !== 'GET' && status >= 200 && status < 300) clearCache();
-      if (method === 'GET' && status === 200 && CACHE_TTL > 0) setCache(cacheKey, data);
-      // 脱敏：任何含 user label 的响应都剥离 password*
-      return sendJSON(res, status, desensitizeIssue(data), headers);
+      if (method !== 'GET') {
+        // 写操作：仅剥离 password*
+        return sendJSON(res, status, desensitizeIssue(data), headers);
+      }
+      // ---- GET：隐私约束 ----
+      const isUserList = /[?&]labels=(user|admin)\b/.test(ghPath);
+      const singleMatch = ghPath.match(/\/issues\/\d+(?:\?.*)?$/);
+      if (isUserList || singleMatch) {
+        // 敏感用户数据不进公共缓存，避免越权缓存侧信道
+        const tk = bearerPayload(req);
+        if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED' }, headers);
+        if (singleMatch) {
+          // 单条 issue：user/admin 类且非管理员则强脱敏，杜绝泄露他人手机/姓名
+          if (issueHasUserLabel(data)) {
+            if (tk.role === 'admin') return sendJSON(res, status, desensitizeIssue(data), headers);
+            return sendJSON(res, status, desensitizeIssuePrivate(data), headers);
+          }
+          return sendJSON(res, status, desensitizeIssue(data), headers);
+        }
+        // user/admin 列表：一律强脱敏（管理员查全量请走 /api/admin/users）
+        return sendJSON(res, status, desensitizeIssuePrivate(data), headers);
+      }
+      // 公开数据（订单/问答/二手等）：仅剥离 password*，可安全缓存
+      const safe = desensitizeIssue(data);
+      if (status === 200 && CACHE_TTL > 0) setCache(cacheKey, safe);
+      return sendJSON(res, status, safe, headers);
     } catch (e) {
       return sendJSON(res, 502, { error: e.message }, headers);
     }
