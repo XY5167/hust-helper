@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.28.0">
+<meta name="version" content="1.29.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -202,6 +202,65 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .tab-btn.active.tab-qa{color:var(--cat-qa);border-bottom-color:var(--cat-qa);background:rgba(186,117,23,.08)}
 .tab-btn.active.tab-find{color:var(--cat-carpool);border-bottom-color:var(--cat-carpool);background:rgba(83,74,183,.08)}
 .home-announce{display:none;background:var(--bg-hover);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin:14px auto 8px}
+
+/* ===== 竞争力强化模块 v1.29.0 ===== */
+/* A. 差异化对比条 */
+.why-us{margin:18px auto 0;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px}
+.why-us-title{font-size:.92rem;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.why-us-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.why-us-col{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 10px;text-align:center}
+.why-us-col.is-us{border-color:var(--brand);background:rgba(24,95,165,.06);box-shadow:0 0 0 1px var(--brand) inset}
+.why-us-name{font-size:.82rem;font-weight:600;margin-bottom:6px}
+.why-us-col.is-us .why-us-name{color:var(--brand)}
+.why-us-desc{font-size:.7rem;color:var(--text-muted);line-height:1.4}
+.why-us-tag{display:inline-block;margin-top:7px;font-size:.64rem;padding:1px 8px;border-radius:99px;background:var(--bg-hover);color:var(--text-secondary)}
+.why-us-col.is-us .why-us-tag{background:var(--brand);color:#fff}
+/* B3. 信任与安全四图标 */
+.trust-module{margin:18px auto 0;background:linear-gradient(180deg,rgba(24,95,165,.05),var(--bg-card));border:1.5px solid var(--border);border-radius:var(--radius);padding:16px}
+.trust-title{font-size:.92rem;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--brand)}
+.trust-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.trust-item{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.trust-ico{width:42px;height:42px;border-radius:12px;background:rgba(22,163,74,.12);color:#16a34a;display:flex;align-items:center;justify-content:center;font-size:20px}
+.trust-name{font-size:.76rem;font-weight:600;color:var(--text)}
+.trust-desc{font-size:.66rem;color:var(--text-muted);line-height:1.35}
+/* D. 实时数据 + 最新动态 */
+.live-data{margin:18px auto 0;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.live-stats{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px}
+.live-stat-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--border)}
+.live-stat-row:last-child{border-bottom:none}
+.live-stat-num{font-size:1.3rem;font-weight:700;color:var(--brand)}
+.live-stat-label{font-size:.78rem;color:var(--text-secondary)}
+.live-activity{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px}
+.live-activity h4{font-size:.85rem;margin:0 0 8px;font-weight:600}
+.live-act-item{display:flex;align-items:center;gap:8px;font-size:.76rem;color:var(--text-secondary);padding:6px 0;border-bottom:1px dashed var(--border)}
+.live-act-item:last-child{border-bottom:none}
+.live-act-dot{width:6px;height:6px;border-radius:99px;background:var(--cat-task);flex:0 0 auto}
+.live-act-empty{font-size:.76rem;color:var(--text-muted)}
+/* F. 3步上手引导 */
+.steps-guide{margin:18px auto 0;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px}
+.steps-title{font-size:.92rem;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.step-item{text-align:center}
+.step-num{width:30px;height:30px;border-radius:99px;background:var(--brand);color:#fff;font-size:.85rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-bottom:6px}
+.step-name{font-size:.8rem;font-weight:600;margin-bottom:3px}
+.step-desc{font-size:.68rem;color:var(--text-muted);line-height:1.4}
+/* 订单卡片接单人信用徽标 */
+.taker-credit{font-size:.7rem;padding:1px 7px;border-radius:99px;background:rgba(22,163,74,.12);color:#16a34a;font-weight:600}
+/* 安全中心页 */
+.safety-page{padding:18px 0 30px}
+.safety-head{background:var(--brand);color:#fff;padding:20px 0;margin-bottom:16px}
+.safety-hero-title{font-size:1.3rem;font-weight:700;margin:0}
+.safety-hero-sub{font-size:.85rem;color:rgba(255,255,255,.8);margin-top:4px}
+.safety-back{display:inline-flex;align-items:center;gap:4px;color:#fff;background:rgba(255,255,255,.18);border:none;padding:6px 12px;border-radius:99px;font-size:.8rem;cursor:pointer;margin-bottom:12px}
+.safety-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-start}
+.safety-card-ico{width:44px;height:44px;border-radius:12px;background:rgba(22,163,74,.12);color:#16a34a;display:flex;align-items:center;justify-content:center;font-size:22px;flex:0 0 auto}
+.safety-card-title{font-size:.95rem;font-weight:600;margin-bottom:4px}
+.safety-card-desc{font-size:.8rem;color:var(--text-secondary);line-height:1.5}
+@media(max-width:768px){
+  .why-us-grid,.trust-grid{grid-template-columns:repeat(2,1fr)}
+  .live-data{grid-template-columns:1fr}
+  .steps-grid{grid-template-columns:1fr}
+}
 
 /* Sections */
 .section{padding:56px 0}
@@ -658,11 +717,85 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
     </div>
   </div>
 
+  <!-- A. 差异化对比条：直接回应"凭什么比上交/微信群/闲鱼好" -->
+  <div class="container">
+    <div class="why-us">
+      <div class="why-us-title">🆚 为什么选 HUST互助，而不是微信群 / 闲鱼 / 其他校园互助</div>
+      <div class="why-us-grid">
+        <div class="why-us-col"><div class="why-us-name">微信群</div><div class="why-us-desc">信息刷屏就沉，难检索，无信任背书</div><span class="why-us-tag">信息易沉</span></div>
+        <div class="why-us-col"><div class="why-us-name">闲鱼</div><div class="why-us-desc">跨校公开交易，无校内身份核验</div><span class="why-us-tag">无校内背书</span></div>
+        <div class="why-us-col"><div class="why-us-name">纯公益互助网</div><div class="why-us-desc">靠自觉，无安全与响应保障</div><span class="why-us-tag">无信任机制</span></div>
+        <div class="why-us-col is-us"><div class="why-us-name">HUST互助</div><div class="why-us-desc">校内实名 + 信用分 + 担保交易，敢交易</div><span class="why-us-tag">实名·信用·担保</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B3. 信任与安全四图标（点标题进安全中心） -->
+  <div class="container">
+    <div class="trust-module">
+      <div class="trust-title" onclick="navigate('safety')">🛡️ 平台信任与安全 · 点此查看安全中心 ›</div>
+      <div class="trust-grid">
+        <div class="trust-item"><div class="trust-ico">✓</div><div class="trust-name">学号核验</div><div class="trust-desc">校园邮箱 / 人工审核双轨，确保校内真实身份</div></div>
+        <div class="trust-item"><div class="trust-ico">🔒</div><div class="trust-name">担保交易</div><div class="trust-desc">先服务后付款，双方确认才完成</div></div>
+        <div class="trust-item"><div class="trust-ico">🕶️</div><div class="trust-name">隐私脱敏</div><div class="trust-desc">非本人/非管理员，学号手机号强制隐藏</div></div>
+        <div class="trust-item"><div class="trust-ico">⚖️</div><div class="trust-name">投诉仲裁</div><div class="trust-desc">纠纷可投诉，成立扣信用分并封停</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- D. 实时数据 + 最新互助动态 -->
+  <div class="container">
+    <div class="live-data">
+      <div class="live-stats">
+        <div class="live-stat-row"><span class="live-stat-label">注册同学</span><span class="live-stat-num" id="liveUsers">0</span></div>
+        <div class="live-stat-row"><span class="live-stat-label">累计订单</span><span class="live-stat-num" id="liveTotal">0</span></div>
+        <div class="live-stat-row"><span class="live-stat-label">进行中</span><span class="live-stat-num" id="liveProgress">0</span></div>
+        <div class="live-stat-row"><span class="live-stat-label">已完成</span><span class="live-stat-num" id="liveDone">0</span></div>
+      </div>
+      <div class="live-activity">
+        <h4>🔥 最新互助动态</h4>
+        <div id="liveActivity">加载中…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- F. 3步上手引导 -->
+  <div class="container">
+    <div class="steps-guide">
+      <div class="steps-title">🚀 三步开始互助</div>
+      <div class="steps-grid">
+        <div class="step-item"><div class="step-num">1</div><div class="step-name">学号验证注册</div><div class="step-desc">校园邮箱 / 人工审核，确保对面是真实校友</div></div>
+        <div class="step-item"><div class="step-num">2</div><div class="step-name">发布或接单</div><div class="step-desc">代取快递、二手流转、有问必答、拼车组队</div></div>
+        <div class="step-item"><div class="step-num">3</div><div class="step-name">担保完成</div><div class="step-desc">先服务后付款，双方确认，安全到账</div></div>
+      </div>
+    </div>
+  </div>
+
   <!-- 5. 公告条：复用现有 #announceBanner 逻辑，仅套新样式容器（浅灰卡） -->
   <div class="container">
     <div id="announceBanner" class="home-announce"></div>
   </div>
 
+</section>
+
+<section class="page" id="page-safety" style="display:none">
+  <div class="safety-page">
+    <div class="safety-head">
+      <div class="container">
+        <button class="safety-back" onclick="navigate('home')">‹ 返回首页</button>
+        <h1 class="safety-hero-title">🛡️ 平台信任与安全中心</h1>
+        <p class="safety-hero-sub">我们用工程化手段解决"陌生人敢不敢交易"——这是纯公益互助网做不到的</p>
+      </div>
+    </div>
+    <div class="container">
+      <div class="safety-card"><div class="safety-card-ico">🎓</div><div><div class="safety-card-title">① 学号实名核验</div><div class="safety-card-desc">注册采用「校园邮箱验证」或「管理员人工审核」双轨，确保对面是真实在校校友，杜绝校外匿名账号。</div></div></div>
+      <div class="safety-card"><div class="safety-card-ico">🔒</div><div><div class="safety-card-title">② 担保交易</div><div class="safety-card-desc">接单人完成服务并请你确认后，才展示其收款信息；请确认付款后再点「确认收到」。48h 内未确认系统自动完成，避免赖账。</div></div></div>
+      <div class="safety-card"><div class="safety-card-ico">🕶️</div><div><div class="safety-card-title">③ 隐私强脱敏</div><div class="safety-card-desc">后端对所有含隐私接口强制登录校验，非本人 / 非管理员直接拒绝，并剥离学号、手机号、宿舍等字段，只保留昵称与信用分。</div></div></div>
+      <div class="safety-card"><div class="safety-card-ico">⚖️</div><div><div class="safety-card-title">④ 投诉仲裁</div><div class="safety-card-desc">纠纷可一键投诉，成立将自动扣除对方信用分，累计 5 次自动封停账号，平台介入裁定。</div></div></div>
+      <div class="safety-card"><div class="safety-card-ico">⭐</div><div><div class="safety-card-title">⑤ 信用分体系</div><div class="safety-card-desc">初始 100 分，完成订单、被好评加分；爽约、被投诉扣分，过低将限制发布与接单，让守信者被看见。</div></div></div>
+      <p class="form-hint" style="margin-top:8px">注：当前为「平台见证 + 信用约束 + 投诉自动惩罚」的轻量担保模式，资金由双方按确认节点线下支付。真·资金托管需接入微信 / 支付宝商户资质，列为本项目未来工作。</p>
+    </div>
+  </div>
 </section>
 
 <section class="page" id="page-task" style="display:none">
@@ -1023,6 +1156,10 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
       <div class="my-credit">
         <div class="my-credit-num" id="myCreditNum">100</div>
         <div class="my-credit-label">信用分</div>
+      </div>
+      <div class="my-credit" id="myMutualWrap" style="display:none">
+        <div class="my-credit-num" id="myMutualNum" style="color:#16a34a">0</div>
+        <div class="my-credit-label">互助值</div>
       </div>
       <span class="my-arrow" id="myArrow">⌄</span>
     </div>
@@ -1387,7 +1524,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.28.0';
+const APP_VERSION = '1.29.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -1492,6 +1629,7 @@ function cacheBust(key) {
     document.getElementById('statUsers').textContent = cached.users;
   }
   loadStats();
+  loadHomeLiveData();
 })();
 
 // ============ GITHUB API ============
@@ -1759,6 +1897,42 @@ async function loadStats() {
   } catch(e) {
     reportError('统计数据加载失败，请稍后重试', e, 'stats');
     document.getElementById('statOrders').textContent = '?';
+  }
+}
+
+// v1.29.0 首页实时数据 + 最新互助动态
+async function loadHomeLiveData() {
+  try {
+    const res = await ghApi('/api/stats', 'GET');
+    if (res.ok) { const d = await res.json(); const u = document.getElementById('liveUsers'); if (u) u.textContent = d.users || 0; }
+  } catch(e) {}
+  try {
+    const list = await ghIssues('order', 'open') || [];
+    let total = list.length, inProg = 0, done = 0;
+    const completed = [];
+    for (const i of list) {
+      let o; try { o = JSON.parse(i.body); } catch(e) { continue; }
+      if (!o || typeof o !== 'object') continue;
+      const s = o.status || 'open';
+      if (s === 'taken' || s === 'awaiting_confirm') inProg++;
+      if (s === 'completed') { done++; completed.push({ o, t: new Date(i.updated_at || i.created_at || 0).getTime() }); }
+    }
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('liveTotal', total); set('liveProgress', inProg); set('liveDone', done);
+    completed.sort((a,b) => b.t - a.t);
+    const act = document.getElementById('liveActivity');
+    if (act) {
+      if (completed.length === 0) act.innerHTML = '<div class="live-act-empty">暂无已完成记录，快来发布第一单～</div>';
+      else act.innerHTML = completed.slice(0,5).map(function(c){
+        const o = c.o;
+        const who = esc(o.publisher_name || o.publisher_nickname || '某同学');
+        const what = esc(o.title || (o.category === 'qa' ? '有问必答' : '互助任务'));
+        const catLabel = { task:'跑腿', secondhand:'二手', borrow:'租借', qa:'问答', find:'找人' }[o.category] || '互助';
+        return '<div class="live-act-item"><span class="live-act-dot"></span><span>' + who + ' 的『' + what + '』' + catLabel + '任务已完成 ✓</span></div>';
+      }).join('');
+    }
+  } catch(e) {
+    const act = document.getElementById('liveActivity'); if (act) act.innerHTML = '<div class="live-act-empty">动态加载失败</div>';
   }
 }
 
@@ -2183,6 +2357,7 @@ function renderOrders(orders) {
       + '<div class="order-card-footer">'
       + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_name || '未知') : maskName(o.publisher_name, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
       + '<span>' + timeAgo(o.created_at) + '</span>'
+      + (o.taker_credit_score != null && (o.status === 'taken' || o.status === 'awaiting_confirm') ? ' <span class="taker-credit">接单人信用 ' + o.taker_credit_score + '</span>' : '')
       + '</div></div>';
   }).join('');
 
@@ -2627,7 +2802,7 @@ async function showDetail(issueNum) {
       + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
       + (isQA || !o.gender_limit || o.gender_limit === 'any' ? '' : '<span style="font-size:.78rem;background:#e0e7ff;color:#3730a3;padding:2px 9px;border-radius:99px">👤 性别要求：' + (o.gender_limit === 'male' ? '仅限男生' : '仅限女生') + '</span>')
       + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_real_name || o.publisher_name || maskName(o.publisher_name, o.publisher_student_id) || maskName(o.publisher_student_id, '') || '未知') : maskName(o.publisher_real_name || o.publisher_name || o.publisher_student_id, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
-      + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.taker_real_name || o.taker_name || '未知') : maskName(o.taker_real_name || o.taker_name, o.taker_student_id)) + '</a>' + (o.taker_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>' : ''))
+      + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.taker_real_name || o.taker_name || '未知') : maskName(o.taker_real_name || o.taker_name, o.taker_student_id)) + '</a>' + (o.taker_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + (o.taker_credit_score != null ? ' <span class="taker-credit">信用 ' + o.taker_credit_score + '</span>' : '') + '</span>' : ''))
       + (isQA ? '' : (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期，原预计 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : ''))
       + (isQA ? '' : (o.status === 'taken' && o.overdue ? '<span style="font-size:.75rem;color:#dc2626;margin-left:6px">已超时，可联系对方或投诉</span>' : ''))
       + '<span>🕐 ' + timeAgo(o.created_at) + '</span>'
@@ -3344,14 +3519,17 @@ async function updateCreditScore(userIssueNum, delta, reason) {
     const oldScore = u.credit_score != null ? u.credit_score : 100;
     const newScore = Math.max(0, Math.min(100, oldScore + delta));
     u.credit_score = newScore;
+    // v1.29.0 互助值：正向加分（完成订单/被好评）时同步累加，收编"公益互惠"文化
+    if (delta > 0) u.mutual_score = (u.mutual_score || 0) + delta;
     if (!u.credit_history) u.credit_history = [];
     u.credit_history.unshift({ score: delta, reason: reason, time: new Date().toISOString(), before: oldScore, after: newScore });
     if (u.credit_history.length > 50) u.credit_history = u.credit_history.slice(0, 50);
     await ghUpdateIssue(userIssueNum, JSON.stringify(u));
     // 如果是当前登录用户，同步本地状态
-    if (S.user && (S.user._issue_number == userIssueNum || S.user.student_id == u.student_id)) {
+      if (S.user && (S.user._issue_number == userIssueNum || S.user.student_id == u.student_id)) {
       S.user.credit_score = newScore;
       S.user.credit_history = u.credit_history;
+      if (u.mutual_score != null) S.user.mutual_score = u.mutual_score;
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       updateUI();
       // 信用分跌破阈值时通知（仅在跨越阈值那一刻，避免重复）
@@ -4762,6 +4940,7 @@ async function confirmTakeOrder() {
     o.taker_id = S.user._issue_number || S.user.student_id;
     o.taker_name = S.user.nickname || S.user.name;
     o.taker_student_id = S.user.student_id;
+    o.taker_credit_score = S.user.credit_score != null ? S.user.credit_score : 100; // v1.29.0 接单时持久化信用分，供卡片/详情展示信任信号
     o.taker_real_name = S.user.name;
     o.taker_runner_verified = S.user.runner_verified || false;
     o.taken_at = new Date().toISOString();
@@ -5968,18 +6147,14 @@ function updateUI() {
     menu.style.display = 'flex';
     btn.style.display = 'none';
     document.getElementById('userNameDisplay').textContent = (isVIP() ? '⭐' : '') + (S.user.nickname || S.user.name || S.user.student_id);
-    // 信用分徽章
+    // 信用分徽章（v1.29.0：登录用户常驻显示，强化信任信号）
     const cs = S.user.credit_score != null ? S.user.credit_score : 100;
     const cl = getCreditLevel(cs);
     const creditEl = menu.querySelector('.user-credit');
     if (creditEl) {
-      if (cs < 85 && S.user.student_id !== ADMIN_STUDENT_ID) {
-        creditEl.textContent = '信用 ' + cs;
-        creditEl.style.background = cl.color;
-        creditEl.style.display = 'inline-block';
-      } else {
-        creditEl.style.display = 'none';
-      }
+      creditEl.textContent = '信用 ' + cs;
+      creditEl.style.background = cl.color;
+      creditEl.style.display = 'inline-block';
     }
     // 显示认证跑腿徽章
     const verifiedEl = menu.querySelector('.user-verified');
@@ -6333,6 +6508,10 @@ function fillMyUserCard() {
   const credit = (u.credit_score != null) ? u.credit_score : 100;
   const cEl = document.getElementById('myCreditNum');
   if (cEl) cEl.textContent = credit;
+  const mEl = document.getElementById('myMutualNum');
+  if (mEl) mEl.textContent = (u.mutual_score || 0);
+  const mWrap = document.getElementById('myMutualWrap');
+  if (mWrap) mWrap.style.display = 'block';
   const badges = [];
   if (u.status === 'approved' || u.name) badges.push('<span class="ub ub-verified">已实名</span>');
   if (isVIP()) badges.push('<span class="ub ub-vip">⭐ 会员</span>');
