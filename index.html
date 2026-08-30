@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.33.0">
+<meta name="version" content="1.34.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -652,56 +652,106 @@ html:not([data-theme="dark"]) {
   --primary: #1666C9; --primary-dark: #0F4F9E; --primary-light: #E9F1FC;
   --accent: #0EA678; --accent-soft: #E7F6F0;     /* 二手 / 流通 */
   --coin: #D99600; --coin-soft: #FBF1D6;          /* 互助币 */
+  --gold: #E0A53B; --gold-soft: #FBEFD6;          /* 高级感强调金 */
   --text: #16233A; --text-secondary: #51607A; --text-muted: #8A96AC;
   --border: #E5EBF3; --border-light: #F1F5FB;
   --bg: #F4F7FB; --bg-card: #FFFFFF; --bg-hover: #F1F5FB;
-  --shadow-sm: 0 1px 2px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.04);
-  --shadow-md: 0 6px 22px rgba(15,23,42,.09);
-  --shadow-lg: 0 16px 48px rgba(15,23,42,.12);
-  --radius: 14px; --radius-lg: 20px;
+  --shadow-sm: 0 1px 2px rgba(15,23,42,.06), 0 2px 8px rgba(15,23,42,.05);
+  --shadow-md: 0 12px 34px rgba(15,23,42,.11);
+  --shadow-lg: 0 24px 60px rgba(15,23,42,.15);
+  --radius: 14px; --radius-lg: 22px;
 }
-html:not([data-theme="dark"]) .header { box-shadow: 0 1px 0 var(--border), 0 8px 30px rgba(15,23,42,.06); }
+/* 全局字体平滑 + 排印质感 */
+html:not([data-theme="dark"]) body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
 html:not([data-theme="dark"]) h1, html:not([data-theme="dark"]) h2,
 html:not([data-theme="dark"]) .task-hero-title, html:not([data-theme="dark"]) .home-section-title,
 html:not([data-theme="dark"]) .safety-hero-title { letter-spacing: -.3px; }
 html:not([data-theme="dark"]) .home-hero-title { font-weight: 800; }
-/* 主按钮：克制的渐变 + 微交互 */
-html:not([data-theme="dark"]) .btn-brand {
-  background: linear-gradient(135deg, #1E72D6, #0F4F9E);
-  box-shadow: 0 6px 18px rgba(22,102,201,.28); border-radius: 10px; font-weight: 600; letter-spacing: .2px;
+
+/* ===== 毛玻璃顶栏 ===== */
+html:not([data-theme="dark"]) .header {
+  background: rgba(255,255,255,.72);
+  backdrop-filter: saturate(180%) blur(18px);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  border-bottom: 1px solid rgba(229,235,243,.85);
+  box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 8px 30px rgba(15,23,42,.07);
 }
-html:not([data-theme="dark"]) .btn-brand:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(22,102,201,.34); }
+html:not([data-theme="dark"]) .brand-logo {
+  background: linear-gradient(135deg,#2A7DE0,#0F4F9E);
+  box-shadow: 0 6px 16px rgba(22,102,201,.35);
+}
+html:not([data-theme="dark"]) .nav-link.active { background: var(--primary-light); color: var(--brand); border-radius: 99px; font-weight: 600; }
+
+/* ===== 主按钮：渐变 + 高光微交互 ===== */
+html:not([data-theme="dark"]) .btn-brand {
+  background: linear-gradient(135deg, #2A7DE0 0%, #0F4F9E 100%);
+  box-shadow: 0 8px 22px rgba(22,102,201,.32); border-radius: 12px;
+  font-weight: 600; letter-spacing: .3px; position: relative; overflow: hidden;
+}
+html:not([data-theme="dark"]) .btn-brand::after {
+  content:""; position:absolute; inset:0;
+  background: linear-gradient(180deg, rgba(255,255,255,.22), transparent 55%);
+  pointer-events:none;
+}
+html:not([data-theme="dark"]) .btn-brand:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(22,102,201,.40); }
 html:not([data-theme="dark"]) .btn-brand:active { transform: translateY(0) scale(.98); }
-html:not([data-theme="dark"]) .btn-outline { border-radius: 10px; }
-/* 卡片：分层阴影 + 悬浮上浮 */
+html:not([data-theme="dark"]) .btn-outline { border-radius: 12px; }
+
+/* ===== 卡片：分层弥散阴影 + 悬浮上浮 + 顶部高光 ===== */
 html:not([data-theme="dark"]) .order-card {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: var(--shadow-sm); transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease;
+  box-shadow: var(--shadow-sm); position: relative; overflow: hidden;
+  transition: box-shadow .22s ease, transform .22s ease, border-color .22s ease;
 }
-html:not([data-theme="dark"]) .order-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: #CFE0F5; }
+html:not([data-theme="dark"]) .order-card::before {
+  content:""; position:absolute; top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, transparent, rgba(22,102,201,.45), transparent);
+  opacity:0; transition: opacity .22s ease;
+}
+html:not([data-theme="dark"]) .order-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color:#CFE0F5; }
+html:not([data-theme="dark"]) .order-card:hover::before { opacity:1; }
 html:not([data-theme="dark"]) .card { border-radius: var(--radius); box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
-/* 导航激活态：胶囊化 */
-html:not([data-theme="dark"]) .nav-link.active { background: var(--primary-light); color: var(--brand); border-radius: 99px; }
-html:not([data-theme="dark"]) .bottom-nav { border-radius: 18px 18px 0 0; padding: 4px 6px; }
-html:not([data-theme="dark"]) .bottom-nav-item { border-radius: 12px; transition: background .15s ease, color .15s ease; }
-html:not([data-theme="dark"]) .bottom-nav-item.active { color: var(--brand); background: var(--primary-light); font-weight: 700; }
+
+/* ===== 底部导航：漂浮药丸指示器 ===== */
+html:not([data-theme="dark"]) .bottom-nav {
+  background: rgba(255,255,255,.82);
+  backdrop-filter: saturate(180%) blur(18px);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  border-top: 1px solid rgba(229,235,243,.85);
+  border-radius: 20px 20px 0 0; padding: 6px 8px;
+  box-shadow: 0 -8px 30px rgba(15,23,42,.10);
+}
+html:not([data-theme="dark"]) .bottom-nav-item { border-radius: 14px; transition: background .18s ease, color .18s ease, transform .18s ease; }
+html:not([data-theme="dark"]) .bottom-nav-item.active {
+  color: #fff; background: linear-gradient(135deg,#2A7DE0,#0F4F9E); font-weight: 700;
+  box-shadow: 0 6px 16px rgba(22,102,201,.35);
+}
 html:not([data-theme="dark"]) .bottom-nav-item.active .bi { transform: translateY(-1px); }
-/* tab / 筛选：胶囊 */
+
+/* ===== tab / 筛选：胶囊（渐变高亮） ===== */
 html:not([data-theme="dark"]) .tab-btn, html:not([data-theme="dark"]) .filter-btn {
   border-radius: 99px; border: 1px solid var(--border); background: var(--bg-card); font-weight: 500; transition: all .15s ease;
 }
 html:not([data-theme="dark"]) .tab-btn.active, html:not([data-theme="dark"]) .filter-btn.active {
-  background: var(--brand); color: #fff; border-color: var(--brand); box-shadow: 0 4px 12px rgba(22,102,201,.25);
+  background: linear-gradient(135deg,#2A7DE0,#0F4F9E); color: #fff; border-color: transparent; box-shadow: 0 4px 14px rgba(22,102,201,.30);
 }
-/* hero：渐变 + 高光，取代纯色块 */
+
+/* ===== Hero：多层渐变光晕（深蓝 + 金） ===== */
 html:not([data-theme="dark"]) .home-hero {
-  background: radial-gradient(1100px 380px at 72% -12%, rgba(255,255,255,.20), transparent), linear-gradient(160deg, #1E72D6 0%, #0F4F9E 100%);
+  background:
+    radial-gradient(900px 360px at 78% -18%, rgba(224,165,59,.18), transparent 60%),
+    radial-gradient(1100px 420px at 18% -10%, rgba(42,125,224,.30), transparent 62%),
+    linear-gradient(160deg, #1C6FD8 0%, #0E3F86 100%);
 }
 html:not([data-theme="dark"]) .task-hero {
-  background: radial-gradient(900px 320px at 82% -22%, rgba(255,255,255,.16), transparent), linear-gradient(160deg, #1E72D6 0%, #0F4F9E 100%);
+  background:
+    radial-gradient(700px 280px at 82% -22%, rgba(224,165,59,.16), transparent 60%),
+    radial-gradient(900px 340px at 12% -12%, rgba(42,125,224,.28), transparent 62%),
+    linear-gradient(160deg, #1C6FD8 0%, #0E3F86 100%);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
-/* 首页模块卡：更柔和的圆角与分层 */
+
+/* ===== 首页模块卡 ===== */
 html:not([data-theme="dark"]) .home-section {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm); overflow: hidden;
@@ -712,6 +762,14 @@ html:not([data-theme="dark"]) .live-data, html:not([data-theme="dark"]) .steps-g
 }
 html:not([data-theme="dark"]) .why-us-col.is-us { background: linear-gradient(180deg, var(--primary-light), #fff); border-color: var(--brand); }
 html:not([data-theme="dark"]) .live-activity, html:not([data-theme="dark"]) .live-stats { box-shadow: none; }
+
+/* 区块标题装饰条（金色点缀） */
+html:not([data-theme="dark"]) .home-section-title::before,
+html:not([data-theme="dark"]) .why-us-title::before,
+html:not([data-theme="dark"]) .steps-title::before {
+  content:""; display:inline-block; width:4px; height:1em; border-radius:99px;
+  background: linear-gradient(180deg,#E0A53B,#C9872A); margin-right:8px; vertical-align:-2px;
+}
 html:not([data-theme="dark"]) :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 html:not([data-theme="dark"]) .home-cat-icon { box-shadow: var(--shadow-sm); }
 html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-card-ico { box-shadow: var(--shadow-sm); }
@@ -729,11 +787,11 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 
 <header class="header">
   <div class="container nav-inner">
-    <a class="brand-logo" href="#" onclick="navigate('ershou');return false" title="HUST互助 二手交易">互</a>
+    <a class="brand-logo" href="#" onclick="navigate('home');return false" title="HUST互助 广场">互</a>
     <nav class="nav-links" id="navLinks">
-      <a href="#" class="nav-link active" data-page="ershou" onclick="navigate('ershou')">二手</a>
+      <a href="#" class="nav-link active" data-page="home" onclick="navigate('home')">广场</a>
+      <a href="#" class="nav-link" data-page="ershou" onclick="navigate('ershou')">二手</a>
       <a href="#" class="nav-link" data-page="help" onclick="navigate('help')">互助</a>
-      <a href="#" class="nav-link" data-page="home" onclick="navigate('home')">发现</a>
       <a href="#" class="nav-link" data-page="my" onclick="navigate('my')">我的</a>
     </nav>
     <div class="header-actions" id="headerActions">
@@ -752,9 +810,9 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 </header>
 
 <nav class="bottom-nav" id="bottomNav">
-  <a href="#" class="bottom-nav-item active" data-page="ershou" onclick="navigate('ershou');return false"><span class="bi">🛒</span><span>二手</span></a>
+  <a href="#" class="bottom-nav-item active" data-page="home" onclick="navigate('home');return false"><span class="bi">🧭</span><span>广场</span></a>
+  <a href="#" class="bottom-nav-item" data-page="ershou" onclick="navigate('ershou');return false"><span class="bi">🛒</span><span>二手</span></a>
   <a href="#" class="bottom-nav-item" data-page="help" onclick="navigate('help');return false"><span class="bi">🤝</span><span>互助</span></a>
-  <a href="#" class="bottom-nav-item" data-page="home" onclick="navigate('home');return false"><span class="bi">🧭</span><span>发现</span></a>
   <a href="#" class="bottom-nav-item" data-page="my" onclick="navigate('my');return false"><span class="bi">👤</span><span>我的</span></a>
 </nav>
 
@@ -921,7 +979,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
   <div class="safety-page">
     <div class="safety-head">
       <div class="container">
-        <button class="safety-back" onclick="navigate('home')">‹ 返回首页</button>
+        <button class="safety-back" onclick="navigate('home')">‹ 返回广场</button>
         <h1 class="safety-hero-title">🛡️ 平台信任与安全中心</h1>
         <p class="safety-hero-sub">我们用工程化手段解决"陌生人敢不敢交易"——这是纯公益互助网做不到的</p>
       </div>
@@ -1683,7 +1741,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.33.0';
+const APP_VERSION = '1.34.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -8385,7 +8443,7 @@ handleAuth = async function(e) {
 (function() {
   if (S.user) { maybeShowNotifyBanner(); runNotificationCheck(); }
   loadAnnounceBanner();
-  navigate('ershou'); // v1.33.0 默认落地页改为「二手交易」（项目主功能）
+  navigate('home'); // v1.34.0 默认落地页改为「广场」（信任/社区/互助动态展示）
 })();
 
 // 每30秒检测订单+私信（复用数据），页面隐藏跳过
