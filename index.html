@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.30.0">
+<meta name="version" content="1.31.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1228,6 +1228,10 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
         <div class="my-credit-num" id="myMutualNum" style="color:#16a34a">0</div>
         <div class="my-credit-label">互助值</div>
       </div>
+      <div class="my-credit" id="myVolunteerWrap" style="display:none">
+        <div class="my-credit-num" id="myVolunteerNum" style="color:#7c3aed">0</div>
+        <div class="my-credit-label">志愿时长(对接中)</div>
+      </div>
       <span class="my-arrow" id="myArrow">⌄</span>
     </div>
     <div id="myProfile" class="my-profile" style="display:none">
@@ -1533,6 +1537,17 @@ html[data-theme="dark"] .runner-avail-track::after{background:#e5e7eb}
 <script>
 // ============ 管理员配置 ============
 const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
+
+// ===== v1.31.0 志愿时长挂钩接口（预留）=====
+// 未来拟将"互助值 / 帮助数"映射到大学志愿服务时长。
+// VOLUNTEER_HOURS_PER_MUTUAL 为【唯一换算系数入口】；对接真实志愿时系统时只需调整此处（或替换为后端返回值）。
+const VOLUNTEER_HOURS_PER_MUTUAL = 0.5; // 每 2 互助值 ≈ 1 志愿时（可调）
+// 计算某用户"可认定的志愿时长（小时）"。这是志愿时长对接的【唯一换算入口】。
+// 数据源：mutual_score（正向互助行为累加，见 updateCreditScore）。未来可改为基于 mutual_ledger 完成单数。
+function computeVolunteerHours(userData) {
+  const ms = (userData && userData.mutual_score) || 0;
+  return +(ms * VOLUNTEER_HOURS_PER_MUTUAL).toFixed(1);
+}
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
 // 腾讯云 SCF 云函数代理（减少 GitHub API 消耗 + 服务端持有密钥 + 密码后端校验）
@@ -1591,7 +1606,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.30.0';
+const APP_VERSION = '1.31.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3697,6 +3712,11 @@ async function updateCreditScore(userIssueNum, delta, reason) {
     // v1.29.0 互助值：正向加分（完成订单/被好评）时同步累加，收编"公益互惠"文化
     if (delta > 0) {
       u.mutual_score = (u.mutual_score || 0) + delta;
+      // v1.31.0 互助流水骨架：为"志愿时长对接"与"互助币"预留真实数据源。
+      // 未来在此处联动 computeVolunteerHours() 与互助币计币逻辑（接单完成 +delta、发求助扣币）。
+      if (!u.mutual_ledger) u.mutual_ledger = [];
+      u.mutual_ledger.unshift({ delta: delta, reason: reason, time: new Date().toISOString() });
+      if (u.mutual_ledger.length > 50) u.mutual_ledger = u.mutual_ledger.slice(0, 50);
       cacheBust('leaderboard'); // v1.30.0 互助榜数据失效
     }
     if (!u.credit_history) u.credit_history = [];
@@ -5032,6 +5052,7 @@ async function takeOrder(inum) {
     showRunnerApply();
     return;
   }
+  // 协调说明（v1.31.0）：本"每日接单限制"是【频次约束】，与规划中的互助币【资源约束】互补不冲突——接单是赚币行为，不受币余额限制。二者叠加逻辑自洽。
   // 每日接单限制：已认证非 VIP 用户每天只能接 1 单，VIP 与管理员不限
   if (!isVIP() && !isAdmin) {
     const todayTaken = await getTodayMyOrders('taken');
@@ -6197,6 +6218,8 @@ async function handlePublish(e) {
     showRunnerApply();
     return;
   }
+  // 协调说明（v1.31.0）：本"每日发单限制"是【频次约束】；规划中的互助币是【资源约束】（发求助类任务需消耗互助币）。
+  // 二者互补：频次限制每天最多 1 单（防刷屏），互助币限制"有无资格求助"（需先帮人攒币）。VIP 仅解除本频次上限，不解除互助币资源约束。
   // 每日发单限制：已认证非 VIP 用户每天只能发布 1 单（交易类），VIP 与管理员不限
   if ((type === 'task' || type === 'secondhand' || type === 'borrow') && !isVIP() && !isAdminUser()) {
     const todayPublished = await getTodayMyOrders('published');
@@ -6690,6 +6713,11 @@ function fillMyUserCard() {
   if (mEl) mEl.textContent = (u.mutual_score || 0);
   const mWrap = document.getElementById('myMutualWrap');
   if (mWrap) mWrap.style.display = 'block';
+  // v1.31.0 志愿时长（对接中）展示位：数据来自 computeVolunteerHours() 唯一换算入口
+  const vEl = document.getElementById('myVolunteerNum');
+  if (vEl) vEl.textContent = computeVolunteerHours(u);
+  const vWrap = document.getElementById('myVolunteerWrap');
+  if (vWrap) vWrap.style.display = 'block';
   const badges = [];
   if (u.status === 'approved' || u.name) badges.push('<span class="ub ub-verified">已实名</span>');
   if (isVIP()) badges.push('<span class="ub ub-vip">⭐ 会员</span>');
