@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.35.0">
+<meta name="version" content="1.36.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -652,7 +652,6 @@ html:not([data-theme="dark"]) {
   --brand: #1666C9; --brand-ink: #fff;
   --primary: #1666C9; --primary-dark: #0F4F9E; --primary-light: #E9F1FC;
   --accent: #0EA678; --accent-soft: #E7F6F0;     /* 二手 / 流通 */
-  --coin: #D99600; --coin-soft: #FBF1D6;          /* 互助币 */
   --gold: #E0A53B; --gold-soft: #FBEFD6;          /* 高级感强调金 */
   --text: #16233A; --text-secondary: #51607A; --text-muted: #8A96AC;
   --border: #E5EBF3; --border-light: #F1F5FB;
@@ -992,7 +991,6 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <div class="safety-card"><div class="safety-card-ico">🕶️</div><div><div class="safety-card-title">③ 隐私强脱敏</div><div class="safety-card-desc">后端对所有含隐私接口强制登录校验，非本人 / 非管理员直接拒绝，并剥离学号、手机号、宿舍等字段，只保留昵称与信用分。</div></div></div>
       <div class="safety-card"><div class="safety-card-ico">⚖️</div><div><div class="safety-card-title">④ 投诉仲裁</div><div class="safety-card-desc">纠纷可一键投诉，成立将自动扣除对方信用分，累计 5 次自动封停账号，平台介入裁定。</div></div></div>
       <div class="safety-card"><div class="safety-card-ico">⭐</div><div><div class="safety-card-title">⑤ 信用分体系</div><div class="safety-card-desc">初始 100 分，完成订单、被好评加分；爽约、被投诉扣分，过低将限制发布与接单，让守信者被看见。</div></div></div>
-      <div class="safety-card"><div class="safety-card-ico">🪙</div><div><div class="safety-card-title">⑥ 互助币互惠机制</div><div class="safety-card-desc">接单完成赚 <b>10 互助币</b>、发布求助消耗 <b>5 互助币</b>、被投诉成立扣 <b>20 币</b>。互助币=你帮助同学的"存款"——想求助，先帮人。把公益互惠从"靠自觉"变成"机制"，区别于纯公益互助网的软约束，也区别于商业跑腿的"花钱买服务"。互助币还可折算志愿时长，未来对接大学志愿服务认定。</div></div></div>
       <p class="form-hint" style="margin-top:8px">注：当前为「平台见证 + 信用约束 + 投诉自动惩罚」的轻量担保模式，资金由双方按确认节点线下支付。真·资金托管需接入微信 / 支付宝商户资质，列为本项目未来工作。</p>
     </div>
   </div>
@@ -1214,7 +1212,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     <form id="publishForm" onsubmit="handlePublish(event)">
       <div class="form-group">
         <label>类型</label>
-        <select id="publishType" required onchange="updatePublishCategories();updatePublishCoinTip()">
+        <select id="publishType" required onchange="updatePublishCategories()">
           <option value="task">跑腿代办</option>
           <option value="secondhand">物品流转 - 出售转让</option>
           <option value="borrow">物品流转 - 短期租借</option>
@@ -1226,7 +1224,6 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <label>子分类</label>
         <select id="publishCategory" onchange="updateFoodPublishTip()"></select>
       </div>
-      <div id="publishCoinTip" class="form-hint" style="display:none;background:#f5f3ff;border:1px solid #ddd6fe;color:#6d28d9;padding:8px 12px;border-radius:8px;margin-bottom:4px;font-size:.82rem"></div>
       <div class="form-group">
         <label>标题</label>
         <input type="text" id="publishTitle" required maxlength="50" placeholder="简要描述你的需求" oninput="updateCharCount('publishTitle','titleCount',50)">
@@ -1357,17 +1354,9 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <div class="my-credit-num" id="myCreditNum">100</div>
         <div class="my-credit-label">信用分</div>
       </div>
-      <div class="my-credit" id="myMutualWrap" style="display:none">
-        <div class="my-credit-num" id="myMutualNum" style="color:#16a34a">0</div>
-        <div class="my-credit-label">互助币</div>
-      </div>
       <div class="my-credit" id="myVolunteerWrap" style="display:none">
         <div class="my-credit-num" id="myVolunteerNum" style="color:#7c3aed">0</div>
         <div class="my-credit-label">志愿时长(对接中)</div>
-      </div>
-      <div class="my-credit" id="myCoinWrap" style="display:none">
-        <div class="my-credit-num" id="myCoinNum" style="color:#d97706">0</div>
-        <div class="my-credit-label">互助币</div>
       </div>
       <span class="my-arrow" id="myArrow">⌄</span>
     </div>
@@ -1675,15 +1664,17 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 // ============ 管理员配置 ============
 const ADMIN_STUDENT_ID = 'U202512533'; // 管理员学号
 
-// ===== v1.31.0 志愿时长挂钩接口（预留）=====
-// 未来拟将"互助币 / 帮助数"映射到大学志愿服务时长。
-// VOLUNTEER_HOURS_PER_MUTUAL 为【唯一换算系数入口】；对接真实志愿时系统时只需调整此处（或替换为后端返回值）。
-const VOLUNTEER_HOURS_PER_MUTUAL = 0.5; // 每 2 互助币 ≈ 1 志愿时（可调）
+// ===== 志愿时长挂钩接口（预留）=====
+// 未来拟将"帮助行为 / 信用积累"映射到大学志愿服务时长。
+// VOLUNTEER_HOURS_PER_EVENT 为【唯一换算系数入口】；对接真实志愿时系统时只需调整此处（或替换为后端返回值）。
+const VOLUNTEER_HOURS_PER_EVENT = 0.5; // 每完成 1 次正向互助（信用事件）≈ 0.5 志愿时（可调）
 // 计算某用户"可认定的志愿时长（小时）"。这是志愿时长对接的【唯一换算入口】。
-// 数据源：mutual_score（正向互助行为累加，见 updateCreditScore）。未来可改为基于 mutual_ledger 完成单数。
+// 数据源：credit_history 中正向事件（完成订单 / 被好评）次数。
 function computeVolunteerHours(userData) {
-  const ms = (userData && userData.mutual_score) || 0;
-  return +(ms * VOLUNTEER_HOURS_PER_MUTUAL).toFixed(1);
+  const hist = (userData && userData.credit_history) || [];
+  let n = 0;
+  for (const e of hist) { if (e && e.score > 0) n++; }
+  return +(n * VOLUNTEER_HOURS_PER_EVENT).toFixed(1);
 }
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
@@ -1743,7 +1734,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.35.0';
+const APP_VERSION = '1.36.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2212,20 +2203,14 @@ async function loadHomeLeaderboard() {
     for (const i of issues) {
       let u; try { u = JSON.parse(i.body); } catch(e) { continue; }
       if (!u || typeof u !== 'object') continue;
-      const ms = u.mutual_score || 0;
       const cs = u.credit_score != null ? u.credit_score : 100;
-      if (ms <= 0) continue; // 只显示有互助记录的同学
       users.push({
         nickname: u.nickname || u.name || '匿名校友',
-        mutual_score: ms,
         credit_score: cs,
         sid: u.student_id
       });
     }
-    users.sort(function(a, b) {
-      if (b.mutual_score !== a.mutual_score) return b.mutual_score - a.mutual_score;
-      return b.credit_score - a.credit_score;
-    });
+    users.sort(function(a, b) { return b.credit_score - a.credit_score; });
     cacheSet('leaderboard', users);
     renderHomeLeaderboard(users);
   } catch(e) {
@@ -2251,8 +2236,8 @@ function renderHomeLeaderboard(users) {
     return '<div class="leaderboard-item">'
       + '<div class="leaderboard-rank ' + rankClass + '">' + medal + '</div>'
       + '<div class="leaderboard-avatar">' + avatar + '</div>'
-      + '<div class="leaderboard-info"><div class="leaderboard-name">' + esc(u.nickname) + '</div><div class="leaderboard-meta">信用 ' + u.credit_score + '</div></div>'
-      + '<div class="leaderboard-score">' + u.mutual_score + '<small>互助币</small></div>'
+      + '<div class="leaderboard-info"><div class="leaderboard-name">' + esc(u.nickname) + '</div><div class="leaderboard-meta">互助达人</div></div>'
+      + '<div class="leaderboard-score">' + u.credit_score + '<small>信用分</small></div>'
       + '</div>';
   }).join('');
   if (meEl) {
@@ -2261,7 +2246,7 @@ function renderHomeLeaderboard(users) {
       for (let i = 0; i < users.length; i++) { if (users[i].sid === S.user.student_id) { myIdx = i; break; } }
       if (myIdx >= 0) {
         meEl.style.display = 'flex';
-        meEl.innerHTML = '<span class="leaderboard-me-label">我的排名：第 ' + (myIdx + 1) + ' 名 · 互助币 ' + users[myIdx].mutual_score + '</span><span class="leaderboard-me-score">继续加油</span>';
+        meEl.innerHTML = '<span class="leaderboard-me-label">我的排名：第 ' + (myIdx + 1) + ' 名 · 信用分 ' + users[myIdx].credit_score + '</span><span class="leaderboard-me-score">继续加油</span>';
       } else {
         meEl.style.display = 'none';
       }
@@ -3801,7 +3786,6 @@ async function applyReportResolved(r) {
   // 被投诉方 -10 信用分
   if (r.target_id) {
     const newScore = await updateCreditScore(r.target_id, -10, '投诉成立：' + (r.reason || ''));
-    await awardMutualCoin(r.target_id, -20, '投诉成立：' + (r.reason || '')).catch(()=>{});
     if (newScore != null && newScore < 25) {
       toast('⚠️ 被投诉方信用分已降至 ' + newScore + ' 分，账号将受到限制。', 'info');
     } else if (newScore != null) {
@@ -3893,16 +3877,7 @@ async function updateCreditScore(userIssueNum, delta, reason) {
     const oldScore = u.credit_score != null ? u.credit_score : 100;
     const newScore = Math.max(0, Math.min(100, oldScore + delta));
     u.credit_score = newScore;
-    // v1.29.0 互助币：正向加分（完成订单/被好评）时同步累加，收编"公益互惠"文化
-    if (delta > 0) {
-      u.mutual_score = (u.mutual_score || 0) + delta;
-      // v1.31.0 互助流水骨架：为"志愿时长对接"与"互助币"预留真实数据源。
-      // 未来在此处联动 computeVolunteerHours() 与互助币计币逻辑（接单完成 +delta、发求助扣币）。
-      if (!u.mutual_ledger) u.mutual_ledger = [];
-      u.mutual_ledger.unshift({ delta: delta, reason: reason, time: new Date().toISOString() });
-      if (u.mutual_ledger.length > 50) u.mutual_ledger = u.mutual_ledger.slice(0, 50);
-      cacheBust('leaderboard'); // v1.30.0 互助榜数据失效
-    }
+    cacheBust('leaderboard'); // 互助达人榜（按信用分）数据失效
     if (!u.credit_history) u.credit_history = [];
     u.credit_history.unshift({ score: delta, reason: reason, time: new Date().toISOString(), before: oldScore, after: newScore });
     if (u.credit_history.length > 50) u.credit_history = u.credit_history.slice(0, 50);
@@ -3911,7 +3886,6 @@ async function updateCreditScore(userIssueNum, delta, reason) {
       if (S.user && (S.user._issue_number == userIssueNum || S.user.student_id == u.student_id)) {
       S.user.credit_score = newScore;
       S.user.credit_history = u.credit_history;
-      if (u.mutual_score != null) S.user.mutual_score = u.mutual_score;
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       updateUI();
       // 信用分跌破阈值时通知（仅在跨越阈值那一刻，避免重复）
@@ -3924,37 +3898,6 @@ async function updateCreditScore(userIssueNum, delta, reason) {
     }
     return newScore;
   } catch(e) { console.error('updateCreditScore error:', e); return null; }
-}
-
-// ===== v1.32.0 互助币计币（独立于信用分，mutual_score 即互助币余额）=====
-const DAILY_COIN_CAP = 3; // 单日接单计币上限（防刷）
-async function awardMutualCoin(userIssueNum, amount, reason, opts) {
-  opts = opts || {};
-  try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + userIssueNum, { headers: {} });
-    if (!res.ok) return null;
-    const issue = await res.json();
-    const u = JSON.parse(issue.body);
-    // 防刷：单日接单计币（earn）上限，超出不再发放（不影响信用分）
-    if (opts.antiSpam && amount > 0) {
-      if (!u.mutual_ledger) u.mutual_ledger = [];
-      const today = new Date().toISOString().slice(0, 10);
-      const earnedToday = u.mutual_ledger.filter(e => e.amount > 0 && (e.time || '').slice(0, 10) === today).length;
-      if (earnedToday >= DAILY_COIN_CAP) return (u.mutual_score != null ? u.mutual_score : 0);
-    }
-    u.mutual_score = (u.mutual_score != null ? u.mutual_score : 0) + amount;
-    if (!u.mutual_ledger) u.mutual_ledger = [];
-    u.mutual_ledger.unshift({ amount: amount, reason: reason, time: new Date().toISOString() });
-    if (u.mutual_ledger.length > 50) u.mutual_ledger = u.mutual_ledger.slice(0, 50);
-    await ghUpdateIssue(userIssueNum, JSON.stringify(u));
-    if (S.user && (S.user._issue_number == userIssueNum || S.user.student_id == u.student_id)) {
-      S.user.mutual_score = u.mutual_score;
-      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
-      updateUI();
-    }
-    cacheBust('leaderboard');
-    return u.mutual_score;
-  } catch (e) { console.error('awardMutualCoin error:', e); return null; }
 }
 
 // 反馈中心
@@ -5267,7 +5210,7 @@ async function takeOrder(inum) {
     showRunnerApply();
     return;
   }
-  // 协调说明（v1.31.0）：本"每日接单限制"是【频次约束】，与规划中的互助币【资源约束】互补不冲突——接单是赚币行为，不受币余额限制。二者叠加逻辑自洽。
+  // 每日接单限制（频次约束）：控制每天最多接单次数，防刷屏与滥用。
   // 每日接单限制：已认证非 VIP 用户每天只能接 1 单，VIP 与管理员不限
   if (!isVIP() && !isAdmin) {
     const todayTaken = await getTodayMyOrders('taken');
@@ -5528,7 +5471,7 @@ async function submitCompleteOrder(inum, hasHandoff) {
       // 无交接码 → 原逻辑直接 completed
       o.status = 'completed';
       await ghUpdateIssue(inum, JSON.stringify(o));
-      toast('订单完成！互助币已结算 🪙', 'success');
+      toast('订单完成！', 'success');
       closeDetailModal();
       optimisticUpdateMyOrder(inum, 'completed');
       cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
@@ -5537,8 +5480,6 @@ async function submitCompleteOrder(inum, hasHandoff) {
       deleteAllComments(inum).catch(()=>{});
       if (o.taker_id && !isAdminUser()) {
         updateCreditScore(o.taker_id, 1, '完成订单：' + (o.title || '')).catch(()=>{});
-        awardMutualCoin(o.taker_id, 10, '接单完成：' + (o.title || ''), { antiSpam: true }).catch(()=>{});
-        awardMutualCoin(o.publisher_id, 5, '订单发布完成：' + (o.title || ''), {}).catch(()=>{});
       }
       if (S.page === 'task') setTimeout(() => refreshCurrentTab(), 1500);
     }
@@ -5558,7 +5499,7 @@ async function finalizeOrder(inum) {
     o.status = 'completed';
     delete o.awaiting_confirm_at;
     await ghUpdateIssue(inum, JSON.stringify(o));
-    toast('已确认收到，订单完成！互助币 +5 🪙', 'success');
+    toast('已确认收到，订单完成！', 'success');
     closeDetailModal();
     optimisticUpdateMyOrder(inum, 'completed');
     cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
@@ -5567,8 +5508,6 @@ async function finalizeOrder(inum) {
     deleteAllComments(inum).catch(()=>{});
     if (o.taker_id && !isAdminUser()) {
       updateCreditScore(o.taker_id, 1, '完成订单：' + (o.title || '')).catch(()=>{});
-      awardMutualCoin(o.taker_id, 10, '接单完成：' + (o.title || ''), { antiSpam: true }).catch(()=>{});
-      awardMutualCoin(o.publisher_id, 5, '订单发布完成：' + (o.title || ''), {}).catch(()=>{});
     }
     sendNotify('✅ 订单已确认完成', '发布者已确认收到，订单「' + (o.title || '') + '」完成，信用分 +1', { icon: '✅', link: 'my' });
   } catch(e) { toast(e.message, 'error'); }
@@ -6047,7 +5986,7 @@ async function handleAuth(e) {
       let initialStatus = (sid === ADMIN_STUDENT_ID) ? 'approved' : 'pending';
       if (verifyMethod === 'email') initialStatus = 'approved'; // 邮箱验证通过即放行
       // 注意：密码不在前端存储，单独传给 /api/register，由服务端哈希后写入 Issue
-      const userData = { student_id: sid, name, nickname: nicknameInput || name, name_nonstandard: nameValid.nonstandard, phone, dorm, balance: 0, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], mutual_score: 20, mutual_ledger: [], created_at: new Date().toISOString() };
+      const userData = { student_id: sid, name, nickname: nicknameInput || name, name_nonstandard: nameValid.nonstandard, phone, dorm, balance: 0, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
       if (verifyMethod === 'email') { userData.email = (document.getElementById('authEmail').value || '').trim().toLowerCase(); userData.email_verified = true; }
       else { userData.email_verified = false; }
       // 7天会员试用改为在「跑腿认证通过」时赠送（见 approveRunner），注册/审核通过不再赠送
@@ -6335,22 +6274,6 @@ function updateFoodPublishTip() {
   const tip = document.getElementById('foodPublishTip');
   if (tip) tip.style.display = (t === 'task' && c === 'food') ? 'block' : 'none';
 }
-// v1.32.0 发布页互助币提示
-function updatePublishCoinTip() {
-  const tip = document.getElementById('publishCoinTip');
-  if (!tip) return;
-  const el = document.getElementById('publishType');
-  if (!el) return;
-  const type = el.value;
-  if (!S.user) { tip.style.display = 'none'; return; }
-  const bal = (S.user.mutual_score != null) ? S.user.mutual_score : 20;
-  if (type === 'task' || type === 'borrow') {
-    tip.innerHTML = '💰 发布求助类任务将消耗 <b>5 互助币</b>（当前余额 ' + bal + '）。互助币=你帮助同学的存款，接单完成可赚 10 币，先帮人才能求助~';
-  } else {
-    tip.innerHTML = '✨ 此类发布免费（当前互助币 ' + bal + '）。多去接单攒币，发布求助更顺畅！';
-  }
-  tip.style.display = 'block';
-}
 function autoGenHandoffCode() {
   const el = document.getElementById('publishHandoffCode');
   if (el) el.value = String(Math.floor(1000 + Math.random() * 9000));
@@ -6457,8 +6380,7 @@ async function handlePublish(e) {
     showRunnerApply();
     return;
   }
-  // 协调说明（v1.31.0）：本"每日发单限制"是【频次约束】；规划中的互助币是【资源约束】（发求助类任务需消耗互助币）。
-  // 二者互补：频次限制每天最多 1 单（防刷屏），互助币限制"有无资格求助"（需先帮人攒币）。VIP 仅解除本频次上限，不解除互助币资源约束。
+  // 每日发单限制（频次约束）：每天最多 1 单（防刷屏）。VIP 可解除本上限。
   // 每日发单限制：已认证非 VIP 用户每天只能发布 1 单（交易类），VIP 与管理员不限
   if ((type === 'task' || type === 'secondhand' || type === 'borrow') && !isVIP() && !isAdminUser()) {
     const todayPublished = await getTodayMyOrders('published');
@@ -6554,24 +6476,6 @@ async function handlePublish(e) {
   window._publishLock = true;
   const _pb = document.querySelector('#publishForm button[type=submit]');
   if (_pb) { _pb.disabled = true; _pb.textContent = '发布中…'; }
-
-  // v1.32.0 互助币扣费（资源约束）：发布"求助类"任务(task/borrow)消耗 5 互助币；secondhand/qa/find 免费。与上方频次约束互补。
-  if (type === 'task' || type === 'borrow') {
-    const COIN_COST_PUBLISH = 5;
-    const bal = (S.user.mutual_score != null) ? S.user.mutual_score : 20;
-    if (bal < COIN_COST_PUBLISH) {
-      err.textContent = '互助币不足（当前 ' + bal + '）。互助币=你帮助同学的存款：先去「接单」帮同学，完成可得 10 币，才能发布求助~';
-      err.style.display = 'block';
-      if (_pb) { _pb.disabled = false; _pb.textContent = '发布'; }
-      return;
-    }
-    const newBal = await awardMutualCoin(S.user._issue_number, -COIN_COST_PUBLISH, '发布求助任务：' + (title || ''));
-    if (newBal == null) {
-      err.textContent = '互助币扣费失败，请重试'; err.style.display = 'block';
-      if (_pb) { _pb.disabled = false; _pb.textContent = '发布'; }
-      return;
-    }
-  }
 
   try {
     const label = type === 'qa' ? 'qa' : 'order';
@@ -6966,20 +6870,11 @@ function fillMyUserCard() {
   const credit = (u.credit_score != null) ? u.credit_score : 100;
   const cEl = document.getElementById('myCreditNum');
   if (cEl) cEl.textContent = credit;
-  const mEl = document.getElementById('myMutualNum');
-  if (mEl) mEl.textContent = (u.mutual_score || 0);
-  const mWrap = document.getElementById('myMutualWrap');
-  if (mWrap) mWrap.style.display = 'block';
-  // v1.31.0 志愿时长（对接中）展示位：数据来自 computeVolunteerHours() 唯一换算入口
+  // 志愿时长（对接中）展示位：数据来自 computeVolunteerHours() 唯一换算入口
   const vEl = document.getElementById('myVolunteerNum');
   if (vEl) vEl.textContent = computeVolunteerHours(u);
   const vWrap = document.getElementById('myVolunteerWrap');
   if (vWrap) vWrap.style.display = 'block';
-  // v1.32.0 互助币展示位（mutual_score 即余额）
-  const coinEl = document.getElementById('myCoinNum');
-  if (coinEl) coinEl.textContent = (u.mutual_score != null ? u.mutual_score : 0);
-  const coinWrap = document.getElementById('myCoinWrap');
-  if (coinWrap) coinWrap.style.display = 'block';
   const badges = [];
   if (u.status === 'approved' || u.name) badges.push('<span class="ub ub-verified">已实名</span>');
   if (isVIP()) badges.push('<span class="ub ub-vip">⭐ 会员</span>');
@@ -8233,13 +8128,11 @@ async function checkAwaitingConfirmOrders(issues) {
         deleteAllComments(o._num).catch(()=>{});
         if (fresh.taker_id && !isAdminUser()) {
           updateCreditScore(fresh.taker_id, 1, '完成订单：' + (fresh.title || '')).catch(()=>{});
-          awardMutualCoin(fresh.taker_id, 10, '接单完成(超时自动确认)：' + (fresh.title || ''), { antiSpam: true }).catch(()=>{});
-          awardMutualCoin(fresh.publisher_id, 5, '订单发布完成(超时自动确认)：' + (fresh.title || ''), {}).catch(()=>{});
         }
         const uid = S.user._issue_number || S.user.student_id;
         const isPub = (fresh.publisher_id == uid || fresh.publisher_student_id == S.user.student_id);
         if (isPub) sendNotify('✅ 订单已自动确认', '你未在 48h 内确认，「' + (fresh.title || '') + '」已自动完成', { icon: '✅', link: 'my' });
-        else sendNotify('✅ 订单已确认完成', '发布者 48h 未确认，系统已自动确认订单「' + (fresh.title || '') + '」完成，信用分 +1，互助币 +10 🪙', { icon: '✅', link: 'my' });
+        else sendNotify('✅ 订单已确认完成', '发布者 48h 未确认，系统已自动确认订单「' + (fresh.title || '') + '」完成，信用分 +1', { icon: '✅', link: 'my' });
       } catch(e) { /* 单条失败不阻断 */ }
     }
   } finally { _awaitConfirmBusy = false; }
