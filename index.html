@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.36.0">
+<meta name="version" content="1.37.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -178,6 +178,117 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 .home-cat-label{font-size:12px;color:var(--text-secondary)}
 .home-cta-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0 6px}
 .btn-brand{background:var(--brand);color:#fff}
+
+/* ===== v1.37.0 校园圈 Forum ===== */
+.forum-home-bg{background:var(--bg);padding-bottom:8px}
+.forum-home{padding-top:18px}
+.forum-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.forum-header-left{display:flex;align-items:center;gap:12px}
+.forum-header-title{font-size:1.2rem;font-weight:700;color:var(--text);margin:0}
+.forum-campus-select{border:1px solid var(--border);border-radius:99px;padding:5px 12px;font-size:.82rem;color:var(--text-secondary);background:var(--bg-card);outline:none;cursor:pointer}
+.forum-header-actions{display:flex;gap:10px}
+.forum-header-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-sm)}
+.forum-header-btn:active{transform:scale(.95)}
+
+/* Banner */
+.forum-banner{position:relative;border-radius:var(--radius-sm);overflow:hidden;margin-bottom:18px;background:var(--bg-card);box-shadow:var(--shadow-md)}
+.forum-banner-track{display:flex;transition:transform .5s ease}
+.forum-banner-slide{flex:0 0 100%;min-height:140px;padding:18px 20px;color:#fff;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.forum-banner-tag{display:inline-block;align-self:flex-start;background:rgba(255,255,255,.25);color:#fff;font-size:.68rem;font-weight:600;padding:3px 8px;border-radius:99px}
+.forum-banner-title{font-size:1.25rem;font-weight:700}
+.forum-banner-sub{font-size:.82rem;opacity:.9}
+.forum-banner-dots{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+.forum-banner-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.45);cursor:pointer}
+.forum-banner-dot.active{background:#fff}
+
+/* Stats */
+.forum-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.forum-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 8px;text-align:center}
+.forum-stat-num{font-size:1.35rem;font-weight:700;color:var(--brand);line-height:1}
+.forum-stat-label{font-size:.72rem;color:var(--text-muted);margin-top:4px}
+
+/* 8 grid */
+.forum-cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.forum-cat{display:flex;flex-direction:column;align-items:center;gap:8px;background:none;border:none;cursor:pointer;padding:4px 0}
+.forum-cat-icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;transition:transform .15s ease}
+.forum-cat:hover .forum-cat-icon{transform:translateY(-2px)}
+.forum-cat-label{font-size:.75rem;color:var(--text-secondary)}
+
+/* Guest bar */
+.forum-guest-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:18px;font-size:.85rem;color:#1e40af}
+
+/* Biz cards */
+.forum-biz-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.forum-biz-card{display:flex;align-items:center;justify-content:space-between;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;cursor:pointer;text-align:left;box-shadow:var(--shadow-sm)}
+.forum-biz-main{display:flex;align-items:center;gap:12px}
+.forum-biz-ico{font-size:1.6rem}
+.forum-biz-title{font-size:.9rem;font-weight:700;color:var(--text)}
+.forum-biz-desc{font-size:.72rem;color:var(--text-muted);margin-top:2px}
+.forum-biz-arrow{font-size:1.2rem;color:var(--text-muted)}
+.forum-biz-task{border-left:3px solid var(--cat-task)}
+.forum-biz-secondhand{border-left:3px solid var(--cat-goods)}
+
+/* Feed */
+.forum-feed-section{margin-bottom:18px}
+.forum-feed-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.forum-feed-title{font-size:1rem;font-weight:700;color:var(--text)}
+.forum-feed-more{font-size:.8rem;color:var(--primary);text-decoration:none}
+.forum-feed{display:flex;flex-direction:column;gap:12px}
+.forum-post-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;cursor:pointer;box-shadow:var(--shadow-sm);transition:box-shadow .2s,transform .15s}
+.forum-post-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.forum-post-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.forum-post-avatar{width:36px;height:36px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.9rem;font-weight:600;flex-shrink:0}
+.forum-post-meta{flex:1;min-width:0}
+.forum-post-author{font-size:.85rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.forum-post-time{font-size:.72rem;color:var(--text-muted)}
+.forum-post-tags{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.forum-post-cat{font-size:.65rem;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--primary-light);color:var(--primary)}
+.forum-post-campus{font-size:.65rem;color:var(--text-muted);background:var(--bg-hover);padding:2px 8px;border-radius:99px}
+.forum-post-title{font-size:.98rem;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.35}
+.forum-post-content{font-size:.85rem;color:var(--text-secondary);line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:10px}
+.forum-post-images{display:grid;gap:6px;margin-bottom:10px}
+.forum-post-images:has(>:nth-child(2)){grid-template-columns:1fr 1fr}
+.forum-post-images:has(>:only-child){grid-template-columns:1fr}
+.forum-post-images img{width:100%;height:160px;object-fit:cover;border-radius:8px;background:var(--bg-hover)}
+.forum-post-images:has(>:only-child) img{height:200px}
+.forum-post-actions{display:flex;gap:16px;align-items:center}
+.forum-post-action{display:flex;align-items:center;gap:4px;font-size:.78rem;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px}
+.forum-post-action:hover{background:var(--bg-hover);color:var(--text)}
+.forum-post-action.liked{color:var(--danger)}
+
+/* Forum list page */
+.forum-page-head{padding:14px 0;background:var(--bg-card);border-bottom:1px solid var(--border);margin-bottom:16px}
+.forum-back{background:none;border:none;color:var(--text-secondary);font-size:.9rem;cursor:pointer;padding:4px 0}
+.forum-back:hover{color:var(--text)}
+.forum-page-title{font-size:1.1rem;font-weight:700;color:var(--text);margin:8px 0 0}
+.forum-sort-bar{display:flex;gap:8px;margin-bottom:16px}
+.forum-sort{background:var(--bg-card);border:1px solid var(--border);border-radius:99px;padding:6px 14px;font-size:.82rem;color:var(--text-secondary);cursor:pointer}
+.forum-sort.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.forum-list{display:flex;flex-direction:column;gap:12px}
+.forum-pager{margin-top:20px}
+
+/* Forum detail */
+.forum-detail-body{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px}
+.forum-detail-content{font-size:.95rem;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word;margin:12px 0}
+.forum-detail-content img{max-width:100%;border-radius:8px;margin-top:8px}
+.forum-detail-actions{display:flex;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+.forum-detail-comments{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:80px}
+.forum-detail-comment-form{position:fixed;bottom:64px;left:0;right:0;background:var(--bg-card);border-top:1px solid var(--border);padding:10px 16px;display:flex;gap:8px;align-items:center;z-index:40}
+.forum-comment-input{flex:1;border:1px solid var(--border);border-radius:99px;padding:10px 14px;font-size:.9rem;outline:none;resize:none;max-height:100px}
+.forum-comment-card{padding:12px 0;border-bottom:1px solid var(--border-light)}
+.forum-comment-card:last-child{border-bottom:none}
+.forum-comment-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.forum-comment-author{font-size:.82rem;font-weight:600;color:var(--text)}
+.forum-comment-floor{font-size:.65rem;color:var(--text-muted);background:var(--bg-hover);padding:1px 6px;border-radius:99px}
+.forum-comment-text{font-size:.85rem;color:var(--text-secondary);line-height:1.55}
+.forum-comment-text img{max-width:120px;border-radius:6px;margin-top:4px;display:block}
+
+/* Forum publish */
+.forum-publish-images{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.forum-publish-thumb{position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.forum-publish-thumb img{width:100%;height:100%;object-fit:cover}
+.forum-publish-thumb button{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,.5);color:#fff;font-size:.7rem;cursor:pointer}
+
 
 /* 任务大厅顶部蓝色统一（与首页、我的页蓝卡呼应） */
 .task-hero{background:var(--brand);color:#fff;padding:18px 0 28px}
@@ -775,6 +886,39 @@ html:not([data-theme="dark"]) :focus-visible { outline: 2px solid var(--brand); 
 html:not([data-theme="dark"]) .home-cat-icon { box-shadow: var(--shadow-sm); }
 html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-card-ico { box-shadow: var(--shadow-sm); }
 
+/* ===== v1.37.0 论坛卡片 / 详情 / 评论 补充样式 ===== */
+.forum-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-sm);cursor:pointer;transition:box-shadow .2s ease,transform .2s ease,border-color .2s ease}
+.forum-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);border-color:#CFE0F5}
+.forum-card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.forum-card-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#2A7DE0,#0F4F9E);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex:0 0 auto}
+.forum-card-meta{flex:1;min-width:0}
+.forum-card-name{font-size:.9rem;font-weight:600;color:var(--text);line-height:1.2}
+.forum-card-sub{font-size:.72rem;color:var(--text-muted);margin-top:2px}
+.forum-card-tag{font-size:.72rem;color:var(--text-secondary);background:var(--bg-hover);padding:3px 8px;border-radius:99px;white-space:nowrap}
+.forum-card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.4}
+.forum-card-content{font-size:.86rem;color:var(--text-secondary);line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.forum-card-imgs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.forum-card-img{width:96px;height:96px;border-radius:10px;object-fit:cover;border:1px solid var(--border)}
+.forum-card-foot{display:flex;gap:18px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light);font-size:.8rem;color:var(--text-muted)}
+.forum-like-btn{cursor:pointer}
+.forum-report-btn{margin-left:auto;color:var(--text-muted);cursor:pointer}
+.forum-detail-card{background:none}
+.forum-detail-title{font-size:1.25rem;font-weight:800;color:var(--text);margin:4px 0 8px;line-height:1.4}
+.forum-detail-imgs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.forum-detail-img{width:100px;height:100px;border-radius:10px;object-fit:cover;border:1px solid var(--border);cursor:pointer}
+.forum-comment{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--border-light)}
+.forum-comment:last-child{border-bottom:none}
+.forum-comment-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2A7DE0,#0F4F9E);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex:0 0 auto}
+.forum-comment-body{flex:1;min-width:0}
+.forum-comment-name{font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:3px}
+.forum-comment-text{font-size:.88rem;color:var(--text-secondary);line-height:1.55;word-break:break-word}
+.forum-comment-time{font-size:.68rem;color:var(--text-muted);margin-top:4px}
+.forum-comment-empty,.forum-empty{padding:24px 12px;text-align:center;color:var(--text-muted);font-size:.85rem}
+.forum-pub-img{position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.forum-pub-img img{width:100%;height:100%;object-fit:cover}
+.forum-pub-img button{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,.5);color:#fff;font-size:.7rem;cursor:pointer;line-height:1}
+.forum-detail-loading{color:var(--text-muted);font-size:.85rem}
+
 </style>
 </head>
 <body>
@@ -827,93 +971,162 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 
 <section class="page" id="page-home">
 
-  <!-- 1. 品牌 hero 区（实色 #185FA5 非渐变，移动端满宽） -->
-  <div class="home-hero">
-    <div class="container home-hero-inner">
-      <div class="home-hero-top">
-        <span class="home-hero-brand">HUST互助</span>
-        <button class="home-hero-avatar" onclick="navigate('my')" aria-label="我的主页">我</button>
-      </div>
-      <h1 class="home-hero-title">校园生活，互相帮忙</h1>
-      <p class="home-hero-sub"><span id="statUsers">0</span> 位同学在用 · <span id="statOrders">0</span> 单待互助</p>
-    </div>
-    <!-- 2. 搜索框浮在 hero 下沿（负 margin 上移叠住 hero） -->
-    <div class="container home-search-wrap">
-      <div class="home-search" onclick="document.getElementById('homeSearchInput').focus()">
-        <span class="home-search-ico">🔍</span>
-        <input type="text" id="homeSearchInput" class="home-search-input"
-               placeholder="搜索任务、闲置、问答"
-               onkeydown="if(event.key==='Enter'){event.preventDefault();homeSearchSubmit();}">
-      </div>
-    </div>
-  </div>
+  <!-- v1.37.0 校园圈社区首页 -->
+  <div class="forum-home-bg">
+    <div class="container forum-home">
 
-  <!-- 3. 一排圆形彩色图标入口（grid 4 列） -->
-  <div class="container">
-    <div class="home-icon-row">
-      <button class="home-cat" onclick="homeGo('task')">
-        <span class="home-cat-icon cat-task"><svg viewBox="0 0 24 24"><path d="M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg></span><span class="home-cat-label">跑腿</span>
-      </button>
-      <button class="home-cat" onclick="homeGo('goods')">
-        <span class="home-cat-icon cat-goods"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span><span class="home-cat-label">二手</span>
-      </button>
-      <button class="home-cat" onclick="homeGo('qa')">
-        <span class="home-cat-icon cat-qa"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="home-cat-label">问答</span>
-      </button>
-      <button class="home-cat" onclick="homeGo('find','carpool')">
-        <span class="home-cat-icon cat-carpool"><svg viewBox="0 0 24 24"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a2 2 0 0 0-1.6-.8H9.3a2 2 0 0 0-1.6.8L5 11l-5.16.86a1 1 0 0 0-.84.99V16h3m10 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM7 16a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/></svg></span><span class="home-cat-label">拼车</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- 4. 两个 CTA 按钮（grid 2 列） -->
-  <div class="container">
-    <div class="home-cta-row">
-      <button class="btn btn-brand btn-lg btn-block" onclick="navigate('ershou');showPublishModal()">发布闲置 / 需求</button>
-      <button class="btn btn-outline btn-lg btn-block" onclick="navigate('help')">去互助大厅</button>
-    </div>
-  </div>
-
-  <!-- A. 差异化对比条：直接回应"凭什么比上交/微信群/闲鱼好" -->
-  <div class="container">
-    <div class="home-section collapsed" data-section="why-us">
-      <div class="home-section-head" onclick="toggleHomeSection('why-us')">
-        <div class="home-section-title">🆚 为什么选 HUST互助</div>
-        <div class="home-section-summary">实名 · 信用 · 担保</div>
-        <button class="home-section-toggle" onclick="event.stopPropagation(); toggleHomeSection('why-us')"><span class="toggle-text">展开</span><span class="toggle-icon">▼</span></button>
-      </div>
-      <div class="home-section-body collapsed" id="homeSection-why-us">
-        <div class="why-us-grid">
-          <div class="why-us-col"><div class="why-us-name">微信群</div><div class="why-us-desc">信息刷屏就沉，难检索，无信任背书</div><span class="why-us-tag">信息易沉</span></div>
-          <div class="why-us-col"><div class="why-us-name">闲鱼</div><div class="why-us-desc">跨校公开交易，无校内身份核验</div><span class="why-us-tag">无校内背书</span></div>
-          <div class="why-us-col"><div class="why-us-name">纯公益互助网</div><div class="why-us-desc">靠自觉，无安全与响应保障</div><span class="why-us-tag">无信任机制</span></div>
-          <div class="why-us-col is-us"><div class="why-us-name">HUST互助</div><div class="why-us-desc">校内实名 + 信用分 + 担保交易，敢交易</div><span class="why-us-tag">实名·信用·担保</span></div>
+      <!-- Header -->
+      <div class="forum-header">
+        <div class="forum-header-left">
+          <h1 class="forum-header-title">校园圈</h1>
+          <select id="forumCampusSelect" class="forum-campus-select" onchange="setForumCampus(this.value)">
+            <option value="main">主校区</option>
+            <option value="nanhu" selected>南湖校区</option>
+            <option value="guanggu">光谷校区</option>
+            <option value="yunyuan">韵苑</option>
+            <option value="qinyuan">沁苑</option>
+          </select>
+        </div>
+        <div class="forum-header-actions">
+          <button class="forum-header-btn" onclick="showForumPublishModal()" title="发布帖子">＋</button>
+          <button class="forum-header-btn" onclick="toggleNotifyPanel()" title="消息通知">🔔</button>
         </div>
       </div>
+
+      <!-- Banner 轮播 -->
+      <div class="forum-banner" id="forumBanner">
+        <div class="forum-banner-track" id="forumBannerTrack">
+          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#185FA5,#6366f1)">
+            <div class="forum-banner-tag">限时活动</div>
+            <div class="forum-banner-title">校园跑腿节</div>
+            <div class="forum-banner-sub">接单赏金 +20%，每天前 50 单 › 去接单</div>
+          </div>
+          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#3B6D11,#84cc16)">
+            <div class="forum-banner-tag">新生季</div>
+            <div class="forum-banner-title">二手教材流转</div>
+            <div class="forum-banner-sub">教材 5 折起 · 同校自提更安全 ›</div>
+          </div>
+        </div>
+        <div class="forum-banner-dots" id="forumBannerDots"></div>
+      </div>
+
+      <!-- 数据条 -->
+      <div class="forum-stats">
+        <div class="forum-stat">
+          <div class="forum-stat-num" id="forumStatPosts">0</div>
+          <div class="forum-stat-label">今日新帖</div>
+        </div>
+        <div class="forum-stat">
+          <div class="forum-stat-num" id="forumStatOnline">0</div>
+          <div class="forum-stat-label">在线同学</div>
+        </div>
+        <div class="forum-stat">
+          <div class="forum-stat-num" id="forumStatOrders">0</div>
+          <div class="forum-stat-label">待接订单</div>
+        </div>
+      </div>
+
+      <!-- 8 宫格分类 -->
+      <div class="forum-cat-grid">
+        <button class="forum-cat" onclick="openForumCat('tucao')">
+          <span class="forum-cat-icon" style="background:#fff7ed;color:#ea580c">💬</span>
+          <span class="forum-cat-label">校园吐槽</span>
+        </button>
+        <button class="forum-cat" onclick="openForumCat('study')">
+          <span class="forum-cat-icon" style="background:#eff6ff;color:#2563eb">📚</span>
+          <span class="forum-cat-label">学习求助</span>
+        </button>
+        <button class="forum-cat" onclick="navigate('ershou')">
+          <span class="forum-cat-icon" style="background:#f0fdf4;color:#16a34a">🔄</span>
+          <span class="forum-cat-label">闲置交易</span>
+        </button>
+        <button class="forum-cat" onclick="openForumCat('dating')">
+          <span class="forum-cat-icon" style="background:#fdf2f8;color:#db2777">💖</span>
+          <span class="forum-cat-label">交友脱单</span>
+        </button>
+        <button class="forum-cat" onclick="openForumCat('activity')">
+          <span class="forum-cat-icon" style="background:#fffbeb;color:#ca8a04">🎉</span>
+          <span class="forum-cat-label">校园活动</span>
+        </button>
+        <button class="forum-cat" onclick="openForumCat('confession')">
+          <span class="forum-cat-icon" style="background:#fdf4ff;color:#a855f7">💌</span>
+          <span class="forum-cat-label">表白墙</span>
+        </button>
+        <button class="forum-cat" onclick="navigate('help')">
+          <span class="forum-cat-icon" style="background:#ecfeff;color:#0891b2">❓</span>
+          <span class="forum-cat-label">问答求助</span>
+        </button>
+        <button class="forum-cat" onclick="openForumCat('life')">
+          <span class="forum-cat-icon" style="background:#f5f3ff;color:#7c3aed">☕</span>
+          <span class="forum-cat-label">生活分享</span>
+        </button>
+      </div>
+
+      <!-- 游客提示条 -->
+      <div class="forum-guest-bar" id="forumGuestBar" style="display:none">
+        <span>🙂 你正在游客浏览，认证后可发帖、评论和私信</span>
+        <button class="btn btn-brand btn-sm" onclick="showAuthModal()">去认证</button>
+      </div>
+
+      <!-- 业务卡片 -->
+      <div class="forum-biz-cards">
+        <button class="forum-biz-card forum-biz-task" onclick="navigate('help')">
+          <div class="forum-biz-main">
+            <span class="forum-biz-ico">🏃</span>
+            <div>
+              <div class="forum-biz-title">校园跑腿</div>
+              <div class="forum-biz-desc">赏金托管 · <span id="forumBizTaskCount">0</span> 单待接</div>
+            </div>
+          </div>
+          <span class="forum-biz-arrow">›</span>
+        </button>
+        <button class="forum-biz-card forum-biz-secondhand" onclick="navigate('ershou')">
+          <div class="forum-biz-main">
+            <span class="forum-biz-ico">🛒</span>
+            <div>
+              <div class="forum-biz-title">闲置交易</div>
+              <div class="forum-biz-desc">同校自提 · 教材 5 折起</div>
+            </div>
+          </div>
+          <span class="forum-biz-arrow">›</span>
+        </button>
+      </div>
+
+      <!-- 今日推荐 -->
+      <div class="forum-feed-section">
+        <div class="forum-feed-head">
+          <div class="forum-feed-title">📌 今日推荐</div>
+          <a href="#" class="forum-feed-more" onclick="gotoForumAll();return false">查看更多 ›</a>
+        </div>
+        <div id="forumFeed" class="forum-feed">加载中…</div>
+      </div>
+
     </div>
   </div>
 
-  <!-- B3. 信任与安全四图标（点标题进安全中心） -->
-  <div class="container">
+  <!-- 原有信任/数据/达人榜/引导区块保留，默认折叠 -->
+  <div class="container" style="margin-top:24px">
+    <!-- B3. 信任与安全 -->
     <div class="home-section trust-section collapsed" data-section="trust">
       <div class="home-section-head" onclick="toggleHomeSection('trust')">
         <div class="home-section-title trust-title" onclick="event.stopPropagation(); navigate('safety')">🛡️ 平台信任与安全 · 点此查看安全中心 ›</div>
-        <div class="home-section-summary">4 项安全机制已启用</div>
+        <div class="home-section-summary">5 项安全机制已启用</div>
         <button class="home-section-toggle" onclick="event.stopPropagation(); toggleHomeSection('trust')"><span class="toggle-text">展开</span><span class="toggle-icon">▼</span></button>
       </div>
       <div class="home-section-body collapsed" id="homeSection-trust">
         <div class="trust-grid">
-          <div class="trust-item"><div class="trust-ico">✓</div><div class="trust-name">学号核验</div><div class="trust-desc">校园邮箱 / 人工审核双轨，确保校内真实身份</div></div>
+          <div class="trust-item"><div class="trust-ico">🎓</div><div class="trust-name">学号实名核验</div><div class="trust-desc">校园邮箱 / 人工审核双轨，确保校内真实身份</div></div>
           <div class="trust-item"><div class="trust-ico">🔒</div><div class="trust-name">担保交易</div><div class="trust-desc">先服务后付款，双方确认才完成</div></div>
           <div class="trust-item"><div class="trust-ico">🕶️</div><div class="trust-name">隐私脱敏</div><div class="trust-desc">非本人/非管理员，学号手机号强制隐藏</div></div>
           <div class="trust-item"><div class="trust-ico">⚖️</div><div class="trust-name">投诉仲裁</div><div class="trust-desc">纠纷可投诉，成立扣信用分并封停</div></div>
+          <div class="trust-item"><div class="trust-ico">⭐</div><div class="trust-name">信用分体系</div><div class="trust-desc">初始 100 分，完成订单、被好评加分；爽约、被投诉扣分</div></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- D. 实时数据 + 最新互助动态 -->
   <div class="container">
+    <!-- D. 实时数据 + 最新互助动态 -->
     <div class="home-section collapsed" data-section="live">
       <div class="home-section-head" onclick="toggleHomeSection('live')">
         <div class="home-section-title">📊 平台实时数据</div>
@@ -937,8 +1150,8 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     </div>
   </div>
 
-  <!-- G. 互助达人榜 -->
   <div class="container">
+    <!-- G. 互助达人榜 -->
     <div class="home-section collapsed" data-section="leaderboard">
       <div class="home-section-head" onclick="toggleHomeSection('leaderboard')">
         <div class="home-section-title">🏆 互助达人榜</div>
@@ -952,8 +1165,8 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     </div>
   </div>
 
-  <!-- F. 3步上手引导 -->
   <div class="container">
+    <!-- F. 3步上手引导 -->
     <div class="home-section collapsed" data-section="steps">
       <div class="home-section-head" onclick="toggleHomeSection('steps')">
         <div class="home-section-title">🚀 三步开始互助</div>
@@ -969,11 +1182,46 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     </div>
   </div>
 
-  <!-- 5. 公告条：复用现有 #announceBanner 逻辑，仅套新样式容器（浅灰卡） -->
+  <!-- 公告条 -->
   <div class="container">
     <div id="announceBanner" class="home-announce"></div>
   </div>
 
+</section>
+
+<section class="page" id="page-forum" style="display:none">
+  <div class="forum-page-head">
+    <div class="container">
+      <button class="forum-back" onclick="navigate('home')">‹ 返回校园圈</button>
+      <h1 class="forum-page-title" id="forumPageTitle">全部帖子</h1>
+    </div>
+  </div>
+  <div class="container">
+    <div class="forum-sort-bar">
+      <button class="forum-sort active" data-sort="recommend" onclick="setForumSort('recommend')">推荐</button>
+      <button class="forum-sort" data-sort="latest" onclick="setForumSort('latest')">最新</button>
+      <button class="forum-sort" data-sort="hot" onclick="setForumSort('hot')">最热</button>
+    </div>
+    <div id="forumList" class="forum-list">加载中…</div>
+    <div id="forumPager" class="forum-pager"></div>
+  </div>
+</section>
+
+<section class="page" id="page-forum-detail" style="display:none">
+  <div class="forum-page-head" style="position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)">
+    <div class="container" style="display:flex;align-items:center;gap:12px;padding:12px 28px">
+      <button class="forum-back" onclick="navigate('forum')">‹ 返回</button>
+      <h1 class="forum-page-title" style="margin:0;font-size:1.05rem">帖子详情</h1>
+    </div>
+  </div>
+  <div class="container">
+    <div id="forumDetailBody" class="forum-detail-body">加载中…</div>
+    <div id="forumDetailComments" class="forum-detail-comments"></div>
+    <div id="forumDetailCommentForm" class="forum-detail-comment-form" style="display:none">
+      <textarea id="forumCommentInput" class="forum-comment-input" placeholder="写评论…" rows="1"></textarea>
+      <button class="btn btn-brand" onclick="submitForumComment()">发送</button>
+    </div>
+  </div>
 </section>
 
 <section class="page" id="page-safety" style="display:none">
@@ -1532,6 +1780,59 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
   </div>
 </div>
 
+<!-- Forum Publish Modal -->
+<div class="modal-overlay" id="forumPublishModal">
+  <div class="modal" style="max-width:560px">
+    <button class="modal-close" onclick="closeForumPublishModal()">&times;</button>
+    <h3 style="margin-bottom:16px">✏️ 发布帖子</h3>
+    <form id="forumPublishForm" onsubmit="event.preventDefault();submitForumPost();">
+      <div class="form-group">
+        <label>分类</label>
+        <select id="forumPublishCat" class="form-control" required>
+          <option value="tucao">💬 校园吐槽</option>
+          <option value="study">📚 学习求助</option>
+          <option value="dating">💖 交友脱单</option>
+          <option value="activity">🎉 校园活动</option>
+          <option value="confession">💌 表白墙</option>
+          <option value="life">☕ 生活分享</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>标题</label>
+        <input type="text" id="forumPublishTitle" class="form-control" placeholder="一句话标题" maxlength="60" required>
+      </div>
+      <div class="form-group">
+        <label>正文</label>
+        <textarea id="forumPublishContent" class="form-control" rows="5" placeholder="分享你的校园生活…" required></textarea>
+      </div>
+      <div class="form-group">
+        <label>校区</label>
+        <select id="forumPublishCampus" class="form-control">
+          <option value="main">主校区</option>
+          <option value="nanhu">南湖校区</option>
+          <option value="guanggu">光谷校区</option>
+          <option value="yunyuan">韵苑</option>
+          <option value="qinyuan">沁苑</option>
+        </select>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:12px">
+        <label style="margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
+          <input type="checkbox" id="forumPublishAnon" checked>
+          <span>匿名发布（显示为「匿名校友」）</span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label>图片（可选，最多 3 张）</label>
+        <div id="forumPublishImages" class="forum-publish-images"></div>
+        <input type="file" id="forumPublishImageInput" accept="image/*" multiple style="display:none" onchange="onForumPublishImageChange(this)">
+        <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('forumPublishImageInput').click()">+ 添加图片</button>
+      </div>
+      <p class="form-error" id="forumPublishError" style="display:none"></p>
+      <button type="submit" class="btn btn-primary btn-block" id="forumPublishSubmit">发布</button>
+    </form>
+  </div>
+</div>
+
 <!-- Report Modal -->
 <div class="modal-overlay" id="reportModal">
   <div class="modal">
@@ -1734,7 +2035,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.36.0';
+const APP_VERSION = '1.37.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2064,7 +2365,9 @@ function navigate(page) {
   // 列表引擎（发布/接单后刷新等）依赖 S.page==='task'，故复用 task 作为底层页标识
   if (page === 'ershou') { S.page = 'task'; applyListingMode('ershou'); }
   else if (page === 'help') { S.page = 'task'; applyListingMode('help'); }
-  else if (page === 'home') { loadStats(); restoreHomeSections(); loadHomeLiveData(); loadHomeLeaderboard(); }
+  else if (page === 'home') { loadStats(); restoreHomeSections(); loadHomeLiveData(); loadHomeLeaderboard(); loadForumStats(); loadForumFeed(); startForumBanner(); }
+  else if (page === 'forum') { loadForumList(); }
+  else if (page === 'forum-detail') { loadForumDetail(S._forumDetailNum); }
   else if (page === 'my') loadMyOrders();
   else if (page === 'stats') loadStatsPage();
 }
@@ -2103,6 +2406,310 @@ function skeletonCards(n) {
       + '</div>';
   }
   return h;
+}
+
+// ============ 论坛 / 校园圈（v1.37.0）============
+const FORUM_CATS = {
+  tucao: '校园吐槽', study: '学习求助', dating: '交友脱单',
+  activity: '校园活动', confession: '表白墙', life: '生活分享'
+};
+const FORUM_CAT_ICON = {
+  tucao: '💬', study: '📚', dating: '💖', activity: '🎉', confession: '💌', life: '☕'
+};
+function campusName(c) {
+  return ({ main: '主校区', nanhu: '南湖校区', guanggu: '光谷校区', yunyuan: '韵苑', qinyuan: '沁苑' })[c] || '主校区';
+}
+function forumDisplayName(p) {
+  if (p.is_anonymous) return '匿名校友';
+  return p.author_nickname || maskName(p.author_name) || '同学';
+}
+// 拉取全部 forum 帖子（issue + label "forum"）
+async function forumLoadPosts() {
+  const issues = await ghIssues('forum', 'open') || [];
+  const posts = [];
+  for (const i of issues) {
+    let u; try { u = JSON.parse(i.body); } catch (e) { continue; }
+    if (!u || u.type !== 'forum') continue;
+    u._issue_number = i.number;
+    u._comments = i.comments || 0;
+    posts.push(u);
+  }
+  return posts;
+}
+// 按编号取单帖（代理仅支持 PATCH 单帖，故复用列表过滤）
+async function forumGetPost(num) {
+  const posts = await forumLoadPosts();
+  return posts.find(function (p) { return String(p._issue_number) === String(num); }) || null;
+}
+function forumPostCardHTML(p) {
+  const name = esc(forumDisplayName(p));
+  const avatar = esc((forumDisplayName(p) || '匿').charAt(0));
+  const cat = FORUM_CATS[p.cat] || '帖子';
+  const imgs = (p.images && p.images.length)
+    ? '<div class="forum-card-imgs">' + p.images.slice(0, 3).map(function (u) {
+        return '<img src="' + safeImgSrc(u) + '" class="forum-card-img" onclick="event.stopPropagation();previewForumImg(\'' + encodeURIComponent(u) + '\')">';
+      }).join('') + '</div>'
+    : '';
+  const foot = '<div class="forum-card-foot"><span>❤️ ' + (p.upvotes || 0) + '</span><span>💬 ' + (p.comment_count || p._comments || 0) + '</span></div>';
+  return '<div class="forum-card" onclick="openForumDetail(' + p._issue_number + ')">'
+    + '<div class="forum-card-head">'
+    + '<div class="forum-card-avatar">' + avatar + '</div>'
+    + '<div class="forum-card-meta"><div class="forum-card-name">' + name + '</div>'
+    + '<div class="forum-card-sub">' + cat + ' · ' + campusName(p.campus) + ' · ' + timeAgo(p.created_at) + '</div></div>'
+    + '<span class="forum-card-tag">' + (FORUM_CAT_ICON[p.cat] || '') + ' ' + cat + '</span>'
+    + '</div>'
+    + '<div class="forum-card-title">' + esc(p.title) + '</div>'
+    + (p.content ? '<div class="forum-card-content">' + esc(p.content) + '</div>' : '')
+    + imgs + foot + '</div>';
+}
+async function loadForumFeed() {
+  const el = document.getElementById('forumFeed'); if (!el) return;
+  try {
+    const posts = await forumLoadPosts();
+    posts.sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
+    const top = posts.slice(0, 4);
+    if (top.length === 0) el.innerHTML = '<div class="forum-empty">还没有帖子，点击右上角 ＋ 发布第一条～</div>';
+    else el.innerHTML = top.map(function (p) { return forumPostCardHTML(p); }).join('');
+  } catch (e) { el.innerHTML = '<div class="forum-empty">帖子加载失败，请稍后重试</div>'; }
+}
+function gotoForumAll() { S._forumCat = null; navigate('forum'); }
+async function loadForumList() {
+  const el = document.getElementById('forumList'); if (!el) return;
+  const titleEl = document.getElementById('forumPageTitle');
+  const cat = S._forumCat || null;
+  if (titleEl) titleEl.textContent = cat ? (FORUM_CATS[cat] || '帖子') : '全部帖子';
+  el.innerHTML = skeletonCards(5);
+  try {
+    let posts = await forumLoadPosts();
+    if (cat) posts = posts.filter(function (p) { return p.cat === cat; });
+    const sort = S._forumSort || 'recommend';
+    if (sort === 'latest') posts.sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
+    else if (sort === 'hot') posts.sort(function (a, b) { return (b.upvotes || 0) - (a.upvotes || 0); });
+    else posts.sort(function (a, b) { return (b.upvotes || 0) * 2 + (b.comment_count || 0) - ((a.upvotes || 0) * 2 + (a.comment_count || 0)); });
+    if (posts.length === 0) el.innerHTML = '<div class="forum-empty">该分区还没有帖子，去发布第一条吧～</div>';
+    else el.innerHTML = posts.map(function (p) { return forumPostCardHTML(p); }).join('');
+  } catch (e) { el.innerHTML = '<div class="forum-empty">帖子加载失败，请稍后重试</div>'; }
+}
+function setForumSort(s) {
+  S._forumSort = s;
+  document.querySelectorAll('.forum-sort').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-sort') === s); });
+  loadForumList();
+}
+function openForumCat(cat) { S._forumCat = cat; S._forumSort = S._forumSort || 'recommend'; navigate('forum'); }
+function openForumDetail(num) { S._forumDetailNum = num; navigate('forum-detail'); }
+async function loadForumDetail(num) {
+  const body = document.getElementById('forumDetailBody');
+  const cEl = document.getElementById('forumDetailComments');
+  if (!body) return;
+  body.innerHTML = '<div class="forum-detail-loading">加载中…</div>';
+  if (cEl) cEl.innerHTML = '';
+  try {
+    const p = await forumGetPost(num);
+    if (!p) throw new Error('not found');
+    p.views = (p.views || 0) + 1;
+    ghUpdateIssue(num, JSON.stringify(p)).catch(function () {}); // 浏览量 +1（非阻塞）
+    const imgs = (p.images && p.images.length)
+      ? '<div class="forum-detail-imgs">' + p.images.map(function (u) {
+          return '<img src="' + safeImgSrc(u) + '" class="forum-detail-img" onclick="previewForumImg(\'' + encodeURIComponent(u) + '\')">';
+        }).join('') + '</div>'
+      : '';
+    body.innerHTML = '<div class="forum-detail-card">'
+      + '<div class="forum-card-head"><div class="forum-card-avatar">' + esc((forumDisplayName(p) || '匿').charAt(0)) + '</div>'
+      + '<div class="forum-card-meta"><div class="forum-card-name">' + esc(forumDisplayName(p)) + '</div>'
+      + '<div class="forum-card-sub">' + (FORUM_CATS[p.cat] || '帖子') + ' · ' + campusName(p.campus) + ' · ' + timeAgo(p.created_at) + '</div></div>'
+      + '<span class="forum-card-tag">' + (FORUM_CAT_ICON[p.cat] || '') + ' ' + (FORUM_CATS[p.cat] || '') + '</span></div>'
+      + '<h2 class="forum-detail-title">' + esc(p.title) + '</h2>'
+      + '<div class="forum-detail-content">' + esc(p.content).replace(/\n/g, '<br>') + '</div>'
+      + imgs
+      + '<div class="forum-card-foot"><span class="forum-like-btn" onclick="toggleForumLike(' + num + ')">❤️ <span id="forumLikeNum">' + (p.upvotes || 0) + '</span></span><span>💬 ' + (p.comment_count || p._comments || 0) + '</span><span>👁️ ' + (p.views || 0) + '</span><span class="forum-report-btn" onclick="reportForumPost(' + num + ')">⚠️ 举报</span></div>'
+      + '</div>';
+    await renderForumComments(num);
+    const cf = document.getElementById('forumDetailCommentForm');
+    if (cf) cf.style.display = S.user ? 'flex' : 'none';
+  } catch (e) { body.innerHTML = '<div class="forum-empty">帖子加载失败</div>'; }
+}
+async function renderForumComments(num) {
+  const cEl = document.getElementById('forumDetailComments');
+  if (!cEl) return;
+  try {
+    const res = await ghApi('/api/comments/' + num, 'GET');
+    let comments = [];
+    if (res.ok) comments = await res.json();
+    if (!comments || comments.length === 0) { cEl.innerHTML = '<div class="forum-comment-empty">还没有评论，来抢沙发～</div>'; return; }
+    cEl.innerHTML = comments.map(function (c) {
+      let u; try { u = JSON.parse(c.body); } catch (e) { u = { content: c.body }; }
+      const name = u.is_anonymous ? '匿名校友' : (u.author_nickname || '同学');
+      return '<div class="forum-comment"><div class="forum-comment-avatar">' + esc((name || '匿').charAt(0)) + '</div>'
+        + '<div class="forum-comment-body"><div class="forum-comment-name">' + esc(name) + '</div>'
+        + '<div class="forum-comment-text">' + esc(u.content || '').replace(/\n/g, '<br>') + '</div>'
+        + '<div class="forum-comment-time">' + (u.created_at ? timeAgo(u.created_at) : '') + '</div></div></div>';
+    }).join('');
+  } catch (e) { cEl.innerHTML = ''; }
+}
+async function submitForumComment() {
+  if (!S.user) { showAuthModal(); return; }
+  const inp = document.getElementById('forumCommentInput');
+  if (!inp) return;
+  const text = (inp.value || '').trim();
+  if (!text) { toast('评论不能为空', 'error'); return; }
+  const num = S._forumDetailNum;
+  try {
+    const bodyJson = JSON.stringify({
+      type: 'forum_comment',
+      author_id: S.user._issue_number || S.user.student_id,
+      author_sid: S.user.student_id,
+      author_nickname: S.user.nickname || S.user.name,
+      is_anonymous: false,
+      content: text,
+      created_at: new Date().toISOString()
+    });
+    const res = await ghApi('/api/comments/' + num, 'POST', { body: bodyJson });
+    if (!res.ok) throw new Error('comment ' + res.status);
+    inp.value = '';
+    try {
+      const r2 = await forumGetPost(num);
+      if (r2) { r2.comment_count = (r2.comment_count || 0) + 1; await ghUpdateIssue(num, JSON.stringify(r2)); }
+    } catch (e) {}
+    await renderForumComments(num);
+    toast('评论成功', 'success');
+  } catch (e) { toast('评论失败，请重试', 'error'); }
+}
+async function toggleForumLike(num) {
+  if (!S.user) { showAuthModal(); return; }
+  let liked = {}; try { liked = JSON.parse(localStorage.getItem('hust_forum_liked') || '{}'); } catch (e) {}
+  const isLiked = !!liked[num];
+  try {
+    const p = await forumGetPost(num);
+    if (!p) throw new Error('not found');
+    p.upvotes = (p.upvotes || 0) + (isLiked ? -1 : 1);
+    if (p.upvotes < 0) p.upvotes = 0;
+    await ghUpdateIssue(num, JSON.stringify(p));
+    if (isLiked) delete liked[num]; else liked[num] = true;
+    localStorage.setItem('hust_forum_liked', JSON.stringify(liked));
+    const nEl = document.getElementById('forumLikeNum');
+    if (nEl) nEl.textContent = p.upvotes;
+  } catch (e) { toast('操作失败', 'error'); }
+}
+function showForumPublishModal() {
+  if (!S.user) { showAuthModal(); return; }
+  const m = document.getElementById('forumPublishModal'); if (m) m.style.display = 'flex';
+  const catSel = document.getElementById('forumPublishCat');
+  if (catSel && S._forumCat) catSel.value = S._forumCat;
+  S._forumImages = [];
+  const prev = document.getElementById('forumPublishImages'); if (prev) prev.innerHTML = '';
+  const err = document.getElementById('forumPublishError'); if (err) { err.style.display = 'none'; err.textContent = ''; }
+}
+function closeForumPublishModal() {
+  const m = document.getElementById('forumPublishModal'); if (m) m.style.display = 'none';
+}
+function onForumPublishImageChange(input) {
+  const files = Array.from(input.files || []);
+  if (!S._forumImages) S._forumImages = [];
+  const prev = document.getElementById('forumPublishImages');
+  (async function () {
+    for (const f of files) {
+      if (S._forumImages.length >= 3) { toast('最多 3 张图片', 'error'); break; }
+      try { const url = await uploadToImgBB(f); S._forumImages.push(url); } catch (e) { toast('图片上传失败：' + (e.message || ''), 'error'); }
+    }
+    if (prev) prev.innerHTML = S._forumImages.map(function (u, i) {
+      return '<div class="forum-pub-img"><img src="' + safeImgSrc(u) + '"><button type="button" onclick="removeForumImage(' + i + ')">×</button></div>';
+    }).join('');
+    input.value = '';
+  })();
+}
+function removeForumImage(i) {
+  if (!S._forumImages) return;
+  S._forumImages.splice(i, 1);
+  const prev = document.getElementById('forumPublishImages');
+  if (prev) prev.innerHTML = S._forumImages.map(function (u, idx) {
+    return '<div class="forum-pub-img"><img src="' + safeImgSrc(u) + '"><button type="button" onclick="removeForumImage(' + idx + ')">×</button></div>';
+  }).join('');
+}
+async function submitForumPost() {
+  if (!S.user) { showAuthModal(); return; }
+  const err = document.getElementById('forumPublishError');
+  const cat = document.getElementById('forumPublishCat').value;
+  const title = document.getElementById('forumPublishTitle').value.trim();
+  const content = document.getElementById('forumPublishContent').value.trim();
+  const campus = document.getElementById('forumPublishCampus').value;
+  const anon = document.getElementById('forumPublishAnon').checked;
+  if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
+  if (!content) { err.textContent = '请填写正文'; err.style.display = 'block'; return; }
+  const btn = document.getElementById('forumPublishSubmit');
+  btn.disabled = true; btn.textContent = '发布中…';
+  try {
+    const bodyObj = {
+      type: 'forum', cat: cat, title: title, content: content, campus: campus,
+      is_anonymous: anon,
+      author_id: S.user._issue_number || S.user.student_id,
+      author_sid: S.user.student_id,
+      author_nickname: S.user.nickname || S.user.name,
+      author_name: S.user.name,
+      images: S._forumImages || [],
+      upvotes: 0, views: 0, comment_count: 0,
+      created_at: new Date().toISOString(), status: 'open'
+    };
+    const labels = ['forum', 'forum-' + cat];
+    const created = await ghCreateIssue('[论坛]' + title, JSON.stringify(bodyObj), labels);
+    if (err) err.style.display = 'none';
+    closeForumPublishModal();
+    toast('发布成功 🎉', 'success');
+    document.getElementById('forumPublishTitle').value = '';
+    document.getElementById('forumPublishContent').value = '';
+    S._forumImages = [];
+    S._forumCat = cat;
+    cacheBust('forum');
+    navigate('forum');
+  } catch (e) {
+    err.textContent = '发布失败：' + (e.message || '请重试'); err.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = '发布';
+  }
+}
+function previewForumImg(encUrl) {
+  const url = decodeURIComponent(encUrl);
+  try { window.open(safeImgSrc(url), '_blank'); } catch (e) {}
+}
+function setForumCampus(v) { S._forumCampus = v; }
+async function loadForumStats() {
+  try {
+    const res = await ghApi('/api/stats', 'GET');
+    let orders = 0;
+    if (res.ok) { const d = await res.json(); orders = d.orders || 0; }
+    const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
+    const posts = await forumLoadPosts();
+    const today = new Date().toISOString().slice(0, 10);
+    const todayCount = posts.filter(function (p) { return (p.created_at || '').slice(0, 10) === today; }).length;
+    set('forumStatPosts', todayCount);
+    set('forumStatOnline', Math.max(1, Math.round((orders || 0) / 3)) + '+');
+    set('forumStatOrders', orders);
+    set('forumBizTaskCount', orders);
+  } catch (e) {}
+  const gb = document.getElementById('forumGuestBar');
+  if (gb) gb.style.display = S.user ? 'none' : 'flex';
+}
+let _forumBannerTimer = null;
+function startForumBanner() {
+  const track = document.getElementById('forumBannerTrack');
+  const dots = document.getElementById('forumBannerDots');
+  if (!track) return;
+  const slides = track.children.length;
+  if (slides <= 1) { if (dots) dots.style.display = 'none'; return; }
+  if (dots) {
+    dots.innerHTML = '';
+    for (let i = 0; i < slides; i++) {
+      const d = document.createElement('span');
+      d.className = 'forum-banner-dot' + (i === 0 ? ' active' : '');
+      dots.appendChild(d);
+    }
+  }
+  let idx = 0;
+  if (_forumBannerTimer) clearInterval(_forumBannerTimer);
+  _forumBannerTimer = setInterval(function () {
+    idx = (idx + 1) % slides;
+    track.style.transform = 'translateX(-' + (idx * 100) + '%)';
+    if (dots) dots.querySelectorAll('.forum-banner-dot').forEach(function (d, i) { d.classList.toggle('active', i === idx); });
+  }, 4000);
 }
 
 // ============ STATS ============
@@ -3617,6 +4224,7 @@ function stopCommentPolling() {
 
 // ============ REPORT SYSTEM ============
 let _reportIssueNum = null;
+let _reportIsForum = false;
 
 // v1.19.0：投诉原因切换 → 食品证据引导区显隐 + 描述模板
 function onReportReasonChange() {
@@ -3649,11 +4257,28 @@ function showReportModal(issueNum) {
 function closeReportModal() {
   document.getElementById('reportModal').classList.remove('active');
   _reportIssueNum = null;
+  _reportIsForum = false;
   // v1.19.0：复位食品投诉字段
   const g = document.getElementById('reportFoodGroup'); if (g) g.style.display = 'none';
   const mn = document.getElementById('reportMerchantName'); if (mn) mn.value = '';
   const pd = document.getElementById('reportPackageDamaged'); if (pd) pd.value = '';
   const d = document.getElementById('reportDesc'); if (d) d.placeholder = '请详细描述问题...';
+}
+
+// 论坛帖举报：复用订单举报弹窗，仅切换数据源为帖子作者
+async function reportForumPost(num) {
+  if (!S.user) { showAuthModal(); return; }
+  _reportIssueNum = num;
+  _reportIsForum = true;
+  try {
+    const p = await forumGetPost(num);
+    if (p) {
+      document.getElementById('reportTarget').textContent = forumDisplayName(p);
+      document.getElementById('reportOrderTitle').textContent = p.title || '无标题';
+    }
+    document.getElementById('reportError').style.display = 'none';
+    document.getElementById('reportModal').classList.add('active');
+  } catch (e) { toast('打开举报失败', 'error'); }
 }
 
 async function submitReport() {
@@ -3692,13 +4317,20 @@ async function submitReport() {
     });
     const issue = await res.json();
     const o = JSON.parse(issue.body);
-    const isPublisher = (o.publisher_id == (S.user._issue_number || S.user.student_id));
-    const targetId = isPublisher ? (o.taker_id || o.taker_student_id) : (o.publisher_id || o.publisher_student_id);
-    const targetName = isPublisher ? (o.taker_name || o.taker_student_id) : (o.publisher_name || o.publisher_student_id);
+    let targetId, targetName;
+    if (_reportIsForum) {
+      targetId = o.author_id || o.author_sid;
+      targetName = forumDisplayName(o);
+    } else {
+      const isPublisher = (o.publisher_id == (S.user._issue_number || S.user.student_id));
+      targetId = isPublisher ? (o.taker_id || o.taker_student_id) : (o.publisher_id || o.publisher_student_id);
+      targetName = isPublisher ? (o.taker_name || o.taker_student_id) : (o.publisher_name || o.publisher_student_id);
+    }
 
     const report = {
       order_issue_number: _reportIssueNum,
       order_title: o.title,
+      target_type: _reportIsForum ? 'post' : 'order',
       reporter_id: S.user._issue_number || S.user.student_id,
       reporter_name: S.user.name,
       target_id: targetId,
