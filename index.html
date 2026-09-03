@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.39.0">
+<meta name="version" content="1.39.1">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2100,7 +2100,7 @@ async function aiModerate(title, content) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.39.0';
+const APP_VERSION = '1.39.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -9210,7 +9210,7 @@ if ('serviceWorker' in navigator) {
 // ============ AI 互助小助手 (ai+opc) ============
 (function(){
   const AI_QUOTA_LOGGED = 100, AI_QUOTA_GUEST = 5;
-  function aiQuotaLimit(){ return (window.S && S.user) ? AI_QUOTA_LOGGED : AI_QUOTA_GUEST; }
+  function aiQuotaLimit(){ return (S && S.user) ? AI_QUOTA_LOGGED : AI_QUOTA_GUEST; }
   function aiQuotaState(){
     try{
       const d = new Date().toISOString().slice(0,10);
@@ -9247,7 +9247,7 @@ if ('serviceWorker' in navigator) {
     else { d.innerHTML = renderMarkdown(text || ''); }
     body.appendChild(d); body.scrollTop = body.scrollHeight; return d;
   }
-  const _aiHistory = [{ role:'system', content:'你是 Hust互助 校园互助平台的 AI 小助手。Hust互助 是华中科技大学(HUST)校园互助平台，有五大类：跑腿代办(代拿快递/外卖、帮买帮送、打印、维修)、物品流转(二手出售/租借)、有问必答(含习题解答)、找人(组队/拼车/招募)、校园公告。用户用学号邮箱验证登录，信用分初始100，新用户送7天会员。平台无资金托管，报酬线下支付。请用简洁友好中文回答，不超过120字，不知道就说不知道。\n\n平台全部面向华中科技大学：主校区在武汉喻家山（含东九/西十二等教学楼，韵苑/紫菘/沁苑等宿舍区），同济医学院校区在汉口（与主校区约30公里，跨校区互助需求明显），另有网安校区、军山校区。校内常用服务：菜鸟驿站/近邻宝取快递、百景园/西一/东园等食堂、校医院、图书馆、校车连接各区域。当用户问校园生活攻略时，可结合以上给出实用建议；若用户表达想发跑腿单、找失物、写发布内容，请引导其使用对应功能按钮。' }];
+  const _aiHistory = [{ role:'system', content:'你是 Hust互助（华中科技大学校园互助平台）的 AI 小助手。平台业务：跑腿代办（代拿快递/外卖、帮买帮送、打印、维修）、物品流转（二手出售/租借）、有问必答（含习题解答）、找人组队/拼车/招募、校园公告/失物招领。用户学号邮箱验证登录，信用分初始100，新用户送7天会员。平台无资金托管，报酬由双方线下协商支付。请用简洁友好中文回答；校园攻略类问题可适当展开，不知道就说不知道。\n\n【华中科技大学校园生活常识参考】\n1. 校区与通勤：主校区在武昌喻家山，宿舍区主要有韵苑、紫菘、沁苑等，教学楼包括东九、东五、西十二、西五等；同济医学院校区在汉口航空路，距主校区约30公里；网安校区、军山校区相对独立。主校区内常见通行方式：步行、共享单车/电动车、校车循环线（连接宿舍区与教学区，具体线路/时刻以学校后勤最新通知为准）；跨校区可选地铁（主校区附近光谷广场/佳园路站等）+公交/打车。\n2. 食堂：主校区常见食堂有百景园、西一、西二、东一、东三、东园、集锦园、喻园、梧桐雨等；同济校区有同济食堂。各食堂支持校园卡/支付宝/微信，部分窗口因假期调整开放。\n3. 快递点：主校区快递多集中在菜鸟驿站、近邻宝，宿舍区周边（如韵苑、紫菘、沁苑附近）通常设有站点；跨校区取件/寄件需求较多，可在平台发跑腿单。\n4. 校园卡：丢失后尽快通过学校官方 APP/公众号/自助机挂失；补办一般带身份证/学生证到师生服务中心或校园卡管理中心办理，具体地点以学校通知为准。\n5. 图书馆与自习：主图书馆、各分馆需刷校园卡进入，考试周座位紧张，建议提前占座或使用预约系统。\n6. 校医院：主校区校医院位于校园内，小病/急诊可刷校园卡挂号；严重情况建议去同济医院、协和医院等三甲医院。\n\n回答用户时：若问平台功能/规则，直接回答；若问校园生活攻略，结合上述信息给出实用建议并提醒“具体以学校最新通知为准”；若用户想发跑腿、发布失物招领、润色文案，请引导其点击对应功能按钮。' }];
   async function sendAiMessage(){
     const inp = document.getElementById('aiInput'); if(!inp) return;
     const text = inp.value.trim(); if(!text) return;
@@ -9262,7 +9262,7 @@ if ('serviceWorker' in navigator) {
     addAiMsg('me', text);
     _aiHistory.push({ role:'user', content:text });
     const typing = addAiMsg('bot','',true);
-    const reply = await callAiChat(_aiHistory.slice(1));
+    const reply = await callAiChat(_aiHistory);
     _aiHistory.push({ role:'assistant', content:reply });
     await typeOutAi(typing, reply);
     saveAiHistory();
