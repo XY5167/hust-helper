@@ -39,9 +39,13 @@ const ADMIN_STUDENT_ID = process.env.ADMIN_STUDENT_ID || 'U202512533';
 const HUNYUAN_SECRET_ID = process.env.HUNYUAN_SECRET_ID || '';
 const HUNYUAN_SECRET_KEY = process.env.HUNYUAN_SECRET_KEY || '';
 const HUNYUAN_MODEL = process.env.HUNYUAN_MODEL || 'hunyuan-lite';
+// 2026-09 腾讯混元旧版模型下线，AI 对话/润色/审核/仲裁统一迁移至 TokenHub（OpenAI 兼容接口）
+const TOKENHUB_API_KEY = process.env.TOKENHUB_API_KEY || '';
+const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://tokenhub.tencentmaas.com/v1').replace(/\/$/, '');
+const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'hy3-preview';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.17.2';
+const VERSION = '1.39.2';
 
 // 白名单：仅放行本仓库的 issues（含子路径 /comments），拒绝其它仓库/敏感路径
 const REPO_ESC = REPO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -221,29 +225,36 @@ async function tc3Request(opts) {
   } finally { clearTimeout(timer); }
 }
 
-// ---- 腾讯混元大模型（薄封装：复用 tc3Request）----
+// ---- 腾讯混元 / TokenHub 大模型（OpenAI 兼容接口）----
 async function callHunyuan(messages) {
-  if (!HUNYUAN_SECRET_ID || !HUNYUAN_SECRET_KEY) throw new Error('HUNYUAN_NOT_CONFIGURED');
-  const json = await tc3Request({
-    service: 'hunyuan',
-    host: 'hunyuan.tencentcloudapi.com',
-    action: 'ChatCompletions',
-    version: '2023-09-01',
-    region: 'ap-guangzhou',
-    payloadObj: {
-      Model: HUNYUAN_MODEL,
-      Stream: false,
-      Messages: messages.map(m => ({
-        Role: (m.role === 'system') ? 'system'
-          : (m.role === 'assistant' || m.role === 'bot') ? 'assistant'
-          : 'user',
-        Content: String(m.content || '')
-      }))
-    }
+  if (!TOKENHUB_API_KEY) throw new Error('TOKENHUB_NOT_CONFIGURED');
+  const body = JSON.stringify({
+    model: TOKENHUB_MODEL,
+    messages: messages.map(m => ({
+      role: (m.role === 'system') ? 'system'
+        : (m.role === 'assistant' || m.role === 'bot') ? 'assistant'
+        : 'user',
+      content: String(m.content || '')
+    })),
+    temperature: 0.7
   });
-  if (json.Response && json.Response.Error) throw new Error(json.Response.Error.Message || 'HUNYUAN_ERROR');
-  if (!json.Response || !json.Response.Choices || !json.Response.Choices[0]) throw new Error('HUNYUAN_EMPTY');
-  return json.Response.Choices[0].Message.Content;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20000);
+  try {
+    const r = await fetch(TOKENHUB_BASE_URL + '/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + TOKENHUB_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body,
+      signal: ctl.signal
+    });
+    const json = await r.json();
+    if (!r.ok) throw new Error((json.error && json.error.message) || 'TOKENHUB_ERROR');
+    if (!json.choices || !json.choices[0] || !json.choices[0].message) throw new Error('TOKENHUB_EMPTY');
+    return json.choices[0].message.content;
+  } finally { clearTimeout(timer); }
 }
 
 // ---- 腾讯云 OCR 通用文字识别（GeneralBasicOCR，免费 1000 次/月）----
