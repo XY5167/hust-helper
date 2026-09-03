@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.37.4">
+<meta name="version" content="1.38.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -189,6 +189,24 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 .forum-header-actions{display:flex;gap:10px}
 .forum-header-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-sm)}
 .forum-header-btn:active{transform:scale(.95)}
+/* v1.38 AI 互助入口卡片：校园圈首屏核心卖点 */
+.ai-entry{display:flex;align-items:center;gap:14px;margin:14px 0;padding:14px 16px;border-radius:var(--radius-md);background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(24,95,165,.10));border:1px solid rgba(99,102,241,.28);box-shadow:var(--shadow-sm);cursor:pointer;transition:box-shadow .2s ease,transform .12s ease}
+.ai-entry:hover{box-shadow:var(--shadow-md)}
+.ai-entry:active{transform:scale(.99)}
+.ai-entry-ico{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#6366f1,#185FA5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex:0 0 auto;box-shadow:0 4px 14px rgba(99,102,241,.35)}
+.ai-entry-main{flex:1;min-width:0}
+.ai-entry-title{font-size:.98rem;font-weight:700;color:var(--text)}
+.ai-entry-sub{font-size:.76rem;color:var(--text-muted);margin-top:3px;line-height:1.4}
+.ai-entry-chips{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
+.ai-chip{font-size:.8rem;font-weight:600;color:#fff;background:linear-gradient(135deg,#6366f1,#185FA5);border:none;border-radius:99px;padding:7px 13px;cursor:pointer;white-space:nowrap;transition:transform .12s ease,box-shadow .2s;box-shadow:0 2px 8px rgba(24,95,165,.3)}
+.ai-chip:hover{box-shadow:0 4px 14px rgba(24,95,165,.45)}
+.ai-chip:active{transform:scale(.93)}
+@media(max-width:768px){.ai-entry{flex-wrap:wrap}.ai-entry-chips{margin-left:0;width:100%;justify-content:space-between}.ai-chip{flex:1;padding:8px 6px}}
+/* AI 面板内的意图动作按钮 */
+.ai-actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px;padding-left:8px}
+.ai-action-btn{font-size:.82rem;font-weight:600;color:#185FA5;background:rgba(24,95,165,.10);border:1px solid rgba(24,95,165,.35);border-radius:99px;padding:7px 13px;cursor:pointer;transition:background .15s,transform .12s}
+.ai-action-btn:hover{background:rgba(24,95,165,.18)}
+.ai-action-btn:active{transform:scale(.94)}
 /* v1.37.2 悬浮发布按钮（FAB）：明显的胶囊按钮，带文字标签，z-index 高于底部导航 */
 /* v1.37.3 悬浮发布按钮（FAB）：放在左下角，避开右下角的 AI 互助小助手 */
 .forum-fab{position:fixed;left:20px;bottom:28px;z-index:400;display:inline-flex;align-items:center;gap:6px;height:46px;padding:0 20px;border:none;border-radius:99px;background:linear-gradient(135deg,var(--brand),#6366f1);color:#fff;font-size:1rem;font-weight:600;line-height:1;white-space:nowrap;cursor:pointer;box-shadow:0 6px 20px rgba(24,95,165,.42);animation:fabPulse 2.2s ease-in-out infinite;transition:transform .15s ease,box-shadow .2s ease}
@@ -1040,6 +1058,21 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <div class="forum-stat">
           <div class="forum-stat-num" id="forumStatOrders">0</div>
           <div class="forum-stat-label">待接订单</div>
+        </div>
+      </div>
+
+      <!-- v1.38 AI 互助入口卡片：首屏核心卖点 -->
+      <div class="ai-entry" onclick="aiEntryOpen()" title="打开互助 AI 小助手">
+        <div class="ai-entry-ico">🤖</div>
+        <div class="ai-entry-main">
+          <div class="ai-entry-title">互助 AI 小助手</div>
+          <div class="ai-entry-sub">华科生活，一句话搞定 · 发单 / 失物 / 攻略 / 润色</div>
+        </div>
+        <div class="ai-entry-chips">
+          <button class="ai-chip" onclick="event.stopPropagation();aiEntryTask()">📦 发跑腿</button>
+          <button class="ai-chip" onclick="event.stopPropagation();aiEntryLost()">🎒 丢东西</button>
+          <button class="ai-chip" onclick="event.stopPropagation();aiEntryGuide()">❓ 华科攻略</button>
+          <button class="ai-chip" onclick="event.stopPropagation();toggleAiAssist()">✍️ 润色</button>
         </div>
       </div>
 
@@ -2050,7 +2083,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.37.4';
+const APP_VERSION = '1.38.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -9126,7 +9159,8 @@ if ('serviceWorker' in navigator) {
 <script>
 // ============ AI 互助小助手 (ai+opc) ============
 (function(){
-  const AI_QUOTA_PER_DAY = 30;
+  const AI_QUOTA_LOGGED = 100, AI_QUOTA_GUEST = 5;
+  function aiQuotaLimit(){ return (window.S && S.user) ? AI_QUOTA_LOGGED : AI_QUOTA_GUEST; }
   function aiQuotaState(){
     try{
       const d = new Date().toISOString().slice(0,10);
@@ -9135,7 +9169,7 @@ if ('serviceWorker' in navigator) {
       return rec;
     }catch(e){ return { date:new Date().toISOString().slice(0,10), count:0 }; }
   }
-  function aiQuotaLeft(){ return Math.max(0, AI_QUOTA_PER_DAY - aiQuotaState().count); }
+  function aiQuotaLeft(){ return Math.max(0, aiQuotaLimit() - aiQuotaState().count); }
   function aiQuotaUse(){ const r = aiQuotaState(); r.count = (r.count||0)+1; try{ localStorage.setItem('hust_ai_quota', JSON.stringify(r)); }catch(e){} updateAiQuotaLabel(); }
   function updateAiQuotaLabel(){ const el = document.getElementById('aiQuota'); if(el) el.textContent = '今日剩余 AI 次数：' + aiQuotaLeft(); }
   window.updateAiQuotaLabel = updateAiQuotaLabel;
@@ -9163,7 +9197,7 @@ if ('serviceWorker' in navigator) {
     else { d.innerHTML = renderMarkdown(text || ''); }
     body.appendChild(d); body.scrollTop = body.scrollHeight; return d;
   }
-  const _aiHistory = [{ role:'system', content:'你是 Hust互助 校园互助平台的 AI 小助手。Hust互助 是华中科技大学(HUST)校园互助平台，有五大类：跑腿代办(代拿快递/外卖、帮买帮送、打印、维修)、物品流转(二手出售/租借)、有问必答(含习题解答)、找人(组队/拼车/招募)、校园公告。用户用学号邮箱验证登录，信用分初始100，新用户送7天会员。平台无资金托管，报酬线下支付。请用简洁友好中文回答，不超过120字，不知道就说不知道。' }];
+  const _aiHistory = [{ role:'system', content:'你是 Hust互助 校园互助平台的 AI 小助手。Hust互助 是华中科技大学(HUST)校园互助平台，有五大类：跑腿代办(代拿快递/外卖、帮买帮送、打印、维修)、物品流转(二手出售/租借)、有问必答(含习题解答)、找人(组队/拼车/招募)、校园公告。用户用学号邮箱验证登录，信用分初始100，新用户送7天会员。平台无资金托管，报酬线下支付。请用简洁友好中文回答，不超过120字，不知道就说不知道。\n\n平台全部面向华中科技大学：主校区在武汉喻家山（含东九/西十二等教学楼，韵苑/紫菘/沁苑等宿舍区），同济医学院校区在汉口（与主校区约30公里，跨校区互助需求明显），另有网安校区、军山校区。校内常用服务：菜鸟驿站/近邻宝取快递、百景园/西一/东园等食堂、校医院、图书馆、校车连接各区域。当用户问校园生活攻略时，可结合以上给出实用建议；若用户表达想发跑腿单、找失物、写发布内容，请引导其使用对应功能按钮。' }];
   async function sendAiMessage(){
     const inp = document.getElementById('aiInput'); if(!inp) return;
     const text = inp.value.trim(); if(!text) return;
@@ -9183,9 +9217,57 @@ if ('serviceWorker' in navigator) {
     await typeOutAi(typing, reply);
     saveAiHistory();
     aiQuotaUse();
+    renderAiActions(text);
   }
   function aiQuickAsk(btn){ const inp = document.getElementById('aiInput'); if(inp) inp.value = btn.textContent; sendAiMessage(); }
   window.toggleAiChat = toggleAiChat; window.sendAiMessage = sendAiMessage; window.aiQuickAsk = aiQuickAsk;
+
+  // v1.38：AI 入口卡片 & 对话动作闭环
+  function openAiAndAsk(q){
+    toggleAiChat(true);
+    const inp = document.getElementById('aiInput');
+    if(inp){ inp.value = q; }
+    if(window.sendAiMessage) sendAiMessage();
+  }
+  function aiEntryOpen(){ toggleAiChat(true); }
+  function aiEntryTask(){ openAiAndAsk('我想发一个跑腿单，比如代取快递到宿舍，大概怎么操作、多少钱合适？'); }
+  function aiEntryLost(){ openAiAndAsk('我在华科丢了/捡到东西（比如校园卡、伞），怎么发布失物招领能更快找到对方？'); }
+  function aiEntryGuide(){ openAiAndAsk('介绍一下华中科技大学校园生活攻略：校车怎么坐、食堂有哪些、快递点在哪、校园卡丢了怎么补？'); }
+  function aiGotoLost(){
+    if(typeof showForumPublishModal === 'function') showForumPublishModal();
+    setTimeout(function(){
+      const c = document.getElementById('forumPublishCat'); if(c) c.value = 'life';
+      const t = document.getElementById('forumPublishTitle'); if(t) t.value = '【失物招领】捡到/丢失 物品（请补充：物品+地点+时间）';
+      const x = document.getElementById('forumPublishContent'); if(x) x.value = '';
+    }, 120);
+  }
+  window.aiEntryOpen = aiEntryOpen; window.aiEntryTask = aiEntryTask; window.aiEntryLost = aiEntryLost; window.aiEntryGuide = aiEntryGuide;
+  window.openAiAndAsk = openAiAndAsk; window.aiGotoLost = aiGotoLost;
+
+  // 根据用户原始问题，在 AI 回复后渲染可点击的"下一步"动作按钮（零成本，本地意图检测）
+  function renderAiActions(query){
+    const body = document.getElementById('aiBody'); if(!body) return;
+    const q = String(query || '').toLowerCase();
+    const acts = [];
+    if(/跑腿|代取|代买|取快递|拿快递|外卖|帮忙|送东西|代办|跑腿单|发单/.test(q))
+      acts.push({ label:'📦 去发布跑腿单', fn:"navigate('help')" });
+    if(/丢|捡|失物|遗失|捡到|掉了|校园卡|伞|找不|招领/.test(q))
+      acts.push({ label:'🎒 发布失物招领', fn:'aiGotoLost()' });
+    if(/润色|改写|帮写|起草|写一段|帮我写|写个/.test(q))
+      acts.push({ label:'✍️ 打开 AI 润色', fn:'toggleAiAssist()' });
+    if(/攻略|校车|食堂|快递点|补卡|校区|华科|生活|校医院|图书馆/.test(q))
+      acts.push({ label:'📚 更多华科攻略', fn:"openAiAndAsk('华科生活还有哪些实用小贴士？比如图书馆占座、校医院挂号、打印店')" });
+    if(!acts.length) return;
+    const wrap = document.createElement('div'); wrap.className = 'ai-actions';
+    acts.forEach(function(a){
+      const b = document.createElement('button');
+      b.className = 'ai-action-btn';
+      b.textContent = a.label;
+      b.setAttribute('onclick', a.fn);
+      wrap.appendChild(b);
+    });
+    body.appendChild(wrap); body.scrollTop = body.scrollHeight;
+  }
 
   // v1.25.0 智能客服：菜单式 FAQ 本地库（点菜单直接回复，不耗 AI 配额）
   const AI_FAQ_LABEL = { publish:'怎么发单？', take:'怎么接单？', credit:'信用分规则', vip:'会员/VIP 有什么用？', bounty:'悬赏问答怎么玩？', safety:'安全提醒', contact:'联系管理员', human:'转人工客服' };
