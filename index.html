@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.37.2">
+<meta name="version" content="1.37.3">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -190,7 +190,8 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 .forum-header-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-sm)}
 .forum-header-btn:active{transform:scale(.95)}
 /* v1.37.2 悬浮发布按钮（FAB）：明显的胶囊按钮，带文字标签，z-index 高于底部导航 */
-.forum-fab{position:fixed;right:20px;bottom:28px;z-index:400;display:inline-flex;align-items:center;gap:6px;height:46px;padding:0 20px;border:none;border-radius:99px;background:linear-gradient(135deg,var(--brand),#6366f1);color:#fff;font-size:1rem;font-weight:600;line-height:1;white-space:nowrap;cursor:pointer;box-shadow:0 6px 20px rgba(24,95,165,.42);animation:fabPulse 2.2s ease-in-out infinite;transition:transform .15s ease,box-shadow .2s ease}
+/* v1.37.3 悬浮发布按钮（FAB）：放在左下角，避开右下角的 AI 互助小助手 */
+.forum-fab{position:fixed;left:20px;bottom:28px;z-index:400;display:inline-flex;align-items:center;gap:6px;height:46px;padding:0 20px;border:none;border-radius:99px;background:linear-gradient(135deg,var(--brand),#6366f1);color:#fff;font-size:1rem;font-weight:600;line-height:1;white-space:nowrap;cursor:pointer;box-shadow:0 6px 20px rgba(24,95,165,.42);animation:fabPulse 2.2s ease-in-out infinite;transition:transform .15s ease,box-shadow .2s ease}
 .forum-fab .fa-plus{font-size:1.25rem;font-weight:700;line-height:1}
 .forum-fab:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(24,95,165,.5)}
 .forum-fab:active{transform:scale(.95)}
@@ -198,7 +199,7 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 /* 详情页底部有固定评论框（.forum-detail-comment-form: bottom:64px，高约 56px），FAB 需上移避让 */
 #page-forum-detail .forum-fab{bottom:132px}
 @media(max-width:768px){
-  .forum-fab{right:14px;bottom:74px;height:42px;padding:0 16px;font-size:.92rem}  /* 让开 58px 高的 .bottom-nav(z-index:300) */
+  .forum-fab{left:14px;bottom:74px;height:42px;padding:0 16px;font-size:.92rem}  /* 左下角，让开 58px 高的 .bottom-nav(z-index:300)，避开右下角 AI 助手 */
   #page-forum-detail .forum-fab{bottom:128px}
 }
 @media(prefers-reduced-motion:reduce){.forum-fab{animation:none;transition:none}}
@@ -2049,7 +2050,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.37.2';
+const APP_VERSION = '1.37.3';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
