@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.37.1">
+<meta name="version" content="1.37.2">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -189,22 +189,24 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 .forum-header-actions{display:flex;gap:10px}
 .forum-header-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-sm)}
 .forum-header-btn:active{transform:scale(.95)}
-/* v1.37.1 悬浮发布按钮（FAB）：随 .page 显隐自动生效 */
-.forum-fab{position:fixed;right:20px;bottom:28px;width:52px;height:52px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--brand),#6366f1);color:#fff;font-size:1.7rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 20px rgba(24,95,165,.38);z-index:120;transition:transform .15s ease,box-shadow .2s ease}
-.forum-fab:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(24,95,165,.46)}
-.forum-fab:active{transform:scale(.94)}
+/* v1.37.2 悬浮发布按钮（FAB）：明显的胶囊按钮，带文字标签，z-index 高于底部导航 */
+.forum-fab{position:fixed;right:20px;bottom:28px;z-index:400;display:inline-flex;align-items:center;gap:6px;height:46px;padding:0 20px;border:none;border-radius:99px;background:linear-gradient(135deg,var(--brand),#6366f1);color:#fff;font-size:1rem;font-weight:600;line-height:1;white-space:nowrap;cursor:pointer;box-shadow:0 6px 20px rgba(24,95,165,.42);animation:fabPulse 2.2s ease-in-out infinite;transition:transform .15s ease,box-shadow .2s ease}
+.forum-fab .fa-plus{font-size:1.25rem;font-weight:700;line-height:1}
+.forum-fab:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(24,95,165,.5)}
+.forum-fab:active{transform:scale(.95)}
+@keyframes fabPulse{0%,100%{box-shadow:0 6px 20px rgba(24,95,165,.42)}50%{box-shadow:0 6px 28px rgba(24,95,165,.62)}}
 /* 详情页底部有固定评论框（.forum-detail-comment-form: bottom:64px，高约 56px），FAB 需上移避让 */
 #page-forum-detail .forum-fab{bottom:132px}
 @media(max-width:768px){
-  .forum-fab{right:16px;bottom:76px}          /* 让开 58px 高的 .bottom-nav */
-  #page-forum-detail .forum-fab{bottom:132px}
+  .forum-fab{right:14px;bottom:74px;height:42px;padding:0 16px;font-size:.92rem}  /* 让开 58px 高的 .bottom-nav(z-index:300) */
+  #page-forum-detail .forum-fab{bottom:128px}
 }
-@media(prefers-reduced-motion:reduce){.forum-fab{transition:none}}
+@media(prefers-reduced-motion:reduce){.forum-fab{animation:none;transition:none}}
 
 /* Banner */
 .forum-banner{position:relative;border-radius:var(--radius-sm);overflow:hidden;margin-bottom:18px;background:var(--bg-card);box-shadow:var(--shadow-md)}
 .forum-banner-track{display:flex;transition:transform .5s ease}
-.forum-banner-slide{flex:0 0 100%;min-height:140px;padding:18px 20px;color:#fff;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.forum-banner-slide{flex:0 0 100%;min-height:140px;padding:18px 20px;color:#fff;display:flex;flex-direction:column;justify-content:center;gap:4px;cursor:pointer}
 .forum-banner-tag{display:inline-block;align-self:flex-start;background:rgba(255,255,255,.25);color:#fff;font-size:.68rem;font-weight:600;padding:3px 8px;border-radius:99px}
 .forum-banner-title{font-size:1.25rem;font-weight:700}
 .forum-banner-sub{font-size:.82rem;opacity:.9}
@@ -642,7 +644,8 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .nav-notify-btn:hover{background:var(--bg)}
 .notify-badge{position:absolute;top:-2px;right:0;background:#dc2626;color:#fff;font-size:.65rem;min-width:16px;height:16px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 4px;font-weight:700}
 .notify-panel{display:none;position:fixed;top:56px;right:16px;width:340px;max-height:480px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:1000;overflow:hidden;flex-direction:column}
-.notify-panel.active{display:flex}
+.notify-panel.active{display:flex;animation:notifyPop .16s ease-out}
+@keyframes notifyPop{from{opacity:.4;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
 .notify-panel-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border)}
 .notify-list{overflow-y:auto;flex:1;max-height:420px}
 .notify-item{display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
@@ -955,7 +958,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <button class="btn btn-ghost btn-sm" id="themeToggle" onclick="toggleTheme()" title="切换深色/浅色">🌙</button>
       <button class="btn btn-outline btn-sm" onclick="showAuthModal()" id="btnLogin">登录</button>
       <div class="user-menu" id="userMenu" style="display:none">
-        <button class="nav-notify-btn" id="navNotifyBtn" onclick="toggleNotifyPanel()" title="消息通知">🔔</button>
+        <button class="nav-notify-btn notify-toggle" id="navNotifyBtn" onclick="toggleNotifyPanel()" title="消息通知">🔔</button>
         <span class="user-name" id="userNameDisplay"></span>
         <span class="user-verified" title="已实名">已实名</span>
         <span class="user-verified user-credit" title="信用分" style="display:none;font-size:.7rem;padding:2px 7px;border-radius:99px"></span>
@@ -997,22 +1000,27 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         </div>
         <div class="forum-header-actions">
           <button class="forum-header-btn" onclick="showForumPublishModal()" title="发布帖子">＋</button>
-          <button class="forum-header-btn" onclick="toggleNotifyPanel()" title="消息通知">🔔</button>
+          <button class="forum-header-btn notify-toggle" id="forumNotifyBtn" onclick="toggleNotifyPanel()" title="消息通知">🔔</button>
         </div>
       </div>
 
-      <!-- Banner 轮播 -->
+      <!-- Banner 轮播：真实校园互助场景，点击跳转对应分区 -->
       <div class="forum-banner" id="forumBanner">
         <div class="forum-banner-track" id="forumBannerTrack">
-          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#185FA5,#6366f1)">
-            <div class="forum-banner-tag">限时活动</div>
-            <div class="forum-banner-title">校园跑腿节</div>
-            <div class="forum-banner-sub">接单赏金 +20%，每天前 50 单 › 去接单</div>
+          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#185FA5,#6366f1)" onclick="openForumCat('life')">
+            <div class="forum-banner-tag">失物招领</div>
+            <div class="forum-banner-title">捡到校园卡 / 伞 / 书？</div>
+            <div class="forum-banner-sub">发到「生活分享」找主人 ›</div>
           </div>
-          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#3B6D11,#84cc16)">
-            <div class="forum-banner-tag">新生季</div>
-            <div class="forum-banner-title">二手教材流转</div>
-            <div class="forum-banner-sub">教材 5 折起 · 同校自提更安全 ›</div>
+          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#3B6D11,#84cc16)" onclick="openForumCat('study')">
+            <div class="forum-banner-tag">期末互助</div>
+            <div class="forum-banner-title">组队复习 · 资料共享</div>
+            <div class="forum-banner-sub">在「学习求助」找搭子 ›</div>
+          </div>
+          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#B91C1C,#F59E0B)" onclick="openForumCat('tucao')">
+            <div class="forum-banner-tag">校园公约</div>
+            <div class="forum-banner-title">友善交流 · 拒绝校外交易</div>
+            <div class="forum-banner-sub">有槽点来「校园吐槽」 ›</div>
           </div>
         </div>
         <div class="forum-banner-dots" id="forumBannerDots"></div>
@@ -1213,7 +1221,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     <div id="forumList" class="forum-list">加载中…</div>
     <div id="forumPager" class="forum-pager"></div>
   </div>
-  <button class="forum-fab" onclick="showForumPublishModal()" title="发布帖子" aria-label="发布帖子">＋</button>
+  <button class="forum-fab" onclick="showForumPublishModal()" title="发布帖子" aria-label="发布帖子"><span class="fa-plus">＋</span>发布</button>
 </section>
 
 <section class="page" id="page-forum-detail" style="display:none">
@@ -1231,7 +1239,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <button class="btn btn-brand" onclick="submitForumComment()">发送</button>
     </div>
   </div>
-  <button class="forum-fab" onclick="showForumPublishModal()" title="发布帖子" aria-label="发布帖子">＋</button>
+  <button class="forum-fab" onclick="showForumPublishModal()" title="发布帖子" aria-label="发布帖子"><span class="fa-plus">＋</span>发布</button>
 </section>
 
 <section class="page" id="page-safety" style="display:none">
@@ -2041,7 +2049,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.37.1';
+const APP_VERSION = '1.37.2';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -8645,17 +8653,19 @@ function getUnreadCount() { return _notifications.filter(n => !n.read).length; }
 
 // --- 导航栏铃铛红点 ---
 function updateNavBadge() {
-  const btn = document.getElementById('navNotifyBtn');
-  if (!btn) return;
-  let badge = btn.querySelector('.notify-badge');
+  const btns = document.querySelectorAll('.notify-toggle');
+  if (!btns.length) return;
   const unread = getUnreadCount();
-  if (unread > 0) {
-    if (!badge) { badge = document.createElement('span'); badge.className = 'notify-badge'; btn.appendChild(badge); }
-    badge.textContent = unread > 99 ? '99+' : String(unread);
-    badge.style.display = 'flex';
-  } else {
-    if (badge) badge.style.display = 'none';
-  }
+  btns.forEach(function (btn) {
+    let badge = btn.querySelector('.notify-badge');
+    if (unread > 0) {
+      if (!badge) { badge = document.createElement('span'); badge.className = 'notify-badge'; btn.appendChild(badge); }
+      badge.textContent = unread > 99 ? '99+' : String(unread);
+      badge.style.display = 'flex';
+    } else {
+      if (badge) badge.style.display = 'none';
+    }
+  });
 }
 
 // --- 通知面板渲染 ---
@@ -9021,13 +9031,13 @@ function dismissAnnounceBanner() {
   if (el) el.style.display = 'none';
 }
 
-// 点击面板外关闭通知面板
+// 点击面板外关闭通知面板（但点击任意铃铛按钮不关闭，避免"打开即被关"）
 document.addEventListener('click', function(e) {
   const panel = document.getElementById('notifyPanel');
-  const btn = document.getElementById('navNotifyBtn');
-  if (panel && panel.classList.contains('active') && !panel.contains(e.target) && (!btn || !btn.contains(e.target))) {
-    panel.classList.remove('active');
-  }
+  if (!panel || !panel.classList.contains('active')) return;
+  if (panel.contains(e.target)) return;
+  if (e.target.closest('.notify-toggle')) return;
+  panel.classList.remove('active');
 });
 
 // --- 初始化 ---
