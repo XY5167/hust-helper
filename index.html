@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.37.3">
+<meta name="version" content="1.37.4">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1833,7 +1833,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <div class="form-group" style="display:flex;align-items:center;gap:12px">
         <label style="margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
           <input type="checkbox" id="forumPublishAnon" checked>
-          <span>匿名发布（显示为「匿名校友」）</span>
+          <span>匿名发布（显示我的昵称）</span>
         </label>
       </div>
       <div class="form-group">
@@ -2050,7 +2050,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.37.3';
+const APP_VERSION = '1.37.4';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2471,7 +2471,8 @@ try {
   fillCampusSelect('forumPublishCampus', S._forumCampus);
 } catch (e) { console.warn('[campus] init failed', e); }
 function forumDisplayName(p) {
-  if (p.is_anonymous) return '匿名校友';
+  // 匿名帖仍优先展示用户设置的昵称，未设置昵称才回退到「匿名校友」
+  if (p.is_anonymous) return p.author_nickname || '匿名校友';
   return p.author_nickname || maskName(p.author_name) || '同学';
 }
 // 拉取全部 forum 帖子（issue + label "forum"）
@@ -2589,7 +2590,7 @@ async function renderForumComments(num) {
     if (!comments || comments.length === 0) { cEl.innerHTML = '<div class="forum-comment-empty">还没有评论，来抢沙发～</div>'; return; }
     cEl.innerHTML = comments.map(function (c) {
       let u; try { u = JSON.parse(c.body); } catch (e) { u = { content: c.body }; }
-      const name = u.is_anonymous ? '匿名校友' : (u.author_nickname || '同学');
+      const name = u.is_anonymous ? (u.author_nickname || '匿名校友') : (u.author_nickname || '同学');
       return '<div class="forum-comment"><div class="forum-comment-avatar">' + esc((name || '匿').charAt(0)) + '</div>'
         + '<div class="forum-comment-body"><div class="forum-comment-name">' + esc(name) + '</div>'
         + '<div class="forum-comment-text">' + esc(u.content || '').replace(/\n/g, '<br>') + '</div>'
