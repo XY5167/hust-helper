@@ -42,7 +42,7 @@ const HUNYUAN_MODEL = process.env.HUNYUAN_MODEL || 'hunyuan-lite';
 // 2026-09 腾讯混元旧版模型下线，AI 对话/润色/审核/仲裁统一迁移至 TokenHub（OpenAI 兼容接口）
 const TOKENHUB_API_KEY = process.env.TOKENHUB_API_KEY || '';
 const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://tokenhub.tencentmaas.com/v1').replace(/\/$/, '');
-const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'hy3-preview';
+const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'hy3';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
 const VERSION = '1.39.2';
