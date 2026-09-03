@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.38.0">
+<meta name="version" content="1.39.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2055,7 +2055,13 @@ const SENSITIVE_WORDS = new Set([
   '傻逼','草泥马','操你','fuck','shit',
   '枪支','弹药','管制刀具','迷药','安眠药',
   '自杀','自残','跳楼',
-  '垫付','先付款','先交钱','押金','保证金','刷单返利','扫码付款','私下转账','私下交易','定金不退','预付定金','先打款'
+  '垫付','先付款','先交钱','押金','保证金','刷单返利','扫码付款','私下转账','私下交易','定金不退','预付定金','先打款',
+  // v1.39.0 扩展违禁词（强化禁止发稿）
+  '办证','假证','刻章','学历造假','成绩修改','改分','代注册',
+  '信用卡套现','套现','洗钱','比特币','虚拟币',
+  '招嫖','色情交易','黄片','裸聊',
+  '点赞返利','培训贷','美容贷','医美贷',
+  '虚开','走私','烟草','香烟','电子烟'
 ]);
 const SENSITIVE_MIN_LEN = 2, SENSITIVE_MAX_LEN = 10;
 function checkSensitive(text) {
@@ -2081,9 +2087,20 @@ function checkContactLeak(text) {
   for (const p of CONTACT_LEAK_PATTERNS) { if (p.re.test(text)) return p.msg; }
   return null;
 }
+// v1.39.0 AI 内容安全预检（发帖/发布前调用）。fail-open：任何异常都按 safe 放行，绝不因 AI 故障阻断正常发帖。
+async function aiModerate(title, content) {
+  try {
+    const res = await ghApi('/api/ai/moderate', 'POST', { title: title || '', content: content || '' });
+    if (res && res.ok) {
+      const d = await res.json();
+      if (d && d.verdict) return { verdict: d.verdict, confidence: d.confidence || 0, reason: d.reason || '', suggestion: d.suggestion || '' };
+    }
+  } catch (e) { /* fail open：AI 预检失败不阻断发布 */ }
+  return { verdict: 'safe', confidence: 0, reason: '', suggestion: '' };
+}
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.38.0';
+const APP_VERSION = '1.39.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2722,12 +2739,28 @@ async function submitForumPost() {
   const anon = document.getElementById('forumPublishAnon').checked;
   if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
   if (!content) { err.textContent = '请填写正文'; err.style.display = 'block'; return; }
+  // v1.39.0 违禁词硬拦截（此前论坛缺失，与跑腿发布一致）
+  const sensitiveWord = checkSensitive(title + ' ' + content);
+  if (sensitiveWord) { err.textContent = '内容包含违禁词「' + sensitiveWord + '」，违反平台规范，无法发布'; err.style.display = 'block'; return; }
+  // v1.39.0 AI 内容安全预检（fail-open：异常不阻断发布）
   const btn = document.getElementById('forumPublishSubmit');
+  btn.disabled = true; btn.textContent = 'AI 安全检测中…';
+  let modResult = { verdict: 'safe', reason: '', suggestion: '' };
+  try { modResult = await aiModerate(title, content); } catch (e) { modResult = { verdict: 'safe' }; }
+  if (modResult.verdict === 'block') {
+    err.textContent = '⚠️ 内容疑似违规（' + (modResult.reason || '命中安全规则') + '），无法发布。' + (modResult.suggestion ? ('建议：' + modResult.suggestion) : '');
+    err.style.display = 'block'; btn.disabled = false; btn.textContent = '发布'; return;
+  }
+  if (modResult.verdict === 'warn') {
+    const go = window.confirm('⚠️ 安全提醒：' + (modResult.reason || '内容疑似存在风险') + (modResult.suggestion ? '。' + modResult.suggestion : '') + '\n\n平台不担保脱离平台的私下交易安全。确定仍要发布？');
+    if (!go) { err.style.display = 'none'; btn.disabled = false; btn.textContent = '发布'; return; }
+  }
   btn.disabled = true; btn.textContent = '发布中…';
   try {
     const bodyObj = {
       type: 'forum', cat: cat, title: title, content: content, campus: campus,
       is_anonymous: anon,
+      ai_moderation: modResult.verdict !== 'safe' ? modResult : null,
       author_id: S.user._issue_number || S.user.student_id,
       author_sid: S.user.student_id,
       author_nickname: S.user.nickname || S.user.name,
@@ -7126,6 +7159,22 @@ async function handlePublish(e) {
   const contactWarn = checkContactLeak(title + ' ' + desc);
   if (contactWarn && window.toast) toast(contactWarn);
 
+  // v1.39.0 AI 内容安全预检（fail-open；异常不阻断发布）
+  let _aiMod = { verdict: 'safe', reason: '', suggestion: '' };
+  {
+    const _pb2 = document.querySelector('#publishForm button[type=submit]');
+    if (_pb2) { _pb2.disabled = true; _pb2.textContent = 'AI 安全检测中…'; }
+    try { _aiMod = await aiModerate(title, desc); } catch (e) { _aiMod = { verdict: 'safe' }; }
+    if (_aiMod.verdict === 'block') {
+      err.textContent = '⚠️ 内容疑似违规（' + (_aiMod.reason || '命中安全规则') + '），无法发布。' + (_aiMod.suggestion ? ('建议：' + _aiMod.suggestion) : '');
+      err.style.display = 'block'; if (_pb2) { _pb2.disabled = false; _pb2.textContent = '发布'; } return;
+    }
+    if (_aiMod.verdict === 'warn') {
+      const _go = window.confirm('⚠️ 安全提醒：' + (_aiMod.reason || '内容疑似存在风险') + (_aiMod.suggestion ? '。' + _aiMod.suggestion : '') + '\n\n平台不担保脱离平台的私下交易安全。确定仍要发布？');
+      if (!_go) { err.style.display = 'none'; if (_pb2) { _pb2.disabled = false; _pb2.textContent = '发布'; } return; }
+    }
+  }
+
   // 跑腿认证检查：发布「跑腿代办 / 物品流转（出售、租借）」需先通过跑腿认证（证明华科学生身份）
   // 问答、找人（纯交流类）无需认证。认证通过还可以获赠 7 天会员试用。
   if ((type === 'task' || type === 'secondhand' || type === 'borrow') && !S.user.runner_verified && !isAdminUser()) {
@@ -7215,6 +7264,7 @@ async function handlePublish(e) {
     search_keywords: (window._publishOcr && window._publishOcr.chips && window._publishOcr.chips.length)
       ? window._publishOcr.chips.slice(0, 10) : [],
     status: 'open',
+    ai_moderation: _aiMod.verdict !== 'safe' ? _aiMod : null,
     publisher_id: S.user._issue_number || S.user.student_id,
     publisher_name: S.user.nickname || S.user.name,
     publisher_student_id: S.user.student_id,

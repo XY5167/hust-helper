@@ -694,6 +694,48 @@ const server = http.createServer(async (req, res) => {
           } catch (e) { return sendJSON(res, 502, { error: e.message }, headers); }
         }
 
+        // ---- AI 内容安全审核：发帖/发布前预检，识别广告引流/站外交易/诈骗/违禁品/人身攻击 ----
+        if (method === 'POST' && path === '/api/ai/moderate') {
+          if (rateLimited(clientIp(req), AI_RATE_LIMIT)) return sendJSON(res, 429, { error: 'RATE_LIMITED' }, headers);
+          const title = (ghBody && ghBody.title || '').toString().trim();
+          const content = (ghBody && ghBody.content || '').toString().trim();
+          const kind = (ghBody && ghBody.type || 'post').toString().trim();
+          if (!content && !title) return sendJSON(res, 400, { error: 'INVALID_INPUT' }, headers);
+          const sysPrompt = '你是华中科技大学(HUST)校园互助平台的发帖内容安全审核助手，负责在内容发布前做第一轮风险识别，维护校园互助环境。' +
+            '需要识别的违规类型：' +
+            '1) 广告引流：引导到淘宝/拼多多/抖音/闲鱼/校外商家等平台，或为他人店铺拉客；' +
+            '2) 站外私下交易：诱导用微信/QQ/支付宝/银行卡等脱离平台担保进行私下转账、先款后货；' +
+            '3) 诈骗话术：刷单返利、垫付、押金、中奖、裸聊、色情、赌博、非法贷款、培训贷、医美贷、套现、洗钱；' +
+            '4) 违禁品/违规服务：烟酒、管制刀具、药品、办证/假证/刻章、学历造假、代写论文/代考、成绩修改/改分、代注册、走私、虚拟币交易；' +
+            '5) 人身攻击/仇恨言论/侮辱谩骂。' +
+            '判断规则：' +
+            'A) 明显且确凿的违规（如直接售假证、明码标价诈骗、违禁品交易）→ verdict="block"（置信度 85-99），前端将直接拦截；' +
+            'B) 疑似但不确定（如模糊的引流话术、疑似站外交易引导、风险偏高但未明确违规）→ verdict="warn"（置信度 60-84），前端将提醒用户确认；' +
+            'C) 正常互助内容（代取快递、二手转让、问路、课程求助等）→ verdict="safe"（置信度 85-99）。' +
+            '必须只返回一个 JSON 对象（不要 markdown 代码块、不要任何解释文字）：' +
+            '{"verdict":"safe|warn|block","confidence":0-100的整数,"reason":"一句话理由（20字内）","suggestion":"给发布者的改写建议（如：请勿引导站外私下交易，使用平台担保）"}。' +
+            'confidence 表示把握程度：只有事实非常清楚才给 85 以上；把握不足一律给 80 以下并选 warn 或 safe。';
+          try {
+            const text = '标题：' + (title || '（无）') + '\n内容：' + (content || '（无）') + (kind ? '\n类型：' + kind : '');
+            const c = await callHunyuan([
+              { role: 'system', content: sysPrompt },
+              { role: 'user', content: text }
+            ]);
+            const parsed = extractJson(c);
+            if (!parsed || !parsed.verdict || !['safe', 'warn', 'block'].includes(parsed.verdict)) {
+              return sendJSON(res, 200, { ok: true, verdict: 'safe', confidence: 50, reason: 'AI 未能判定，按安全放行', suggestion: '' });
+            }
+            const conf = Math.max(0, Math.min(100, parseInt(parsed.confidence, 10) || 50));
+            return sendJSON(res, 200, {
+              ok: true,
+              verdict: parsed.verdict,
+              confidence: conf,
+              reason: (parsed.reason || '').toString().slice(0, 80),
+              suggestion: (parsed.suggestion || '').toString().slice(0, 120)
+            });
+          } catch (e) { return sendJSON(res, 502, { error: e.message }, headers); }
+        }
+
         let ghPath = '';
         if (method === 'POST' && path === '/api/issues') {
           ghPath = `/repos/${REPO}/issues`;
