@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.37.0">
+<meta name="version" content="1.37.1">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -189,6 +189,17 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 .forum-header-actions{display:flex;gap:10px}
 .forum-header-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-sm)}
 .forum-header-btn:active{transform:scale(.95)}
+/* v1.37.1 悬浮发布按钮（FAB）：随 .page 显隐自动生效 */
+.forum-fab{position:fixed;right:20px;bottom:28px;width:52px;height:52px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--brand),#6366f1);color:#fff;font-size:1.7rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 20px rgba(24,95,165,.38);z-index:120;transition:transform .15s ease,box-shadow .2s ease}
+.forum-fab:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(24,95,165,.46)}
+.forum-fab:active{transform:scale(.94)}
+/* 详情页底部有固定评论框（.forum-detail-comment-form: bottom:64px，高约 56px），FAB 需上移避让 */
+#page-forum-detail .forum-fab{bottom:132px}
+@media(max-width:768px){
+  .forum-fab{right:16px;bottom:76px}          /* 让开 58px 高的 .bottom-nav */
+  #page-forum-detail .forum-fab{bottom:132px}
+}
+@media(prefers-reduced-motion:reduce){.forum-fab{transition:none}}
 
 /* Banner */
 .forum-banner{position:relative;border-radius:var(--radius-sm);overflow:hidden;margin-bottom:18px;background:var(--bg-card);box-shadow:var(--shadow-md)}
@@ -206,6 +217,7 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 .forum-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 8px;text-align:center}
 .forum-stat-num{font-size:1.35rem;font-weight:700;color:var(--brand);line-height:1}
 .forum-stat-label{font-size:.72rem;color:var(--text-muted);margin-top:4px}
+.forum-stats.stats-degraded .forum-stat-num{color:var(--text-muted);opacity:.65}
 
 /* 8 grid */
 .forum-cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
@@ -981,10 +993,6 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
           <h1 class="forum-header-title">校园圈</h1>
           <select id="forumCampusSelect" class="forum-campus-select" onchange="setForumCampus(this.value)">
             <option value="main">主校区</option>
-            <option value="nanhu" selected>南湖校区</option>
-            <option value="guanggu">光谷校区</option>
-            <option value="yunyuan">韵苑</option>
-            <option value="qinyuan">沁苑</option>
           </select>
         </div>
         <div class="forum-header-actions">
@@ -1205,6 +1213,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     <div id="forumList" class="forum-list">加载中…</div>
     <div id="forumPager" class="forum-pager"></div>
   </div>
+  <button class="forum-fab" onclick="showForumPublishModal()" title="发布帖子" aria-label="发布帖子">＋</button>
 </section>
 
 <section class="page" id="page-forum-detail" style="display:none">
@@ -1222,6 +1231,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <button class="btn btn-brand" onclick="submitForumComment()">发送</button>
     </div>
   </div>
+  <button class="forum-fab" onclick="showForumPublishModal()" title="发布帖子" aria-label="发布帖子">＋</button>
 </section>
 
 <section class="page" id="page-safety" style="display:none">
@@ -1809,10 +1819,6 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <label>校区</label>
         <select id="forumPublishCampus" class="form-control">
           <option value="main">主校区</option>
-          <option value="nanhu">南湖校区</option>
-          <option value="guanggu">光谷校区</option>
-          <option value="yunyuan">韵苑</option>
-          <option value="qinyuan">沁苑</option>
         </select>
       </div>
       <div class="form-group" style="display:flex;align-items:center;gap:12px">
@@ -2035,7 +2041,7 @@ function checkContactLeak(text) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.37.0';
+const APP_VERSION = '1.37.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2107,6 +2113,15 @@ function cacheSet(key, data) {
 function cacheBust(key) {
   try { localStorage.removeItem('hust_c_' + key); } catch(e) {}
 }
+// v1.37.1 忽略 TTL 读取历史缓存，用于接口失败时的降级兜底
+function cacheGetStale(key) {
+  try {
+    const item = localStorage.getItem('hust_c_' + key);
+    if (!item) return null;
+    const o = JSON.parse(item);
+    return (o && o.data) || null;
+  } catch (e) { return null; }
+}
 
 // 初始化
 (function() {
@@ -2134,11 +2149,10 @@ function cacheBust(key) {
   // 初始化 EmailJS
   try { emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY }); } catch(e) { console.warn('EmailJS init failed:', e); }
   // 优先显示缓存数据，后台拉最新
+  // v1.37.1：statOrders/statUsers 已随校园圈首页改版移除，此处必须判空，
+  // 否则命中缓存时抛 TypeError 会中断整个启动 IIFE（后续 loadStats 等全部不执行）
   const cached = cacheGet('stats');
-  if (cached) {
-    document.getElementById('statOrders').textContent = cached.orders;
-    document.getElementById('statUsers').textContent = cached.users;
-  }
+  if (cached) applyStats(cached);
   loadStats();
   restoreHomeSections();
   loadHomeLiveData();
@@ -2416,9 +2430,37 @@ const FORUM_CATS = {
 const FORUM_CAT_ICON = {
   tucao: '💬', study: '📚', dating: '💖', activity: '🎉', confession: '💌', life: '☕'
 };
-function campusName(c) {
-  return ({ main: '主校区', nanhu: '南湖校区', guanggu: '光谷校区', yunyuan: '韵苑', qinyuan: '沁苑' })[c] || '主校区';
+// v1.37.1 华科官方校区（唯一数据源，避免多处硬编码重复）
+const CAMPUSES = [
+  { code: 'main',    name: '主校区' },
+  { code: 'tongji',  name: '同济校区' },
+  { code: 'wangan',  name: '网安校区' },
+  { code: 'junshan', name: '军山校区' }
+];
+const CAMPUS_NAMES = CAMPUSES.reduce(function (m, c) { m[c.code] = c.name; return m; }, {});
+// v1.37.0 历史帖子遗留 code（南湖/光谷为旧称，韵苑/沁苑为主校区生活区）统一归入主校区
+const CAMPUS_LEGACY = { nanhu: 'main', guanggu: 'main', yunyuan: 'main', qinyuan: 'main' };
+function campusCode(c) {
+  if (CAMPUS_NAMES[c]) return c;
+  return CAMPUS_LEGACY[c] || 'main';
 }
+function campusName(c) { return CAMPUS_NAMES[campusCode(c)] || '主校区'; }
+// 由常量渲染下拉，两处选择器共用
+function fillCampusSelect(id, selected) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const cur = campusCode(selected || el.value || 'main');
+  el.innerHTML = CAMPUSES.map(function (c) {
+    return '<option value="' + c.code + '"' + (c.code === cur ? ' selected' : '') + '>' + c.name + '</option>';
+  }).join('');
+  el.value = cur;
+}
+// 立即初始化：此处 CAMPUSES 已完成初始化（规避 TDZ），且 DOM 段落已解析完毕
+try {
+  S._forumCampus = campusCode(localStorage.getItem('hust_forum_campus') || 'main');
+  fillCampusSelect('forumCampusSelect', S._forumCampus);
+  fillCampusSelect('forumPublishCampus', S._forumCampus);
+} catch (e) { console.warn('[campus] init failed', e); }
 function forumDisplayName(p) {
   if (p.is_anonymous) return '匿名校友';
   return p.author_nickname || maskName(p.author_name) || '同学';
@@ -2595,6 +2637,8 @@ function showForumPublishModal() {
   const m = document.getElementById('forumPublishModal'); if (m) m.style.display = 'flex';
   const catSel = document.getElementById('forumPublishCat');
   if (catSel && S._forumCat) catSel.value = S._forumCat;
+  // v1.37.1 同步顶部已选校区（并防御性重建 option，避免首屏初始化失败时下拉为空）
+  fillCampusSelect('forumPublishCampus', S._forumCampus);
   S._forumImages = [];
   const prev = document.getElementById('forumPublishImages'); if (prev) prev.innerHTML = '';
   const err = document.getElementById('forumPublishError'); if (err) { err.style.display = 'none'; err.textContent = ''; }
@@ -2658,6 +2702,7 @@ async function submitForumPost() {
     document.getElementById('forumPublishContent').value = '';
     S._forumImages = [];
     S._forumCat = cat;
+    setForumCampus(campus);
     cacheBust('forum');
     navigate('forum');
   } catch (e) {
@@ -2670,21 +2715,23 @@ function previewForumImg(encUrl) {
   const url = decodeURIComponent(encUrl);
   try { window.open(safeImgSrc(url), '_blank'); } catch (e) {}
 }
-function setForumCampus(v) { S._forumCampus = v; }
+function setForumCampus(v) {
+  S._forumCampus = campusCode(v);
+  try { localStorage.setItem('hust_forum_campus', S._forumCampus); } catch (e) {}
+}
 async function loadForumStats() {
+  const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
+  // 订单/用户数走统一入口（与 loadStats / loadHomeLiveData 共享同一次请求与缓存）
+  applyStats(await fetchStats());
+  // 今日发帖数独立统计，失败单独降级，不影响上面的数字
   try {
-    const res = await ghApi('/api/stats', 'GET');
-    let orders = 0;
-    if (res.ok) { const d = await res.json(); orders = d.orders || 0; }
-    const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
     const posts = await forumLoadPosts();
     const today = new Date().toISOString().slice(0, 10);
-    const todayCount = posts.filter(function (p) { return (p.created_at || '').slice(0, 10) === today; }).length;
-    set('forumStatPosts', todayCount);
-    set('forumStatOnline', Math.max(1, Math.round((orders || 0) / 3)) + '+');
-    set('forumStatOrders', orders);
-    set('forumBizTaskCount', orders);
-  } catch (e) {}
+    set('forumStatPosts', posts.filter(function (p) { return (p.created_at || '').slice(0, 10) === today; }).length);
+  } catch (e) {
+    console.warn('[forumStats] 帖子统计失败', e);
+    set('forumStatPosts', '—');
+  }
   const gb = document.getElementById('forumGuestBar');
   if (gb) gb.style.display = S.user ? 'none' : 'flex';
 }
@@ -2713,26 +2760,58 @@ function startForumBanner() {
 }
 
 // ============ STATS ============
-async function loadStats() {
-  try {
-    const res = await ghApi('/api/stats', 'GET');
-    if (!res.ok) throw new Error('stats ' + res.status);
-    const d = await res.json();
-    document.getElementById('statOrders').textContent = d.orders;
-    document.getElementById('statUsers').textContent = d.users;
-    cacheSet('stats', { orders: d.orders, users: d.users });
-  } catch(e) {
-    reportError('统计数据加载失败，请稍后重试', e, 'stats');
-    document.getElementById('statOrders').textContent = '?';
+// v1.37.1 统一 /api/stats 取数：内存去重 + localStorage 缓存 + 失败降级到旧缓存，永不抛错、永不弹 toast
+let _statsInflight = null;
+function fetchStats(force) {
+  if (!force) {
+    const fresh = cacheGet('stats');
+    if (fresh) return Promise.resolve(fresh);
   }
+  if (_statsInflight) return _statsInflight;          // 合并同一时刻的并发调用
+  _statsInflight = (async function () {
+    try {
+      const res = await ghApi('/api/stats', 'GET');
+      if (!res.ok) throw new Error('stats HTTP ' + res.status);
+      const d = await res.json();
+      const out = { orders: d.orders || 0, users: d.users || 0 };
+      cacheSet('stats', out);
+      return out;
+    } catch (e) {
+      console.warn('[stats] /api/stats 失败，降级使用历史缓存', e);
+      return cacheGetStale('stats');                  // 可能为 null
+    } finally {
+      _statsInflight = null;
+    }
+  })();
+  return _statsInflight;
+}
+// 统一写 DOM（元素可能不存在，全部判空）；d 为 null 时以 '—' 表示暂不可用
+function applyStats(d) {
+  const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const ok = !!d;
+  const orders = ok ? d.orders : '—';
+  const users = ok ? d.users : '—';
+  set('statOrders', orders);      // 兼容旧首页，元素已移除时自动跳过
+  set('statUsers', users);
+  set('forumStatOrders', orders);
+  set('forumBizTaskCount', ok ? d.orders : '—');
+  set('forumStatOnline', ok ? (Math.max(1, Math.round((d.orders || 0) / 3)) + '+') : '—');
+  set('liveUsers', users);
+  // 轻量降级态：仅在统计卡片上标记，不打扰用户
+  const box = document.querySelector('.forum-stats');
+  if (box) {
+    box.classList.toggle('stats-degraded', !ok);
+    box.title = ok ? '' : '统计数据暂不可用，稍后自动重试';
+  }
+  return ok;
+}
+async function loadStats() {
+  applyStats(await fetchStats());   // 失败不再 reportError，无红色 toast
 }
 
 // v1.29.0 首页实时数据 + 最新互助动态
 async function loadHomeLiveData() {
-  try {
-    const res = await ghApi('/api/stats', 'GET');
-    if (res.ok) { const d = await res.json(); const u = document.getElementById('liveUsers'); if (u) u.textContent = d.users || 0; }
-  } catch(e) {}
+  applyStats(await fetchStats());   // v1.37.1 复用统一缓存，避免首页重复打 /api/stats
   try {
     const list = await ghIssues('order', 'open') || [];
     let total = list.length, inProg = 0, done = 0;
@@ -2747,7 +2826,7 @@ async function loadHomeLiveData() {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('liveTotal', total); set('liveProgress', inProg); set('liveDone', done);
     const sum = document.getElementById('liveSummary');
-    if (sum) sum.textContent = '注册 ' + (document.getElementById('liveUsers').textContent || 0) + ' · 订单 ' + total + ' · 完成 ' + done;
+    if (sum) sum.textContent = '注册 ' + ((document.getElementById('liveUsers') || {}).textContent || 0) + ' · 订单 ' + total + ' · 完成 ' + done;
     completed.sort((a,b) => b.t - a.t);
     const act = document.getElementById('liveActivity');
     if (act) {
