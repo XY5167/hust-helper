@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.39.1">
+<meta name="version" content="1.39.3">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2100,7 +2100,7 @@ async function aiModerate(title, content) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.39.1';
+const APP_VERSION = '1.39.3';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2794,6 +2794,11 @@ function previewForumImg(encUrl) {
 function setForumCampus(v) {
   S._forumCampus = campusCode(v);
   try { localStorage.setItem('hust_forum_campus', S._forumCampus); } catch (e) {}
+  // v1.39.3 C+A：切换校区后重算首页数据 + 提示
+  const cn = CAMPUS_NAMES[S._forumCampus] || '主校区';
+  if (typeof toast === 'function') toast('已切换至 ' + cn + '，首页互助内容将按本校筛选', 'info');
+  if (typeof loadHomeLiveData === 'function') loadHomeLiveData();
+  if (typeof loadForumStats === 'function') loadForumStats();
 }
 async function loadForumStats() {
   const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -2803,7 +2808,14 @@ async function loadForumStats() {
   try {
     const posts = await forumLoadPosts();
     const today = new Date().toISOString().slice(0, 10);
-    set('forumStatPosts', posts.filter(function (p) { return (p.created_at || '').slice(0, 10) === today; }).length);
+    // v1.39.3 C：今日新帖按校区过滤（主校区显示全部，其他校区只显示该校区）
+    const campusFilter = (S._forumCampus && S._forumCampus !== 'main') ? S._forumCampus : null;
+    const todayPosts = posts.filter(function (p) {
+      if ((p.created_at || '').slice(0, 10) !== today) return false;
+      if (!campusFilter) return true;
+      return (p.campus || 'main') === campusFilter;
+    });
+    set('forumStatPosts', todayPosts.length);
   } catch (e) {
     console.warn('[forumStats] 帖子统计失败', e);
     set('forumStatPosts', '—');
@@ -2890,9 +2902,15 @@ async function loadHomeLiveData() {
   applyStats(await fetchStats());   // v1.37.1 复用统一缓存，避免首页重复打 /api/stats
   try {
     const list = await ghIssues('order', 'open') || [];
-    let total = list.length, inProg = 0, done = 0;
+    // v1.39.3 C：按校区过滤（主校区显示全部，其他校区只显示该校区订单）
+    const campusFilter = (S._forumCampus && S._forumCampus !== 'main') ? S._forumCampus : null;
+    const listFiltered = campusFilter ? list.filter(function (i) {
+      let o; try { o = JSON.parse(i.body); } catch (e) { return false; }
+      return (o.campus || 'main') === campusFilter;
+    }) : list;
+    let total = listFiltered.length, inProg = 0, done = 0;
     const completed = [];
-    for (const i of list) {
+    for (const i of listFiltered) {
       let o; try { o = JSON.parse(i.body); } catch(e) { continue; }
       if (!o || typeof o !== 'object') continue;
       const s = o.status || 'open';
@@ -2901,6 +2919,11 @@ async function loadHomeLiveData() {
     }
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('liveTotal', total); set('liveProgress', inProg); set('liveDone', done);
+    // v1.39.3 C：校区过滤后覆盖首页订单统计数字
+    if (campusFilter) {
+      set('forumStatOrders', total);
+      set('forumBizTaskCount', total);
+    }
     const sum = document.getElementById('liveSummary');
     if (sum) sum.textContent = '注册 ' + ((document.getElementById('liveUsers') || {}).textContent || 0) + ' · 订单 ' + total + ' · 完成 ' + done;
     completed.sort((a,b) => b.t - a.t);
@@ -7265,6 +7288,7 @@ async function handlePublish(e) {
       ? window._publishOcr.chips.slice(0, 10) : [],
     status: 'open',
     ai_moderation: _aiMod.verdict !== 'safe' ? _aiMod : null,
+    campus: S._forumCampus || 'main',   // v1.39.3 订单带校区，供首页按校区筛选
     publisher_id: S.user._issue_number || S.user.student_id,
     publisher_name: S.user.nickname || S.user.name,
     publisher_student_id: S.user.student_id,
