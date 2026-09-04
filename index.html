@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.39.4">
+<meta name="version" content="1.39.5">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1099,9 +1099,9 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
           <span class="forum-cat-icon" style="background:#f0fdf4;color:#16a34a">🔄</span>
           <span class="forum-cat-label">闲置交易</span>
         </button>
-        <button class="forum-cat" onclick="openForumCat('dating')">
-          <span class="forum-cat-icon" style="background:#fdf2f8;color:#db2777">💖</span>
-          <span class="forum-cat-label">交友脱单</span>
+        <button class="forum-cat" onclick="openForumCat('lost')">
+          <span class="forum-cat-icon" style="background:#f0fdf4;color:#16a34a">🎒</span>
+          <span class="forum-cat-label">失物招领</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('activity')">
           <span class="forum-cat-icon" style="background:#fffbeb;color:#ca8a04">🎉</span>
@@ -1852,7 +1852,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <select id="forumPublishCat" class="form-control" required>
           <option value="tucao">💬 校园吐槽</option>
           <option value="study">📚 学习求助</option>
-          <option value="dating">💖 交友脱单</option>
+          <option value="lost">🎒 失物招领</option>
           <option value="activity">🎉 校园活动</option>
           <option value="confession">💌 表白墙</option>
           <option value="life">☕ 生活分享</option>
@@ -2109,7 +2109,7 @@ async function aiModerate(title, content) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.39.4';
+const APP_VERSION = '1.39.5';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2492,11 +2492,11 @@ function skeletonCards(n) {
 
 // ============ 论坛 / 校园圈（v1.37.0）============
 const FORUM_CATS = {
-  tucao: '校园吐槽', study: '学习求助', dating: '交友脱单',
+  tucao: '校园吐槽', study: '学习求助', lost: '失物招领',
   activity: '校园活动', confession: '表白墙', life: '生活分享'
 };
 const FORUM_CAT_ICON = {
-  tucao: '💬', study: '📚', dating: '💖', activity: '🎉', confession: '💌', life: '☕'
+  tucao: '💬', study: '📚', lost: '🎒', activity: '🎉', confession: '💌', life: '☕'
 };
 // v1.37.1 华科官方校区（唯一数据源，避免多处硬编码重复）
 const CAMPUSES = [
