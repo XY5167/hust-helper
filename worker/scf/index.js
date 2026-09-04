@@ -45,7 +45,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://tokenhub.te
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'hy3';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.39.2';
+const VERSION = '1.39.3';
 
 // 白名单：仅放行本仓库的 issues（含子路径 /comments），拒绝其它仓库/敏感路径
 const REPO_ESC = REPO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -225,10 +225,12 @@ async function tc3Request(opts) {
   } finally { clearTimeout(timer); }
 }
 
-// ---- 腾讯混元 / TokenHub 大模型（OpenAI 兼容接口）----
+// ---- 通用大模型（OpenAI 兼容接口：腾讯 TokenHub / 智谱 GLM / 其他）----
+// 支持多供应商切换：仅需在 SCF 环境变量配 TOKENHUB_API_KEY / TOKENHUB_MODEL / TOKENHUB_BASE_URL。
+// 例：智谱 GLM-4.7-Flash（免费）= https://open.bigmodel.cn/api/paas/v4 + glm-4.7-flash
 async function callHunyuan(messages) {
   if (!TOKENHUB_API_KEY) throw new Error('TOKENHUB_NOT_CONFIGURED');
-  const body = JSON.stringify({
+  const buildBody = () => JSON.stringify({
     model: TOKENHUB_MODEL,
     messages: messages.map(m => ({
       role: (m.role === 'system') ? 'system'
@@ -238,23 +240,39 @@ async function callHunyuan(messages) {
     })),
     temperature: 0.7
   });
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 20000);
-  try {
-    const r = await fetch(TOKENHUB_BASE_URL + '/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + TOKENHUB_API_KEY,
-        'Content-Type': 'application/json'
-      },
-      body,
-      signal: ctl.signal
-    });
-    const json = await r.json();
-    if (!r.ok) throw new Error((json.error && json.error.message) || 'TOKENHUB_ERROR');
-    if (!json.choices || !json.choices[0] || !json.choices[0].message) throw new Error('TOKENHUB_EMPTY');
-    return json.choices[0].message.content;
-  } finally { clearTimeout(timer); }
+  const sleep = ms => new Promise(res => setTimeout(res, ms));
+  // 免费模型（如 GLM-4.7-Flash）偶发 429 限流：最多重试 2 次，退避 1.2s / 2.5s
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 20000);
+    try {
+      const r = await fetch(TOKENHUB_BASE_URL + '/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + TOKENHUB_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: buildBody(),
+        signal: ctl.signal
+      });
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        // 429 / 1305 = 限流，退避后重试
+        if (r.status === 429 || (json.error && (json.error.code === '1305' || String(json.error.code || '').indexOf('429') >= 0))) {
+          if (attempt < MAX_ATTEMPTS) { await sleep(attempt === 1 ? 1200 : 2500); continue; }
+        }
+        throw new Error((json.error && json.error.message) || 'LLM_ERROR');
+      }
+      if (!json.choices || !json.choices[0] || !json.choices[0].message) throw new Error('LLM_EMPTY');
+      const msg = json.choices[0].message;
+      // 部分思考模型 content 为空时，退回 reasoning_content（首次请求一般不会发生）
+      if (msg.content && String(msg.content).trim()) return String(msg.content);
+      if (msg.reasoning_content && String(msg.reasoning_content).trim()) return String(msg.reasoning_content);
+      throw new Error('LLM_EMPTY');
+    } finally { clearTimeout(timer); }
+  }
+  throw new Error('LLM_RETRY_EXHAUSTED');
 }
 
 // ---- 腾讯云 OCR 通用文字识别（GeneralBasicOCR，免费 1000 次/月）----
