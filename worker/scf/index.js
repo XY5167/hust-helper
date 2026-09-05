@@ -45,7 +45,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://tokenhub.te
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'hy3';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.39.4';
+const VERSION = '1.40.0';
 
 // 白名单：仅放行本仓库的 issues（含子路径 /comments），拒绝其它仓库/敏感路径
 const REPO_ESC = REPO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -303,6 +303,142 @@ function extractJson(text) {
   const m = text.match(/\{[\s\S]*\}/);
   if (m) { try { return JSON.parse(m[0]); } catch (e) {} }
   return null;
+}
+
+// ---- 失物招领 AI 智能匹配 ----
+// v1.40.0：物品归一化字典（20 类高频校园失物）
+const LOST_ITEM_DICT = [
+  { key:'card',      label:'校园卡/学生证', kws:['校园卡','学生证','一卡通','饭卡','身份证'] },
+  { key:'umbrella',  label:'雨伞',         kws:['雨伞','伞','折叠伞'] },
+  { key:'book',      label:'书本',         kws:['书','教材','课本','习题册','高数','线代','马原'] },
+  { key:'notebook',  label:'笔记本电脑',   kws:['笔记本','电脑','macbook','thinkpad','联想','戴尔','华为','小米笔记本'] },
+  { key:'phone',     label:'手机',         kws:['手机','iphone','华为','小米','oppo','vivo','荣耀','安卓'] },
+  { key:'key',       label:'钥匙',         kws:['钥匙','钥匙扣','车钥匙','宿舍钥匙'] },
+  { key:'bottle',    label:'水杯/水瓶',    kws:['水杯','水瓶','保温杯','杯子'] },
+  { key:'glasses',   label:'眼镜',         kws:['眼镜','墨镜','近视镜','太阳镜','镜框'] },
+  { key:'wallet',    label:'钱包',         kws:['钱包','卡包','皮夹'] },
+  { key:'headphone', label:'耳机',         kws:['耳机','蓝牙耳机','airpods','有线耳机','头戴'] },
+  { key:'charger',   label:'充电器/充电宝',kws:['充电器','充电宝','数据线','充电头','移动电源'] },
+  { key:'coat',      label:'外套/衣物',    kws:['外套','衣服','上衣','夹克','卫衣','羽绒服','毛衣'] },
+  { key:'pen',       label:'文具',         kws:['笔','文具','钢笔','中性笔','签字笔','文具盒'] },
+  { key:'calculator',label:'计算器',       kws:['计算器','卡西欧','计算器科学'] },
+  { key:'card_other',label:'其他卡类',     kws:['银行卡','公交卡','会员卡','健身卡','水卡'] },
+  { key:'usb',       label:'U盘/硬盘',     kws:['u盘','优盘','移动硬盘','硬盘'] },
+  { key:'watch',     label:'手表',         kws:['手表','腕表','电子表','智能手环','手环'] },
+  { key:'bag',       label:'书包/背包',    kws:['书包','背包','双肩包','斜挎包','手提包','电脑包'] },
+  { key:'bicycle',   label:'自行车',       kws:['自行车','单车','山地车','小电驴','电动车'] },
+  { key:'other',     label:'其他',         kws:[] }
+];
+
+// 抽取物品归一化 key
+function classifyLostItem(text) {
+  if (!text) return 'other';
+  const s = String(text);
+  for (const cat of LOST_ITEM_DICT) {
+    for (const kw of cat.kws) { if (s.includes(kw)) return cat.key; }
+  }
+  return 'other';
+}
+
+// 校区归一化（前后端约定：main/tongji/wangan/junshan/empty）
+function normalizeCampus(c) {
+  const s = String(c || '').trim().toLowerCase();
+  if (['main','tongji','wangan','junshan'].includes(s)) return s;
+  return 'main';
+}
+
+// 字符串相似度（Jaccard，按字）
+function jaccardStr(a, b) {
+  if (!a || !b) return 0;
+  const sa = new Set(String(a).replace(/\s+/g,'').split(''));
+  const sb = new Set(String(b).replace(/\s+/g,'').split(''));
+  let inter = 0;
+  for (const x of sa) if (sb.has(x)) inter++;
+  const uni = sa.size + sb.size - inter;
+  return uni > 0 ? inter / uni : 0;
+}
+
+// 最长公共子串（≥5 字符视作相近）
+function longestCommonSubstr(a, b, minLen) {
+  if (!a || !b) return 0;
+  const sa = String(a), sb = String(b);
+  const m = sa.length, n = sb.length;
+  if (m === 0 || n === 0) return 0;
+  let best = 0;
+  const dp = Array.from({length:m+1}, () => new Array(n+1).fill(0));
+  for (let i=1;i<=m;i++) for (let j=1;j<=n;j++) {
+    if (sa[i-1] === sb[j-1]) { dp[i][j] = dp[i-1][j-1] + 1; if (dp[i][j] > best) best = dp[i][j]; }
+    else dp[i][j] = 0;
+  }
+  return best;
+}
+
+// 计算两个失物帖的匹配分数（4 维度满分 100）
+//   campus 35 + item 30 + time 20 + location 15
+function scoreLostMatch(self, other) {
+  const reasons = [];
+  let score = 0;
+
+  // 校区 35
+  const cSelf = normalizeCampus(self.campus);
+  const cOther = normalizeCampus(other.campus);
+  if (cSelf === cOther) { score += 35; reasons.push('📍 同校区'); }
+
+  // 物品 30（归一化字典相同 +30；关键词重叠度最高 +15）
+  const itemSelf = classifyLostItem((self.item || '') + ' ' + (self.title || '') + ' ' + (self.content || ''));
+  const itemOther = classifyLostItem((other.item || '') + ' ' + (other.title || '') + ' ' + (other.content || ''));
+  if (itemSelf === itemOther && itemSelf !== 'other') { score += 30; reasons.push('🎒 物品类型相似'); }
+  else if (itemSelf !== 'other' && itemOther !== 'other') { score += 15; }
+
+  // 时间 20（丢帖早于捡帖且 ≤30d +20；±6h 强互补额外 +10）
+  const t1 = Date.parse(self.time_bucket || '') || 0;
+  const t2 = Date.parse(other.time_bucket || '') || 0;
+  if (t1 && t2) {
+    const diffH = Math.abs(t1 - t2) / 3600000;
+    const days = diffH / 24;
+    if (days <= 30) { score += 20; if (diffH <= 6) { score += 10; reasons.push('⏰ 时间互补'); } }
+  }
+
+  // 地点 15（最长公共子串≥5 或 Jaccard>0.5）
+  const locSelf = String(self.location || '');
+  const locOther = String(other.location || '');
+  const lcs = longestCommonSubstr(locSelf, locOther, 5);
+  const jc = jaccardStr(locSelf, locOther);
+  if (lcs >= 5 || jc > 0.5) { score += 15; reasons.push('🧭 地点相近'); }
+
+  return { score, reasons };
+}
+
+// 从已发布 Issues 列表中找反向失物帖（lost_type 不同），算 Top3
+function matchLostItems(extract, lostType, recentIssues) {
+  try {
+    const myType = String(lostType || 'lost'); // lost | found
+    const reverseType = myType === 'lost' ? 'found' : 'lost';
+    const cSelf = normalizeCampus(extract.campus);
+    const scored = [];
+    for (const it of (recentIssues || [])) {
+      if (!it) continue;
+      if (String(it.cat || '') !== 'lost') continue;
+      const itsType = String(it.lost_type || (myType === 'lost' ? 'found' : 'lost'));
+      if (itsType !== reverseType) continue;
+      // 校区过滤：同校区优先（跨校区暂不算）
+      const cOther = normalizeCampus(it.campus);
+      if (cSelf !== cOther) continue;
+      const r = scoreLostMatch({
+        item: extract.item, location: extract.location, time_bucket: extract.time_bucket, campus: cSelf,
+        title: extract.title, content: extract.content
+      }, {
+        item: it.ai_extract && it.ai_extract.item || '', location: it.ai_extract && it.ai_extract.location || '',
+        time_bucket: it.ai_extract && it.ai_extract.time_bucket || '', campus: cOther,
+        title: it.title || '', content: it.body_text || ''
+      });
+      if (r.score >= 50) scored.push({ id: it.number, score: r.score, reasons: r.reasons });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 3);
+  } catch (e) {
+    return [];
+  }
 }
 
 // ---- CORS：仅允许白名单来源，不用 * ----
@@ -764,6 +900,53 @@ const server = http.createServer(async (req, res) => {
               suggestion: (parsed.suggestion || '').toString().slice(0, 120)
             });
           } catch (e) { return sendJSON(res, 502, { error: e.message }, headers); }
+        }
+
+        // v1.40.0: 失物招领 AI 抽取 + 匹配（GLM 抽结构化 + 4 维度规则打分）
+        if (method === 'POST' && path === '/api/ai/extract-lost') {
+          if (rateLimited(clientIp(req), AI_RATE_LIMIT)) return sendJSON(res, 429, { error: 'RATE_LIMITED' }, headers);
+          const { title, content, campus, lost_type, recent_issues } = ghBody || {};
+          const sysPrompt = '你是校园失物招领信息抽取助手。从用户发布的中文文本中抽取 4 个字段，返回严格 JSON：' +
+            '{"item":"物品归一化类别（短词，如：校园卡/雨伞/手机/书本/钥匙/钱包 等）","location":"地点短语（如：东九楼 3 楼、西一食堂二楼、韵苑路口）","time_bucket":"事件时间（YYYY-MM-DD HH，缺失则填 unknown）","campus":"main/tongji/wangan/junshan/empty（华科主校区/同济/网安/军山/空）"}' +
+            '。要求：只输出 JSON，不要任何解释、不要 markdown 代码块、不要多余文字。';
+          let aiExtract = null;
+          try {
+            const text = '标题：' + (title || '（无）') + '\n内容：' + (content || '（无）');
+            const c = await callHunyuan([
+              { role: 'system', content: sysPrompt },
+              { role: 'user', content: text }
+            ]);
+            const parsed = extractJson(c);
+            if (parsed && parsed.item) aiExtract = {
+              item: String(parsed.item || '').slice(0, 30),
+              location: String(parsed.location || '').slice(0, 60),
+              time_bucket: /^\d{4}-\d{2}-\d{2} \d{2}$/.test(parsed.time_bucket || '') ? parsed.time_bucket : 'unknown',
+              campus: normalizeCampus(parsed.campus || campus || '')
+            };
+          } catch (e) { /* fail-open：LLM 失败时 aiExtract=null，降级到正则 */ }
+
+          // LLM 失败/无效时降级到正则抽取
+          if (!aiExtract) {
+            const allTxt = String(title || '') + ' ' + String(content || '');
+            aiExtract = {
+              item: LOST_ITEM_DICT.find(cat => cat.kws.some(kw => allTxt.includes(kw)))?.label || '其他',
+              location: 'unknown',
+              time_bucket: 'unknown',
+              campus: normalizeCampus(campus || '')
+            };
+          }
+
+          // 算匹配（传 recent_issues 数组）
+          let matches = [];
+          try {
+            const norm = (Array.isArray(recent_issues) ? recent_issues : []).map(it => ({
+              number: it.number, cat: it.cat, lost_type: it.lost_type,
+              ai_extract: it.ai_extract, title: it.title, body_text: it.body_text, campus: it.campus
+            }));
+            matches = matchLostItems(aiExtract, lost_type, norm);
+          } catch (e) { matches = []; }
+
+          return sendJSON(res, 200, { ok: true, ai_extract: aiExtract, matches });
         }
 
         let ghPath = '';

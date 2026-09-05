@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.39.6">
+<meta name="version" content="1.40.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -699,6 +699,26 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .ai-fab{position:fixed;right:20px;bottom:24px;z-index:200;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,#6366f1,#1a73e8);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
 .ai-fab:hover{transform:translateY(-3px) scale(1.05);box-shadow:var(--shadow-xl)}
 .ai-fab:active{transform:scale(.95)}
+
+/* v1.40.0 失物招领 AI 匹配角标 + 详情匹配区 */
+.forum-ai-badge{display:inline-block;margin:6px 0 0;padding:5px 12px;background:linear-gradient(135deg,#f0f7ff 0%,#e6f1ff 100%);border:1px solid #b8d8ff;border-radius:99px;color:#185fa5;font-size:12px;font-weight:600;letter-spacing:.2px}
+.forum-ai-badge::before{content:'✨ ';font-size:11px}
+.ai-lost-matches{margin:14px 0;padding:14px;background:linear-gradient(135deg,#f8fbff 0%,#eef5fc 100%);border:1px solid #c8dffa;border-radius:12px;box-shadow:0 2px 8px rgba(24,95,165,.06)}
+.ai-lost-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.ai-lost-icon{font-size:20px;animation:aiPulse 2s ease-in-out infinite}
+@keyframes aiPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+.ai-lost-title{font-weight:700;color:#185fa5;font-size:14px}
+.ai-lost-extract{font-size:12px;color:var(--text-secondary);margin:6px 0 10px;padding:6px 10px;background:#fff;border-radius:6px;border-left:3px solid #b8d8ff;line-height:1.5}
+.ai-lost-list{display:flex;flex-direction:column;gap:8px}
+.ai-lost-item{padding:10px;background:#fff;border:1px solid #e1ecf7;border-radius:8px;transition:all .2s}
+.ai-lost-item:hover{border-color:#b8d8ff;box-shadow:0 2px 6px rgba(24,95,165,.1);transform:translateY(-1px)}
+.ai-lost-item-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.ai-lost-score{display:inline-block;padding:2px 10px;background:linear-gradient(135deg,#185fa5,#3680c8);color:#fff;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.3px}
+.ai-lost-item-title{font-size:13px;color:var(--text-secondary);font-weight:500}
+.ai-lost-reasons{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.ai-lost-reason{display:inline-block;padding:3px 9px;background:#f0f7ff;color:#185fa5;border-radius:99px;font-size:11px;font-weight:600;border:1px solid #d8e9fa}
+.ai-lost-btn{padding:5px 14px;font-size:12px;background:linear-gradient(135deg,#185fa5,#3680c8);color:#fff;border:none;border-radius:99px;cursor:pointer;font-weight:600;transition:all .2s}
+.ai-lost-btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(24,95,165,.3)}
 .wheel-fab{position:fixed;right:88px;bottom:24px;z-index:200;width:52px;height:52px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--accent),#fb923c);color:#fff;font-size:1.5rem;line-height:1;cursor:pointer;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
 .wheel-fab:hover{transform:translateY(-3px) scale(1.05) rotate(12deg);box-shadow:var(--shadow-xl)}
 .wheel-fab:active{transform:scale(.95)}
@@ -1878,7 +1898,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     <form id="forumPublishForm" onsubmit="event.preventDefault();submitForumPost();">
       <div class="form-group">
         <label>分类</label>
-        <select id="forumPublishCat" class="form-control" required>
+        <select id="forumPublishCat" class="form-control" required onchange="onForumCatChange()">
           <option value="tucao">💬 校园吐槽</option>
           <option value="study">📚 学习求助</option>
           <option value="lost">🎒 失物招领</option>
@@ -1886,6 +1906,21 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
           <option value="confession">💌 表白墙</option>
           <option value="life">☕ 生活分享</option>
         </select>
+      </div>
+      <!-- v1.40.0 失物招领：丢失/捡到单选 -->
+      <div class="form-group" id="forumPublishLostTypeGroup" style="display:none">
+        <label>类型</label>
+        <div style="display:flex;gap:18px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:500">
+            <input type="radio" name="forumPublishLostType" value="lost" checked>
+            <span>😢 我丢了东西</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:500">
+            <input type="radio" name="forumPublishLostType" value="found">
+            <span>🙌 我捡到了</span>
+          </label>
+        </div>
+        <div style="margin-top:6px;font-size:12px;color:var(--text-secondary);line-height:1.5">🤖 AI 会自动从你的描述里抽取「物品/地点/时间」并匹配反向帖</div>
       </div>
       <div class="form-group">
         <label>标题</label>
@@ -2137,8 +2172,76 @@ async function aiModerate(title, content) {
   return { verdict: 'safe', confidence: 0, reason: '', suggestion: '' };
 }
 
+// v1.40.0 失物招领 AI 抽取+匹配：建帖后异步调用，匹配后写回 issue body 并双向通知
+async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType) {
+  try {
+    // 简易 JSON 解析与 HTML 剥离（避免依赖不存在的工具函数）
+    const tryJson = function (s) { try { return JSON.parse(s); } catch (e) { return null; } };
+    const stripH = function (s) { return String(s || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); };
+
+    // 拉近 30 天反向失物帖列表（同校区同 cat）
+    const recent = await forumLoadPosts({ cat: 'lost', campus: campusCode(campus) });
+    const recentList = (recent || [])
+      .filter(function (p) { return p && p.number && p.number !== issueNum && (p.campus || 'main') === campusCode(campus); })
+      .slice(0, 80)
+      .map(function (p) {
+        let ai = null;
+        if (p.ai_extract) ai = (typeof p.ai_extract === 'string') ? tryJson(p.ai_extract) : p.ai_extract;
+        return {
+          number: p.number, cat: 'lost', lost_type: p.lost_type || 'lost',
+          ai_extract: ai, title: p.title || '', body_text: stripH(p.content || '').slice(0, 200),
+          campus: p.campus || 'main'
+        };
+      });
+
+    const res = await ghApi('/api/ai/extract-lost', 'POST', {
+      title: title, content: content, campus: campus, lost_type: lostType, recent_issues: recentList
+    }, { timeout: 28000, retries: 1 });
+    if (!res || !res.ok) return;
+    const data = await res.json();
+    if (!data || !data.ok) return;
+
+    // 把抽取结果与匹配写回 issue body（保留其它字段）
+    let cur = null;
+    try {
+      const r2 = await ghApi('/gh/repos/' + REPO + '/issues/' + issueNum, 'GET');
+      if (r2 && r2.ok) cur = await r2.json();
+    } catch (_) {}
+    const curBody = (cur && cur.body) ? (tryJson(cur.body) || {}) : {};
+    curBody.ai_extract = data.ai_extract || null;
+    curBody.ai_matches = Array.isArray(data.matches) ? data.matches : [];
+    curBody.lost_type = lostType;
+    await ghUpdateIssue(issueNum, JSON.stringify(curBody));
+
+    // 双向通知：当前用户看到 AI 匹配结果 + 匹配候选帖作者收到"AI 帮你找到"推送
+    const me = S.user;
+    if (data.matches && data.matches.length > 0) {
+      const summary = '🤖 AI 帮你找到 ' + data.matches.length + ' 个可能匹配：' + (data.ai_extract && data.ai_extract.item ? ('「'+data.ai_extract.item+'」') : '');
+      // 通知当前用户（自己）
+      if (me && (me._issue_number || me.student_id)) {
+        try { sendNotify('🤖 AI 失物匹配', summary, { icon: '🎯', link: 'forum:lost:' + issueNum }); } catch(_){}
+      }
+      // 通知候选匹配帖作者
+      for (const m of data.matches) {
+        try {
+          const r3 = await ghApi('/gh/repos/' + REPO + '/issues/' + m.id, 'GET');
+          if (r3 && r3.ok) {
+            const t = await r3.json();
+            const authorSid = (tryJson(t.body || '{}') || {}).author_sid;
+            if (authorSid && me && authorSid !== me.student_id) {
+              sendNotify('🤖 AI 帮你找到了', '你的失物帖「' + (t.title || '').replace(/^\[论坛\]/, '') + '」可能与新帖匹配（' + (data.ai_extract && data.ai_extract.item || '物品相似') + '）', { icon: '🎯', link: 'forum:lost:' + m.id });
+            }
+          }
+        } catch (_) {}
+      }
+      try { cacheBust('forum'); } catch (_){}
+      try { if (typeof loadForumPosts === 'function') loadForumPosts(); } catch(_){}
+    }
+  } catch (e) { /* fail-silent: AI 抽取失败不打扰用户 */ }
+}
+
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.39.6';
+const APP_VERSION = '1.40.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2604,8 +2707,35 @@ function forumPostCardHTML(p) {
     + '</div>'
     + '<div class="forum-card-title">' + esc(p.title) + '</div>'
     + (p.content ? '<div class="forum-card-content">' + esc(p.content) + '</div>' : '')
-    + imgs + foot + '</div>';
+    + imgs
+    + (p.cat === 'lost' && Array.isArray(p.ai_matches) && p.ai_matches.length > 0 ? '<div class="forum-ai-badge">🤖 AI 找到 ' + p.ai_matches.length + ' 个可能匹配</div>' : '')
+    + foot + '</div>';
 }
+// v1.40.0 失物招领 AI 匹配区渲染（详情页用，p.ai_matches 为空/null 时返回空串，绝不阻塞渲染）
+function renderAiLostMatches(p) {
+  if (!p || p.cat !== 'lost') return '';
+  const matches = Array.isArray(p.ai_matches) ? p.ai_matches : [];
+  if (matches.length === 0) return '';
+  const extract = p.ai_extract || {};
+  let html = '<div class="ai-lost-matches">';
+  html += '<div class="ai-lost-header"><span class="ai-lost-icon">🤖</span><span class="ai-lost-title">AI 帮你找到 ' + matches.length + ' 个可能匹配</span></div>';
+  if (extract.item || extract.location) {
+    html += '<div class="ai-lost-extract">📦 抽取：' + esc(extract.item || '未知物品') + (extract.location ? ' · 📍 ' + esc(extract.location) : '') + (extract.time_bucket && extract.time_bucket !== 'unknown' ? ' · ⏰ ' + esc(extract.time_bucket) : '') + '</div>';
+  }
+  html += '<div class="ai-lost-list">';
+  for (const m of matches) {
+    const reasons = Array.isArray(m.reasons) ? m.reasons : [];
+    html += '<div class="ai-lost-item">'
+      + '<div class="ai-lost-item-head"><span class="ai-lost-score">' + (m.score || 0) + ' 分</span>'
+      + '<span class="ai-lost-item-title">#' + m.id + '</span></div>'
+      + (reasons.length ? '<div class="ai-lost-reasons">' + reasons.map(function (r) { return '<span class="ai-lost-reason">' + esc(r) + '</span>'; }).join('') + '</div>' : '')
+      + '<button class="btn btn-sm ai-lost-btn" onclick="openForumDetail(' + m.id + ')">查看原帖 ↗</button>'
+      + '</div>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
 async function loadForumFeed() {
   const el = document.getElementById('forumFeed'); if (!el) return;
   try {
@@ -2665,6 +2795,7 @@ async function loadForumDetail(num) {
       + '<h2 class="forum-detail-title">' + esc(p.title) + '</h2>'
       + '<div class="forum-detail-content">' + esc(p.content).replace(/\n/g, '<br>') + '</div>'
       + imgs
+      + renderAiLostMatches(p)
       + '<div class="forum-card-foot"><span class="forum-like-btn" onclick="toggleForumLike(' + num + ')">❤️ <span id="forumLikeNum">' + (p.upvotes || 0) + '</span></span><span>💬 ' + (p.comment_count || p._comments || 0) + '</span><span>👁️ ' + (p.views || 0) + '</span><span class="forum-report-btn" onclick="reportForumPost(' + num + ')">⚠️ 举报</span></div>'
       + '</div>';
     await renderForumComments(num);
@@ -2739,11 +2870,17 @@ function showForumPublishModal() {
   const m = document.getElementById('forumPublishModal'); if (m) m.style.display = 'flex';
   const catSel = document.getElementById('forumPublishCat');
   if (catSel && S._forumCat) catSel.value = S._forumCat;
+  onForumCatChange();
   // v1.37.1 同步顶部已选校区（并防御性重建 option，避免首屏初始化失败时下拉为空）
   fillCampusSelect('forumPublishCampus', S._forumCampus);
   S._forumImages = [];
   const prev = document.getElementById('forumPublishImages'); if (prev) prev.innerHTML = '';
   const err = document.getElementById('forumPublishError'); if (err) { err.style.display = 'none'; err.textContent = ''; }
+}
+function onForumCatChange() {
+  const cat = (document.getElementById('forumPublishCat') || {}).value;
+  const grp = document.getElementById('forumPublishLostTypeGroup');
+  if (grp) grp.style.display = (cat === 'lost') ? '' : 'none';
 }
 function closeForumPublishModal() {
   const m = document.getElementById('forumPublishModal'); if (m) m.style.display = 'none';
@@ -2798,6 +2935,12 @@ async function submitForumPost() {
     if (!go) { err.style.display = 'none'; btn.disabled = false; btn.textContent = '发布'; return; }
   }
   btn.disabled = true; btn.textContent = '发布中…';
+  // v1.40.0 失物招领：cat=lost 时取 lost_type（丢失/捡到），其它默认 lost
+  let lostType = 'lost';
+  if (cat === 'lost') {
+    const r = document.querySelector('input[name="forumPublishLostType"]:checked');
+    if (r && r.value) lostType = r.value;
+  }
   try {
     const bodyObj = {
       type: 'forum', cat: cat, title: title, content: content, campus: campus,
@@ -2811,6 +2954,11 @@ async function submitForumPost() {
       upvotes: 0, views: 0, comment_count: 0,
       created_at: new Date().toISOString(), status: 'open'
     };
+    if (cat === 'lost') {
+      bodyObj.lost_type = lostType;
+      bodyObj.ai_extract = null;
+      bodyObj.ai_matches = [];
+    }
     const labels = ['forum', 'forum-' + cat];
     const created = await ghCreateIssue('[论坛]' + title, JSON.stringify(bodyObj), labels);
     if (err) err.style.display = 'none';
@@ -2823,6 +2971,11 @@ async function submitForumPost() {
     setForumCampus(campus);
     cacheBust('forum');
     navigate('forum');
+
+    // v1.40.0 失物招领 AI 智能匹配：异步调后端抽取 + 匹配 + 写回 issue + 双向通知（不阻塞 UI）
+    if (cat === 'lost' && created && created.number) {
+      aiExtractAndMatchLost(created.number, title, content, campus, lostType).catch(function (e) { try { console.warn('AI 抽取失败:', e); } catch(_){} });
+    }
   } catch (e) {
     err.textContent = '发布失败：' + (e.message || '请重试'); err.style.display = 'block';
   } finally {
