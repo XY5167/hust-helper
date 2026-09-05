@@ -723,9 +723,9 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .wheel-add-row input{flex:1 1 auto;min-width:0;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font-size:.85rem;background:var(--bg-card);color:var(--text)}
 .wheel-add-row input:focus{outline:none;border-color:var(--primary)}
 .wheel-actions{display:flex;gap:10px;justify-content:center;align-items:center;margin:8px 0 6px;flex-wrap:wrap;min-height:44px}
-#wheelSpinBtn,#wheelSpinMain{min-width:120px;font-size:1rem;font-weight:700;padding:11px 24px;border-radius:99px;box-shadow:0 6px 18px rgba(24,95,165,.35)}
-#wheelSpinMain:hover,#wheelSpinBtn:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(24,95,165,.42)}
-#wheelSpinMain:disabled,#wheelSpinBtn:disabled{opacity:.65;transform:none;cursor:not-allowed}
+#wheelSpinMain{min-width:120px;font-size:1rem;font-weight:700;padding:11px 24px;border-radius:99px;box-shadow:0 6px 18px rgba(24,95,165,.35)}
+#wheelSpinMain:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(24,95,165,.42)}
+#wheelSpinMain:disabled{opacity:.65;transform:none;cursor:not-allowed}
 .wheel-ai-note{text-align:center;font-size:.74rem;color:var(--text-dim,#888);margin:4px 0 0;min-height:16px}
 .ai-panel{position:fixed;right:20px;bottom:92px;z-index:201;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 130px),calc(100dvh - 130px));background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);display:none;flex-direction:column;overflow:hidden}
 .ai-panel.open{display:flex;animation:aiPop .18s var(--ease)}
@@ -9336,7 +9336,6 @@ if ('serviceWorker' in navigator) {
 
     <!-- 操作 -->
     <div class="wheel-actions">
-      <button class="btn btn-brand" id="wheelSpinBtn" onclick="spinWheel()">🎯 开转</button>
       <button class="btn btn-sm" onclick="wheelResetDefault()">↺ 恢复默认</button>
     </div>
     <p style="text-align:center;color:var(--text-dim,#888);font-size:.72rem;margin:8px 0 0">纯娱乐小工具 · 选项自动保存在本机浏览器</p>
