@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.40.1">
+<meta name="version" content="1.41.0">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -535,6 +535,12 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 #page-task .order-card-author{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 #page-task .order-card-avatar{width:30px;height:30px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:600;flex:0 0 auto}
 #page-task .order-card-byline{font-size:.74rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* v1.41.0 二手教材 AI 分类标签 + 科目筛选条 */
+.book-meta-tag{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.book-meta-chip{display:inline-flex;align-items:center;font-size:.7rem;padding:2px 8px;border-radius:99px;background:#e0f2fe;color:#0369a1;font-weight:500;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.book-meta-chip.grade{background:#f3e8ff;color:#7e22ce}
+.filter-label{font-size:.78rem;color:var(--text-muted);align-self:center;margin-right:4px;white-space:nowrap}
 
 /* v1.28.0 交易状态机步骤条 */
 .trade-steps{display:flex;align-items:flex-start;margin:14px 0 6px}
@@ -1422,6 +1428,8 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <button class="filter-btn" data-goods-sub="rent" onclick="switchGoodsSubTab('rent')">📦 短期租借</button>
     </div>
     <div class="filter-bar" id="goodsCategoryFilters" style="display:none;margin-top:4px"></div>
+    <!-- v1.41.0 二手教材科目筛选：从 AI 识别出的科目动态聚合 -->
+    <div class="filter-bar" id="bookSubjectFilters" style="display:none;margin-top:4px"></div>
     <!-- 问答子分类 -->
     <div class="filter-bar" id="qaFilters" style="display:none">
       <button class="filter-btn active" data-filter="all" onclick="filterOrders('qa','all')">全部</button>
@@ -1608,6 +1616,15 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <div class="form-group">
         <label>子分类</label>
         <select id="publishCategory" onchange="updateFoodPublishTip()"></select>
+      </div>
+      <!-- v1.41.0 二手书籍信息：传图后 AI 自动识别填充，用户可随时手改 -->
+      <div class="form-group" id="bookMetaGroup" style="display:none">
+        <label>📚 书籍信息（选填）<span id="bookAiHint" style="font-weight:400;color:var(--text-muted);font-size:.75rem"></span></label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="publishBookTitle" maxlength="40" placeholder="书名，如：高等数学 第七版" style="flex:2">
+          <input type="text" id="publishBookSubject" maxlength="20" placeholder="科目，如：微积分" style="flex:1">
+        </div>
+        <p class="form-hint">填了科目后，买家可在列表按科目一键筛选，搜「微积分」也能直接命中这本书</p>
       </div>
       <div class="form-group">
         <label>标题</label>
@@ -2143,7 +2160,7 @@ const EMAILJS_SERVICE_ID = 'service_2ngckrm';
 const EMAILJS_TEMPLATE_ID = 'template_qfwrpts';
 const EMAILJS_PUBLIC_KEY = 'Qi_-O5OdtoznNnzjw';
 
-const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all', find: 'all' }, taskTab: 'task', myTab: 'all', myPublishedSubTab: 'order', goodsSubTab: 'all', goodsCategory: 'all' };
+const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all', find: 'all' }, taskTab: 'task', myTab: 'all', myPublishedSubTab: 'order', goodsSubTab: 'all', goodsCategory: 'all', bookSubject: '' };  // v1.41.0 bookSubject=选中的教材科目
 
 // ============ 敏感词过滤 ============
 const SENSITIVE_WORDS = new Set([
@@ -2268,7 +2285,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.40.1';
+const APP_VERSION = '1.41.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3682,6 +3699,16 @@ function renderOrders(orders) {
       + (o.location ? ' · 📍' + esc(o.location) : '')
       + '</div></div>'
       + thumbHTML
+      // v1.41.0 二手教材 AI 分类标签（科目 + 学期），没识别到就不占空间
+      + (function () {
+          const bm = (o.category === 'book' || o.category === 'textbook') ? (o.ai_book_meta || null) : null;
+          if (!bm || (!bm.subject && !bm.book_title)) return '';
+          return '<div class="book-meta-tag">'
+            + (bm.subject ? '<span class="book-meta-chip">📚 ' + esc(bm.subject) + '</span>'
+                          : '<span class="book-meta-chip">📖 ' + esc(bm.book_title) + '</span>')
+            + (bm.grade ? '<span class="book-meta-chip grade">🎓 ' + esc(bm.grade) + '</span>' : '')
+            + '</div>';
+        })()
       + '<div class="order-card-title">' + esc(o.title) + urgencyBadge + '</div>'
       + (o.description ? '<div class="order-card-desc">' + esc(o.description) + '</div>' : '')
       + '<div class="order-card-meta">'
@@ -3700,6 +3727,37 @@ function renderOrders(orders) {
   }).join('');
 
   if (pager) renderTaskPager(pager, totalPages, orders.length);
+  renderBookSubjectFilters();        // v1.41.0 教材科目 chips（基于缓存全量聚合，选科后不会只剩自己）
+}
+
+// ============ v1.41.0 二手教材科目筛选（AI 分类动态聚合）============
+function renderBookSubjectFilters() {
+  const bar = document.getElementById('bookSubjectFilters');
+  if (!bar) return;
+  const list = _cachedOrders || [];
+  const counts = {};
+  list.forEach(o => {
+    if ((o.category === 'book' || o.category === 'textbook') && o.ai_book_meta && o.ai_book_meta.subject) {
+      counts[o.ai_book_meta.subject] = (counts[o.ai_book_meta.subject] || 0) + 1;
+    }
+  });
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  if (top.length === 0) { bar.innerHTML = ''; bar.style.display = 'none'; S.bookSubject = ''; return; }
+  let html = '<span class="filter-label">📚 科目：</span>'
+    + '<button class="filter-btn' + (S.bookSubject ? '' : ' active') + '" onclick="filterBookSubject(\'\')">全部</button>';
+  top.forEach(function (kv) {
+    html += '<button class="filter-btn' + (S.bookSubject === kv[0] ? ' active' : '') + '" data-book-subject="' + esc(kv[0]) + '"'
+      + ' onclick="filterBookSubject(this.getAttribute(\'data-book-subject\'))">' + esc(kv[0]) + ' (' + kv[1] + ')</button>';
+  });
+  bar.innerHTML = html;
+  bar.style.display = 'flex';
+}
+
+function filterBookSubject(sub) {
+  S.bookSubject = (S.bookSubject === sub) ? '' : sub;   // 再点同一个 = 取消筛选
+  _taskCurrentPage = 1;
+  applySearchAndSort();
+  if (window.toast) toast(sub && S.bookSubject ? '📚 已筛选：' + sub : '📚 已显示全部科目');
 }
 
 function renderTaskPager(pager, totalPages, totalCount) {
@@ -3756,8 +3814,15 @@ function applySearchAndSort() {
         || (o.publisher_name || '').toLowerCase().includes(keyword)
         || (o.publisher_dorm || '').toLowerCase().includes(keyword)
         || (Array.isArray(o.search_keywords) && o.search_keywords.some(k => (k || '').toLowerCase().includes(keyword)))
-        || (typeof o.search_keywords === 'string' && o.search_keywords.toLowerCase().includes(keyword));
+        || (typeof o.search_keywords === 'string' && o.search_keywords.toLowerCase().includes(keyword))
+        // v1.41.0：教材的科目/书名/学期也进搜索范围（搜「微积分」能命中标题里没写科目的书）
+        || (o.ai_book_meta && ((o.ai_book_meta.subject || '') + (o.ai_book_meta.book_title || '') + (o.ai_book_meta.grade || '')).toLowerCase().includes(keyword));
     });
+  }
+
+  // v1.41.0 教材科目筛选（与关键词、宿舍筛选是 AND 关系）
+  if (S.bookSubject) {
+    orders = orders.filter(o => o.ai_book_meta && o.ai_book_meta.subject === S.bookSubject);
   }
 
   // 宿舍区域筛选（模糊匹配）
@@ -3812,6 +3877,7 @@ function filterOrders(type, cat) {
 function switchGoodsSubTab(sub) {
   S.goodsSubTab = sub;
   S.goodsCategory = 'all';
+  S.bookSubject = '';          // v1.41.0 切换出售/租借时清空科目筛选
   updateGoodsSubTabUI();
   updateGoodsCategoryFilters();
   loadOrders('goods', 'all');
@@ -3851,6 +3917,7 @@ function updateGoodsCategoryFilters() {
 
 function filterGoodsCat(cat) {
   S.goodsCategory = cat;
+  S.bookSubject = '';          // v1.41.0 换品类时清空科目筛选
   // 更新品类筛选栏的 active
   const bar = document.getElementById('goodsCategoryFilters');
   if (bar) {
@@ -3863,6 +3930,7 @@ function filterGoodsCat(cat) {
 
 function switchTaskTab(tab) {
   S.taskTab = tab;
+  S.bookSubject = '';          // v1.41.0 换 tab 清空科目筛选（chips 由 renderBookSubjectFilters 自动隐藏）
   const heroMeta = {
     task: { icon: '🏃', title: '跑腿代办', sub: '校园跑腿、代取快递、帮买帮送，找人接单', cls: 'cat-task' },
     goods: { icon: '📦', title: '物品流转', sub: '出售转让、短期租借，闲置物品再利用', cls: 'cat-goods' },
@@ -7343,6 +7411,25 @@ function updateFoodPublishTip() {
   const c = document.getElementById('publishCategory').value;
   const tip = document.getElementById('foodPublishTip');
   if (tip) tip.style.display = (t === 'task' && c === 'food') ? 'block' : 'none';
+  updateBookMetaVisibility();          // v1.41.0：子分类变化后同步书籍信息区显隐
+}
+
+// v1.41.0：仅在「二手-教材书籍」「租借-教材参考书」时显示书籍信息区
+function updateBookMetaVisibility() {
+  const t = document.getElementById('publishType').value;
+  const c = document.getElementById('publishCategory').value;
+  const g = document.getElementById('bookMetaGroup');
+  if (!g) return;
+  const show = (t === 'secondhand' && c === 'book') || (t === 'borrow' && c === 'textbook');
+  g.style.display = show ? 'block' : 'none';
+  if (!show) {                          // 切走时清空，避免脏数据带进下一次发布
+    const bt = document.getElementById('publishBookTitle');
+    const bs = document.getElementById('publishBookSubject');
+    const hint = document.getElementById('bookAiHint');
+    if (bt) bt.value = '';
+    if (bs) bs.value = '';
+    if (hint) hint.textContent = '';
+  }
 }
 function autoGenHandoffCode() {
   const el = document.getElementById('publishHandoffCode');
@@ -7536,8 +7623,28 @@ async function handlePublish(e) {
     }
   }
 
+  // v1.41.0 书籍分类元信息（仅二手教材 / 租借教材）：AI 识图自动填，用户可改
+  let ai_book_meta = null;
+  const _isBookCat = (type === 'secondhand' && cat === 'book') || (type === 'borrow' && cat === 'textbook');
+  if (_isBookCat) {
+    const btEl = document.getElementById('publishBookTitle');
+    const bsEl = document.getElementById('publishBookSubject');
+    const bt = btEl ? btEl.value.trim().slice(0, 40) : '';
+    const bs = bsEl ? bsEl.value.trim().slice(0, 20) : '';
+    const aiBook = (window._publishOcr && window._publishOcr.book) || null;
+    if (bt || bs) {
+      ai_book_meta = {
+        book_title: bt || (aiBook && aiBook.book_title) || '',
+        subject: bs || (aiBook && aiBook.subject) || '',
+        grade: (aiBook && aiBook.grade) || '',
+        book_kind: (aiBook && aiBook.book_kind) || '其他'
+      };
+    }
+  }
+
   const order = {
     type, category: cat, title, description: desc, price: price || 0,
+    ai_book_meta: ai_book_meta,   // v1.41.0：书名/科目/年级，供二手教材按科目筛选与搜索
     bounty: bounty || 0,
     location: loc, urgency, deadline, payment,
     gender_limit: genderLimit || 'any',   // v1.25.0 性别限制（仅展示）
@@ -8448,10 +8555,10 @@ function compressImage(file, maxWidth = 1920, quality = 0.85) {
 }
 
 // ============ 发布图片预览 + AI 识图（OCR）关键词（v1.16.0） ============
-window._publishOcr = { chips: [], text: '', busy: false, files: [], ocrDone: [] };   // 本次发布的 OCR 状态（files=累积文件列表，ocrDone=已识别文件快照）
+window._publishOcr = { chips: [], text: '', busy: false, files: [], ocrDone: [], book: null };   // 本次发布的 OCR 状态（files=累积文件列表，ocrDone=已识别文件快照）
 
 function resetOcrState() {
-  window._publishOcr = { chips: [], text: '', busy: false, files: [], ocrDone: [] };
+  window._publishOcr = { chips: [], text: '', busy: false, files: [], ocrDone: [], book: null };
   const box = document.getElementById('publishOcrBox'); if (box) box.style.display = 'none';
   const chips = document.getElementById('publishOcrChips'); if (chips) chips.innerHTML = '';
   const st = document.getElementById('publishOcrStatus'); if (st) st.textContent = '';
@@ -8686,6 +8793,28 @@ function ocrFallbackHint() {
 }
 
 // 单张图片 OCR（压缩到 1280/0.8 足够识别，省流量与 SCF 请求体）
+// v1.41.0：把 AI 识别的书籍信息填入发布表单
+// 只在书籍分类可见时生效；已填内容不覆盖（用户手改优先，AI 只是省事）
+function applyAiBookMeta(book) {
+  if (!book) return;
+  if (!window._publishOcr) window._publishOcr = {};
+  window._publishOcr.book = book;                    // 存快照，提交时取 grade / book_kind
+  const g = document.getElementById('bookMetaGroup');
+  const bt = document.getElementById('publishBookTitle');
+  const bs = document.getElementById('publishBookSubject');
+  if (!g || !bt || !bs) return;
+  if (g.style.display === 'none') return;            // 当前不是书籍分类 → 忽略
+  if (!bt.value.trim() && book.book_title) bt.value = book.book_title;
+  if (!bs.value.trim() && book.subject) bs.value = book.subject;
+  const parts = [];
+  if (book.subject) parts.push('科目 ' + book.subject);
+  if (book.grade) parts.push(book.grade);
+  if (book.book_kind && book.book_kind !== '其他') parts.push(book.book_kind);
+  const hint = document.getElementById('bookAiHint');
+  if (hint && parts.length) hint.textContent = '✨ AI 已识别：' + parts.join(' · ');
+  if (window.toast) toast('📚 AI 认出这是本书，已自动填写科目');
+}
+
 async function ocrImageFile(file, idx) {
   const st = document.getElementById('publishOcrStatus');
   const badge = document.getElementById('ocrBadge' + idx);
@@ -8719,6 +8848,8 @@ async function ocrImageFile(file, idx) {
         const t = document.getElementById('aiAssistInput');
         if (t) t.value = (t.value.trim() ? t.value.trim() + '\n' : '') + '[图片文字] ' + d.text.slice(0, 400);
       }
+      // v1.41.0：AI 判定为书籍 → 自动填入书名/科目（不覆盖用户已填内容）
+      if (d.book && (d.book.book_title || d.book.subject)) applyAiBookMeta(d.book);
       if (badge) badge.textContent = '✓';
       if (st) st.textContent = '';
     } else { throw new Error((d && d.error) || 'OCR_FAILED'); }

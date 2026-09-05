@@ -22,6 +22,8 @@
 // v1.16.0 新增（AI 识图）：
 //   - TC3 签名重构为通用 tc3Request()（参数化 service/host/action/version）
 //   - /api/ai/ocr：腾讯云 GeneralBasicOCR 识别图片文字 + 混元提取搜索关键词（两段式）
+// v1.41.0 新增：
+//   - /api/ai/ocr 第二段 GLM 额外返回 book 分类（书名/科目/年级/书类型），供二手教材按科目聚合筛选
 // ============================================================
 
 const http = require('http');
@@ -45,7 +47,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://tokenhub.te
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'hy3';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.40.0';
+const VERSION = '1.41.0';
 
 // 白名单：仅放行本仓库的 issues（含子路径 /comments），拒绝其它仓库/敏感路径
 const REPO_ESC = REPO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -800,11 +802,19 @@ const server = http.createServer(async (req, res) => {
             if (!text) return sendJSON(res, 200, { ok: true, text: '', keywords: [] }, headers); // 图中无文字属正常
             const clip = text.slice(0, 1500);                // 防混元超长
             let keywords = [];
+            let book = null;                                  // v1.41.0 书籍分类（null = 非书 / 未识别）
             try {                                             // 第二段：混元提取关键词（失败不阻断，仅 keywords 为空）
               const sys = '你是二手交易/校园互助平台的图片关键词提取器。输入是照片 OCR 识别出的文字（可能杂乱）。' +
                 '请提取最有助于买家搜索的关键词：商品名、书名/课程名、品牌、型号、成色描述等。' +
-                '必须只返回一个 JSON 对象 {"keywords":["..."]}：最多 8 个，每个 2-10 个字，去掉价格/纯数字/' +
-                '微信号/QQ/手机号等联系方式和乱码，不要编造 OCR 文字中没有的商品信息。';
+                '必须只返回一个 JSON 对象 {"keywords":["..."],"book":null 或 {"book_title":"","subject":"","grade":"","book_kind":""}}。' +
+                'keywords 最多 8 个，每个 2-10 个字，去掉价格/纯数字/微信号/QQ/手机号等联系方式和乱码。' +
+                'book 仅当图片明显是教材/教辅/书籍封面或内页时才填对象，否则必须为 null：' +
+                'book_title = OCR 文字里的书名（20 字内，认不出留空）；' +
+                'subject = 科目或课程名（如 高等数学/线性代数/大学物理/电路理论/数据结构/C语言程序设计/大学英语/概率论，' +
+                '只写课程本身，去掉「教材」「上册」「第X版」等后缀，认不出留空）；' +
+                'grade = 常见开课学期（大一上/大一下/大二上/大二下/大三上/大三下/考研/其他），不确定留空；' +
+                'book_kind 只能是 教材/考研教辅/课外书/其他 之一。' +
+                '严禁编造 OCR 文字中不存在的信息。';
               const content = await callHunyuan([
                 { role: 'system', content: sys },
                 { role: 'user', content: 'OCR 文字：\n' + clip }
@@ -813,8 +823,17 @@ const server = http.createServer(async (req, res) => {
               if (parsed && Array.isArray(parsed.keywords)) {
                 keywords = parsed.keywords.map(k => String(k).trim().slice(0, 10)).filter(k => k.length >= 2).slice(0, 8);
               }
+              // v1.41.0 书籍自动分类：书名 / 科目 / 年级 / 书类型，供二手教材按科目聚合与搜索
+              if (parsed && parsed.book && typeof parsed.book === 'object') {
+                const b = parsed.book;
+                const bt = String(b.book_title || '').trim().slice(0, 40);
+                const bs = String(b.subject || '').trim().slice(0, 20);
+                const bg = String(b.grade || '').trim().slice(0, 8);
+                const bk = ['教材', '考研教辅', '课外书', '其他'].includes(b.book_kind) ? b.book_kind : '其他';
+                if (bt || bs) book = { book_title: bt, subject: bs, grade: bg, book_kind: bk };
+              }
             } catch (e) { /* 关键词提取失败，降级返回纯文本 */ }
-            return sendJSON(res, 200, { ok: true, text: clip, keywords }, headers);
+            return sendJSON(res, 200, { ok: true, text: clip, keywords, book }, headers);
           } catch (e) { return sendJSON(res, 502, { error: e.message }, headers); }
         }
 
