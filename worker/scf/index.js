@@ -45,7 +45,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://tokenhub.te
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'hy3';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.39.3';
+const VERSION = '1.39.4';
 
 // 白名单：仅放行本仓库的 issues（含子路径 /comments），拒绝其它仓库/敏感路径
 const REPO_ESC = REPO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -241,11 +241,12 @@ async function callHunyuan(messages) {
     temperature: 0.7
   });
   const sleep = ms => new Promise(res => setTimeout(res, ms));
-  // 免费模型（如 GLM-4.7-Flash）偶发 429 限流：最多重试 2 次，退避 1.2s / 2.5s
-  const MAX_ATTEMPTS = 3;
+  // 免费模型（如 GLM-4.7-Flash）偶发 429 限流：重试 1 次，退避 1s
+  // 注意：单请求总预算必须 < SCF 平台执行超时（约30s）：12s×2 + 1s ≈ 25s
+  const MAX_ATTEMPTS = 2;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 20000);
+    const timer = setTimeout(() => ctl.abort(), 12000);
     try {
       const r = await fetch(TOKENHUB_BASE_URL + '/chat/completions', {
         method: 'POST',
@@ -260,7 +261,7 @@ async function callHunyuan(messages) {
       if (!r.ok) {
         // 429 / 1305 = 限流，退避后重试
         if (r.status === 429 || (json.error && (json.error.code === '1305' || String(json.error.code || '').indexOf('429') >= 0))) {
-          if (attempt < MAX_ATTEMPTS) { await sleep(attempt === 1 ? 1200 : 2500); continue; }
+          if (attempt < MAX_ATTEMPTS) { await sleep(1000); continue; }
         }
         throw new Error((json.error && json.error.message) || 'LLM_ERROR');
       }

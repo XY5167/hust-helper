@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.39.5">
+<meta name="version" content="1.39.6">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -699,6 +699,32 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .ai-fab{position:fixed;right:20px;bottom:24px;z-index:200;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,#6366f1,#1a73e8);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
 .ai-fab:hover{transform:translateY(-3px) scale(1.05);box-shadow:var(--shadow-xl)}
 .ai-fab:active{transform:scale(.95)}
+.wheel-fab{position:fixed;right:88px;bottom:24px;z-index:200;width:52px;height:52px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--accent),#fb923c);color:#fff;font-size:1.5rem;line-height:1;cursor:pointer;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
+.wheel-fab:hover{transform:translateY(-3px) scale(1.05) rotate(12deg);box-shadow:var(--shadow-xl)}
+.wheel-fab:active{transform:scale(.95)}
+/* 🎡 幸运转盘弹窗 */
+.wheel-tabs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 10px}
+.wheel-tab{border:1px solid var(--border);background:var(--bg-card);color:var(--text);border-radius:99px;padding:4px 11px;font-size:.78rem;cursor:pointer;transition:all var(--t)}
+.wheel-tab:hover{border-color:var(--primary)}
+.wheel-tab.active{background:linear-gradient(135deg,var(--primary),#6366f1);color:#fff;border-color:transparent}
+.wheel-stage{position:relative;width:280px;height:280px;margin:0 auto 8px}
+.wheel-pointer{position:absolute;top:-6px;left:50%;transform:translateX(-50%);z-index:5;color:var(--danger);font-size:1.4rem;line-height:1;text-shadow:0 2px 4px rgba(0,0,0,.2);pointer-events:none}
+#wheelCanvas{display:block;width:280px;height:280px;border-radius:50%;box-shadow:0 8px 30px rgba(0,0,0,.25),inset 0 0 0 6px rgba(255,255,255,.55);transition:transform 4.5s cubic-bezier(.17,.67,.12,1);transform:rotate(0deg)}
+#wheelCanvas.spinning{cursor:default}
+.wheel-result{text-align:center;font-size:1.05rem;font-weight:700;min-height:26px;margin:2px 0 8px;color:var(--primary)}
+.wheel-result.big{animation:wheelPop .5s var(--ease)}
+@keyframes wheelPop{0%{transform:scale(.6);opacity:.3}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+.wheel-options{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;min-height:30px;margin:0 0 10px;max-height:96px;overflow-y:auto}
+.wheel-opt{display:inline-flex;align-items:center;gap:4px;background:var(--primary-light,#e8f0fe);color:var(--text);border:1px solid transparent;border-radius:99px;padding:3px 10px;font-size:.78rem;max-width:140px}
+.wheel-opt.active-opt{background:var(--accent);color:#fff;font-weight:700}
+.wheel-opt .opt-del{cursor:pointer;opacity:.55;font-size:.9rem;line-height:1}
+.wheel-opt .opt-del:hover{opacity:1;color:var(--danger)}
+.wheel-add-row{display:flex;gap:6px;align-items:center;margin:0 0 10px}
+.wheel-add-row input{flex:1 1 auto;min-width:0;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font-size:.85rem;background:var(--bg-card);color:var(--text)}
+.wheel-add-row input:focus{outline:none;border-color:var(--primary)}
+.wheel-actions{display:flex;gap:8px;justify-content:center;align-items:center}
+#wheelSpinBtn{min-width:110px;font-size:1rem}
+.wheel-ai-note{text-align:center;font-size:.74rem;color:var(--text-dim,#888);margin:4px 0 0;min-height:16px}
 .ai-panel{position:fixed;right:20px;bottom:92px;z-index:201;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 130px),calc(100dvh - 130px));background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);display:none;flex-direction:column;overflow:hidden}
 .ai-panel.open{display:flex;animation:aiPop .18s var(--ease)}
 @keyframes aiPop{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
@@ -764,6 +790,7 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}70%{box-shadow:0 0 0 8px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
 @media (max-width:768px){
   .ai-fab{bottom:84px}
+  .wheel-fab{right:84px;bottom:84px}
   .ai-panel{bottom:150px;right:12px;height:calc(100vh - 180px);height:calc(100dvh - 180px);width:calc(100vw - 24px)}
 }
 #updateBanner{position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#1f2937;display:flex;align-items:center;justify-content:center;gap:12px;padding:9px 14px;font-size:.85rem;box-shadow:0 4px 12px rgba(245,158,11,.3);animation:bannerSlide .25s var(--ease)}
@@ -2109,7 +2136,7 @@ async function aiModerate(title, content) {
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.39.5';
+const APP_VERSION = '1.39.6';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2257,7 +2284,10 @@ function getCookieToken() { return getCookie('hust_token'); }
 function getCookieUid() { return getCookie('hust_uid'); }
 function clearAuthCookies() { setCookie('hust_token', '', -1); setCookie('hust_uid', '', -1); }
 
-function ghApi(path, method, body) {
+function ghApi(path, method, body, reqOpts) {
+  const ro = reqOpts || {};
+  const timeoutMs = ro.timeout || 15000;
+  const retries = (ro.retries === undefined) ? 2 : ro.retries;
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json' }
@@ -2265,8 +2295,8 @@ function ghApi(path, method, body) {
   const tk = getToken();
   if (tk) opts.headers['Authorization'] = 'Bearer ' + tk;
   if (body) opts.body = JSON.stringify(body);
-  // v1.26.0 R1：15s 超时 + 429 自动重试（最多 2 次，退避 1s/2s）
-  return ghFetchWithRetry(PROXY_BASE + path, opts, 2)
+  // v1.26.0 R1：15s 超时 + 429 自动重试（最多 2 次，退避 1s/2s）；v1.39.6 起可经 reqOpts 覆盖超时/重试（AI 长请求用）
+  return ghFetchWithRetry(PROXY_BASE + path, opts, retries, timeoutMs)
     .then(function (res) {
       if (res.status === 429) {
         try { if (window.toast) toast('请求过于频繁，请稍后再试', 'error'); } catch (e) {}
@@ -2275,10 +2305,11 @@ function ghApi(path, method, body) {
     });
 }
 
-// v1.26.0 R1：带超时与 429 退避重试的 fetch 封装（不改变返回类型，调用方零改动）
-function ghFetchWithRetry(url, opts, retriesLeft) {
+// v1.26.0 R1：带超时与 429 退避重试的 fetch 封装（不改变返回类型，调用方零改动）；v1.39.6 加 timeoutMs 参数
+function ghFetchWithRetry(url, opts, retriesLeft, timeoutMs) {
+  const tms = timeoutMs || 15000;
   const controller = new AbortController();
-  const timer = setTimeout(function () { controller.abort(); }, 15000);
+  const timer = setTimeout(function () { controller.abort(); }, tms);
   return fetch(url, Object.assign({}, opts, { signal: controller.signal }))
     .then(function (res) {
       clearTimeout(timer);
@@ -2286,7 +2317,7 @@ function ghFetchWithRetry(url, opts, retriesLeft) {
         const delay = retriesLeft === 2 ? 1000 : 2000;
         return new Promise(function (resolve, reject) {
           setTimeout(function () {
-            ghFetchWithRetry(url, opts, retriesLeft - 1).then(resolve, reject);
+            ghFetchWithRetry(url, opts, retriesLeft - 1, tms).then(resolve, reject);
           }, delay);
         });
       }
@@ -2295,7 +2326,7 @@ function ghFetchWithRetry(url, opts, retriesLeft) {
     .catch(function (err) {
       clearTimeout(timer);
       if (err && err.name === 'AbortError') {
-        if (retriesLeft > 0) return ghFetchWithRetry(url, opts, retriesLeft - 1);
+        if (retriesLeft > 0) return ghFetchWithRetry(url, opts, retriesLeft - 1, tms);
         return new Response(JSON.stringify({ error: 'timeout' }), { status: 504, headers: { 'Content-Type': 'application/json' } });
       }
       throw err;
@@ -9235,6 +9266,7 @@ if ('serviceWorker' in navigator) {
 
 <!-- AI 互助小助手 (ai+opc) -->
 <button class="ai-fab" id="aiFab" onclick="toggleAiChat()" aria-label="AI 互助小助手" title="互助AI 小助手"><img src="icons/ai-avatar.png" alt="AI" style="width:32px;height:32px;border-radius:50%;object-fit:cover"></button>
+<button class="wheel-fab" id="wheelFab" onclick="openWheel()" aria-label="幸运转盘" title="🎡 幸运转盘：今天吃什么等随机决策">🎡</button>
 <div class="ai-panel" id="aiPanel" role="dialog" aria-label="AI 互助小助手">
   <div class="ai-panel-header">
     <div class="ai-avatar"><img src="icons/ai-avatar.png" alt="AI" style="width:28px;height:28px;border-radius:50%;object-fit:cover"></div>
@@ -9263,6 +9295,44 @@ if ('serviceWorker' in navigator) {
   <div class="ai-input-row">
     <input id="aiInput" type="text" placeholder="问问互助AI…" onkeydown="if(event.key==='Enter')sendAiMessage()">
     <button class="btn btn-ai btn-sm" onclick="sendAiMessage()">发送</button>
+  </div>
+</div>
+
+<!-- 🎡 幸运转盘 (v1.39.6) -->
+<div class="modal-overlay" id="wheelModal">
+  <div class="modal" style="max-width:430px">
+    <button class="modal-close" onclick="closeWheel()" aria-label="关闭">×</button>
+    <h3 style="text-align:center;margin-top:2px">🎡 幸运转盘</h3>
+    <p style="text-align:center;color:var(--text-dim, #888);font-size:.78rem;margin:2px 0 10px">选择困难症克星 · 转一下就知道 🍀</p>
+
+    <!-- 主题切换 -->
+    <div class="wheel-tabs" id="wheelTabs"></div>
+
+    <!-- 转盘 -->
+    <div class="wheel-stage" id="wheelStage">
+      <div class="wheel-pointer">▼</div>
+      <canvas id="wheelCanvas" width="280" height="280"></canvas>
+    </div>
+
+    <!-- 结果 -->
+    <div class="wheel-result" id="wheelResult">👆 点「开转」试试手气</div>
+
+    <!-- 选项列表（可点 × 删除）-->
+    <div class="wheel-options" id="wheelOptions"></div>
+
+    <!-- 添加 + AI 推荐 -->
+    <div class="wheel-add-row">
+      <input id="wheelAddInput" type="text" placeholder="加个选项，如：黄焖鸡米饭" maxlength="14" onkeydown="if(event.key==='Enter')wheelAddOption()">
+      <button class="btn btn-brand btn-sm" onclick="wheelAddOption()">＋ 添加</button>
+      <button class="btn btn-ai btn-sm" onclick="wheelAiSuggest()" id="wheelAiBtn" title="让 AI 帮你想几个选项">✨ AI 推荐</button>
+    </div>
+
+    <!-- 操作 -->
+    <div class="wheel-actions">
+      <button class="btn btn-brand" id="wheelSpinBtn" onclick="spinWheel()">🎯 开转</button>
+      <button class="btn btn-sm" onclick="wheelResetDefault()">↺ 恢复默认</button>
+    </div>
+    <p style="text-align:center;color:var(--text-dim,#888);font-size:.72rem;margin:8px 0 0">纯娱乐小工具 · 选项自动保存在本机浏览器</p>
   </div>
 </div>
 
@@ -9322,7 +9392,17 @@ if ('serviceWorker' in navigator) {
     addAiMsg('me', text);
     _aiHistory.push({ role:'user', content:text });
     const typing = addAiMsg('bot','',true);
-    const reply = await callAiChat(_aiHistory);
+    const res = await callAiChat(_aiHistory);
+    if(!res.ok){
+      // v1.39.6：API 失败不再静默走 mock 冒充 AI，明确提示
+      const msg = document.createElement('div');
+      msg.className = 'ai-msg bot ai-msg-error';
+      msg.innerHTML = '⚠️ AI 服务暂时连不上，请稍后重试（常见问题可点上方菜单）';
+      typing.parentNode && typing.parentNode.replaceChild(msg, typing);
+      if(window.toast) toast('AI 暂时不可用，请稍后重试','error');
+      return;
+    }
+    const reply = res.text;
     _aiHistory.push({ role:'assistant', content:reply });
     await typeOutAi(typing, reply);
     saveAiHistory();
@@ -9438,12 +9518,19 @@ if ('serviceWorker' in navigator) {
   }
   window.aiFaq = aiFaq;
 
+  // v1.39.6：返回 {ok,text,reason}，失败不再静默伪装成 AI 回答
   async function callAiChat(messages){
     try{
-      const res = await ghApi('/api/ai/chat','POST',{ messages:messages });
-      if(res.ok){ const data = await res.json(); if(data && data.reply) return data.reply; }
-    }catch(e){}
-    return mockAiChat(messages);
+      const res = await ghApi('/api/ai/chat','POST',{ messages:messages }, { timeout: 28000, retries: 1 });
+      if(res.ok){
+        const data = await res.json();
+        if(data && data.reply) return { ok:true, text:String(data.reply), reason:'' };
+        return { ok:false, text:'', reason:'empty' };
+      }
+      return { ok:false, text:'', reason: (res.status === 433 || res.status === 504) ? 'timeout' : ('http' + (res.status || 'err')) };
+    }catch(e){
+      return { ok:false, text:'', reason:'net' };
+    }
   }
   // 安全极简 Markdown 渲染（零依赖：先转义再套安全标签，杜绝 XSS）
   function renderMarkdown(md){
@@ -9518,7 +9605,8 @@ if ('serviceWorker' in navigator) {
     if(/信用/.test(last)) return '信用分初始100，完成订单、被好评加分；爽约/被投诉扣分，过低会受限。';
     if(/会员/.test(last)) return '会员可享发布优先展示、专属标识等。通过跑腿认证（上传学生证）即可解锁发布/接单，并获赠 7 天会员试用。已认证非会员用户每天可发 1 单、接 1 单，VIP 可不限次数。';
     if(/接单|赚钱|怎么赚/.test(last)) return '在任务大厅选分类，看到合适的单点「接单」并填收款方式，完成后对方线下支付即可。';
-    return '我是 Hust互助 AI 小助手🤖，可以帮你了解平台用法、写发布内容。试试发布时点「✨ AI 帮我写」吧！';
+    // v1.39.6：不再冒充 AI 助手，明确本地关键词未命中
+    return '这个问题我这边没能联网回答（AI 服务暂不可用），你可以点上方菜单看常见问答，或稍后再试～';
   }
 
   // 发布润色
@@ -9686,6 +9774,264 @@ if ('serviceWorker' in navigator) {
     return '【解题思路】建议：1) 先拆解题目要求；2) 回顾相关知识点；3) 列出解题步骤；4) 验证结果。把具体题目贴出来，AI 可以给你更针对性的步骤引导～';
   }
   window.aiSolve = aiSolve;
+})();
+</script>
+
+<script>
+// ============ 🎡 幸运转盘 (v1.39.6) 纯前端娱乐工具 ============
+(function(){
+  const WHEEL_THEMES = {
+    eat:     ['百景园','喻园食堂','西一食堂','东园食堂','集锦园','梧桐雨','南三门小吃','点外卖'],
+    weekend: ['东湖绿道','光谷广场','省博物馆','昙华林','江滩散步','欢乐谷','图书馆自习','宅宿舍'],
+    movie:   ['科幻片','喜剧片','动画片','悬疑片','爱情片','纪录片','港片经典','惊悚片'],
+    play:    ['打游戏','操场跑步','约球','看剧','K歌','桌游','撸串','早睡养生'],
+    custom:  []
+  };
+  const WHEEL_PALETTE = ['#f87171','#fb923c','#facc15','#4ade80','#22d3ee','#818cf8','#e879f9','#f472b6','#34d399','#a3e635','#fbbf24','#60a5fa'];
+  const WHEEL_TABS = [
+    { key:'eat',     label:'🍜 吃什么' },
+    { key:'weekend', label:'🌿 周末' },
+    { key:'movie',   label:'🎬 电影' },
+    { key:'play',    label:'🎮 玩啥' },
+    { key:'custom',  label:'✏️ 自定义' }
+  ];
+  const st = {
+    topic:'eat', opts:[], rot:0, spinning:false, inited:false,
+    canvas:null, ctx:null
+  };
+
+  function wheelKey(t){ return 'hust_wheel_' + t; }
+  function wheelLoad(t){
+    try{
+      const raw = localStorage.getItem(wheelKey(t));
+      if(raw){ const arr = JSON.parse(raw); if(Array.isArray(arr) && arr.length) return arr.map(String); }
+    }catch(e){}
+    return (WHEEL_THEMES[t] || []).slice();
+  }
+  function wheelSave(t, arr){
+    try{ localStorage.setItem(wheelKey(t), JSON.stringify(arr)); }catch(e){}
+  }
+  function wheelEscape(s, max){
+    let str = String(s == null ? '' : s).replace(/</g,'&lt;');
+    if(max && str.length > max) str = str.slice(0, max) + '…';
+    return str;
+  }
+  function wheelCanvasInit(){
+    st.canvas = document.getElementById('wheelCanvas');
+    if(st.canvas) st.ctx = st.canvas.getContext('2d');
+  }
+  function wheelDraw(){
+    const cv = st.canvas, ctx = st.ctx;
+    if(!cv || !ctx) return;
+    const N = st.opts.length;
+    const W = cv.width, H = cv.height, cx = W/2, cy = H/2, R = W/2 - 2;
+    ctx.clearRect(0,0,W,H);
+    if(N < 2){
+      ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fillStyle = '#e5e7eb'; ctx.fill();
+      ctx.fillStyle = '#6b7280'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('先加 2 个以上选项', cx, cy);
+      return;
+    }
+    const seg = Math.PI*2 / N;
+    for(let i=0;i<N;i++){
+      const a0 = -Math.PI/2 + i*seg;
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a0,a0+seg); ctx.closePath();
+      ctx.fillStyle = WHEEL_PALETTE[i % WHEEL_PALETTE.length];
+      ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+      // 文字沿径向（从圆心向外）
+      ctx.save();
+      ctx.translate(cx,cy);
+      ctx.rotate(a0 + seg/2);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      let label = String(st.opts[i] || '');
+      const maxChars = N >= 9 ? 3 : (N >= 6 ? 4 : 5);
+      if(label.length > maxChars) label = label.slice(0,maxChars) + '…';
+      ctx.fillStyle = 'rgba(255,255,255,.95)';
+      ctx.font = 'bold ' + (N >= 9 ? 11 : 13) + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+      ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 3;
+      ctx.fillText(label, R * 0.62, 0);
+      ctx.restore();
+    }
+    // 中心圆点
+    ctx.beginPath(); ctx.arc(cx,cy,26,0,Math.PI*2);
+    ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.08)'; ctx.lineWidth = 3; ctx.stroke();
+  }
+  function wheelRenderOpts(){
+    const box = document.getElementById('wheelOptions'); if(!box) return;
+    box.innerHTML = '';
+    st.opts.forEach(function(o, i){
+      const chip = document.createElement('span');
+      chip.className = 'wheel-opt';
+      chip.innerHTML = wheelEscape(o, 12) + ' <span class="opt-del" title="删除" onclick="wheelDel(' + i + ')">×</span>';
+      box.appendChild(chip);
+    });
+    const hint = document.getElementById('wheelResult');
+    if(hint && !st.opts.length) hint.textContent = '👇 先添加一些选项吧';
+  }
+  function wheelRenderTabs(){
+    const box = document.getElementById('wheelTabs'); if(!box) return;
+    box.innerHTML = '';
+    WHEEL_TABS.forEach(function(t){
+      const b = document.createElement('button');
+      b.className = 'wheel-tab' + (t.key === st.topic ? ' active' : '');
+      b.textContent = t.label;
+      b.setAttribute('data-t', t.key);
+      b.onclick = function(){ wheelSetTopic(t.key); };
+      box.appendChild(b);
+    });
+  }
+  function wheelSetTopic(t){
+    st.topic = t; st.opts = wheelLoad(t); st.rot = 0; st.spinning = false;
+    if(st.canvas) st.canvas.style.transform = 'rotate(0deg)';
+    const res = document.getElementById('wheelResult');
+    if(res) res.textContent = '👆 点「开转」试试手气';
+    wheelRenderTabs(); wheelRenderOpts(); wheelDraw();
+  }
+  function openWheel(){
+    const m = document.getElementById('wheelModal'); if(!m) return;
+    if(!st.inited){ wheelCanvasInit(); st.inited = true; }
+    // 首次打开默认 eat；每次打开重读当前主题选项（含自定义）
+    if(!st.opts.length && st.topic === 'custom') wheelSetTopic('eat');
+    else { st.opts = wheelLoad(st.topic); wheelRenderTabs(); wheelRenderOpts(); wheelDraw(); }
+    m.classList.add('active');
+  }
+  function closeWheel(){
+    const m = document.getElementById('wheelModal'); if(m) m.classList.remove('active');
+  }
+  function wheelAddOption(){
+    const inp = document.getElementById('wheelAddInput'); if(!inp) return;
+    const v = inp.value.trim();
+    if(!v){ if(window.toast) toast('先输入一个选项～'); return; }
+    if(st.opts.length >= 12){ if(window.toast) toast('最多 12 个选项哦', 'error'); return; }
+    st.opts.push(v.slice(0,14));
+    inp.value = '';
+    wheelSave(st.topic, st.opts);
+    wheelRenderOpts(); wheelDraw();
+    if(window.toast) toast('已添加「' + v.slice(0,10) + '」');
+  }
+  function wheelDel(i){
+    if(st.spinning) return;
+    st.opts.splice(i,1);
+    wheelSave(st.topic, st.opts);
+    wheelRenderOpts(); wheelDraw();
+    const res = document.getElementById('wheelResult');
+    if(res) res.textContent = '👆 点「开转」试试手气';
+  }
+  function wheelResetDefault(){
+    if(st.spinning) return;
+    try{ localStorage.removeItem(wheelKey(st.topic)); }catch(e){}
+    st.opts = (WHEEL_THEMES[st.topic] || []).slice();
+    wheelRenderOpts(); wheelDraw();
+    if(window.toast) toast('已恢复「' + (WHEEL_TABS.find(function(t){return t.key===st.topic;})||{}).label + '」默认选项');
+  }
+  function spinWheel(){
+    const cv = st.canvas; if(!cv || st.spinning) return;
+    const N = st.opts.length;
+    if(N < 2){ if(window.toast) toast('至少需要 2 个选项才能转～','error'); return; }
+    st.spinning = true;
+    const btn = document.getElementById('wheelSpinBtn');
+    if(btn) btn.disabled = true;
+    const res = document.getElementById('wheelResult');
+    if(res){ res.textContent = '🎡 转起来啦…'; res.classList.remove('big'); }
+    // 选中目标扇
+    const idx = Math.floor(Math.random()*N);
+    const segDeg = 360/N;
+    // 第 idx 扇中心（相对顶部顺时针）当前全局角度应落在 360 的整数倍处
+    const centerCur = st.rot % 360;                       // 当前画布旋转的余角
+    const wantTotal = Math.floor(st.rot/360)*360 + 360*5; // 至少再多 5 圈
+    let target = wantTotal + (360 - ((idx + 0.5) * segDeg));
+    // 保证是继续往前的旋转
+    while(target <= st.rot + 360) target += 360;
+    st.rot = target;
+    cv.style.transition = 'transform 4.2s cubic-bezier(.17,.67,.12,1)';
+    cv.style.transform = 'rotate(' + target + 'deg)';
+    let settled = false;
+    setTimeout(function(){
+      if(settled) return; settled = true;
+      wheelSettle(idx, N);
+    }, 4300);
+  }
+  function wheelSettle(idx, N){
+    st.spinning = false;
+    const btn = document.getElementById('wheelSpinBtn'); if(btn) btn.disabled = false;
+    const win = st.opts[idx];
+    const res = document.getElementById('wheelResult');
+    if(res){ res.textContent = '🎉 就决定是：' + win + '！'; res.classList.remove('big'); void res.offsetWidth; res.classList.add('big'); }
+    // 高亮该选项 chip
+    const chips = document.querySelectorAll('#wheelOptions .wheel-opt');
+    chips.forEach(function(c, i){ c.classList.toggle('active-opt', i === idx); });
+    // 轻量撒花
+    wheelConfetti();
+  }
+  function wheelConfetti(){
+    const stage = document.getElementById('wheelStage'); if(!stage) return;
+    const emojis = ['🎉','✨','🎊','🌟','💫','🎈'];
+    for(let i=0;i<10;i++){
+      const s = document.createElement('span');
+      s.textContent = emojis[i % emojis.length];
+      s.style.cssText = 'position:absolute;left:50%;top:50%;font-size:' + (14+Math.random()*14) + 'px;pointer-events:none;z-index:9;animation:wheelConfettiFly .9s ease-out forwards';
+      const ang = Math.random()*Math.PI*2, dist = 60 + Math.random()*110;
+      s.style.setProperty('--wx', Math.cos(ang)*dist + 'px');
+      s.style.setProperty('--wy', Math.sin(ang)*dist - 30 + 'px');
+      stage.appendChild(s);
+      setTimeout(function(){ if(s.parentNode) s.parentNode.removeChild(s); }, 950);
+    }
+  }
+  // AI 推荐：走 /api/ai/chat（复用全局 ghApi），失败回退本地主题预置
+  function wheelAiSuggest(){
+    if(st.spinning) return;
+    const btn = document.getElementById('wheelAiBtn'); if(!btn) return;
+    if(btn.disabled) return;
+    btn.disabled = true; const old = btn.textContent; btn.textContent = '✨ 生成中…';
+    const topicLabel = (WHEEL_TABS.find(function(t){return t.key===st.topic;})||{}).label || '';
+    const sys = '你是校园生活点子助手。用户玩"幸运转盘"需要候选选项。请只输出一个 JSON 字符串数组（不要 markdown 代码块、不要解释），包含 6 个简短中文选项（每个不超过 6 个字，覆盖该主题下常见且有趣的选择）。';
+    const user = '主题：' + topicLabel + '。请给我 6 个候选选项。';
+    const fallback = function(){
+      const base = (WHEEL_THEMES[st.topic] || []).slice();
+      if(st.opts.length < 4 && base.length){ st.opts = base; wheelSave(st.topic, st.opts); }
+      if(window.toast) toast('AI 暂不可用，已用本地示例填充','error');
+      wheelRenderOpts(); wheelDraw();
+    };
+    if(typeof ghApi !== 'function'){ fallback(); btn.disabled = false; btn.textContent = old; return; }
+    ghApi('/api/ai/chat', 'POST', { messages:[{role:'system',content:sys},{role:'user',content:user}] }, { timeout:28000, retries:1 })
+      .then(function(res){
+        if(res.ok) return res.json();
+        throw new Error('bad');
+      })
+      .then(function(data){
+        let arr = null;
+        if(data && data.reply){
+          const raw = String(data.reply);
+          const m = raw.match(/\[[\s\S]*\]/);
+          if(m){ try{ const p = JSON.parse(m[0]); if(Array.isArray(p)) arr = p.map(String); }catch(e){} }
+        }
+        if(!arr || arr.length < 3){ fallback(); return; }
+        st.opts = arr.slice(0,12).map(function(s){ return String(s).replace(/["'。.,，\s]/g,'').slice(0,14); }).filter(Boolean);
+        wheelSave(st.topic, st.opts);
+        if(window.toast) toast('✨ AI 已帮你生成选项，点「开转」！');
+        wheelRenderOpts(); wheelDraw();
+      })
+      .catch(function(){ fallback(); })
+      .then(function(){
+        btn.disabled = false; btn.textContent = old;
+      });
+  }
+  // 全局导出
+  window.openWheel = openWheel; window.closeWheel = closeWheel;
+  window.spinWheel = spinWheel; window.wheelAddOption = wheelAddOption;
+  window.wheelDel = wheelDel; window.wheelResetDefault = wheelResetDefault;
+  window.wheelAiSuggest = wheelAiSuggest;
+})();
+// 撒花 keyframes（CSS 放这里更稳）
+(function(){
+  if(!document.getElementById('wheelConfettiStyle')){
+    const s = document.createElement('style');
+    s.id = 'wheelConfettiStyle';
+    s.textContent = '@keyframes wheelConfettiFly{0%{transform:translate(-50%,-50%) scale(.6);opacity:1}100%{transform:translate(calc(-50% + var(--wx)),calc(-50% + var(--wy))) scale(1.1);opacity:0}}';
+    document.head.appendChild(s);
+  }
 })();
 </script>
 
