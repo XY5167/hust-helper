@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.40.0">
+<meta name="version" content="1.40.1">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -512,6 +512,30 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .order-card-location{font-size:.78rem;color:var(--text-muted)}
 .order-card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light);font-size:.78rem;color:var(--text-muted)}
 
+/* v1.40.1 紧凑化：仅作用于 #page-task（二手/互助），不动 #page-my 和 #page-home */
+#page-task .task-hero{padding:10px 0 12px}
+#page-task .task-hero-head{gap:10px;margin-bottom:4px}
+#page-task .task-hero-icon{width:40px;height:40px;border-radius:12px;font-size:20px}
+#page-task .task-hero-title{font-size:1.1rem;margin:0 0 2px}
+#page-task .task-hero-sub{font-size:.78rem}
+#page-task .task-hero-stats{margin-top:6px}
+#page-task .tab-bar{margin-bottom:10px}
+#page-task .tab-btn{padding:6px 12px;font-size:.82rem}
+#page-task .filter-bar{gap:5px;margin-bottom:10px}
+#page-task .filter-btn{padding:5px 10px;font-size:.76rem;border-width:1px}
+#page-task #taskSearchBar{margin-bottom:10px}
+#page-task .order-grid{grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:14px}
+#page-task .order-card{padding:14px;border-width:1px}
+#page-task .order-card-title{font-size:1rem;margin-bottom:4px}
+#page-task .order-card-desc{font-size:.8rem;margin-bottom:8px}
+#page-task .order-card-price{font-size:1rem}
+#page-task .order-card-location{font-size:.74rem}
+#page-task .order-card-footer{font-size:.74rem;margin-top:8px;padding-top:8px}
+/* 仿 forum-card-head：头像 + byline 多行填充，让卡片内更紧凑 */
+#page-task .order-card-author{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#page-task .order-card-avatar{width:30px;height:30px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:600;flex:0 0 auto}
+#page-task .order-card-byline{font-size:.74rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
 /* v1.28.0 交易状态机步骤条 */
 .trade-steps{display:flex;align-items:flex-start;margin:14px 0 6px}
 .ts-step{display:flex;flex-direction:column;align-items:center;width:58px;flex:0 0 auto}
@@ -656,6 +680,9 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
   .hero-title{font-size:1.7rem}
   .hero-stats{gap:22px}
   .order-grid{grid-template-columns:1fr}
+  /* v1.40.1 紧凑化：移动端更紧 */
+  #page-task .task-hero{padding:8px 0 10px}
+  #page-task .order-grid{gap:10px}
   .nav-links{overflow-x:auto;gap:0}
   #taskTabBar{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;padding-bottom:2px}
   #taskTabBar .tab-btn{flex:0 0 auto}
@@ -2241,7 +2268,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.40.0';
+const APP_VERSION = '1.40.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3636,13 +3663,24 @@ function renderOrders(orders) {
     // 缩略图预览
     const imgList = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     const thumbHTML = imgList.length > 0
-      ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList.slice(0, 3).map(img => '<img src="' + safeImgSrc(img) + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList.length > 3 ? '<div style="width:80px;height:80px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList.length - 3) + '</div>' : '') + '</div>'
+      ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList.slice(0, 3).map(img => '<img src="' + safeImgSrc(img) + '" style="width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList.length > 3 ? '<div style="width:72px;height:72px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList.length - 3) + '</div>' : '') + '</div>'
       : '';
     return '<div class="order-card" onclick="showDetail(' + o._issue_number + ')">'
       + '<div class="order-card-header">'
       + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + recTag + dormTag
       + '<span class="order-card-status status-' + o.status + '">' + (o.type === 'qa' || o.type === 'find' || o.type === 'academic' ? (o.solved ? '✅ 已解决' : (o.type === 'find' ? '🔍 寻找中' : '💬 待解答')) : sl[o.status]) + '</span>'
       + '</div>'
+      // v1.40.1 紧凑化：在 header 后插入头像+byline 行（仿 forum-card-head）
+      + '<div class="order-card-author">'
+      + '<div class="order-card-avatar">' + esc((o.publisher_name || '匿').charAt(0)) + '</div>'
+      + '<div class="order-card-byline">'
+      + '<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">'
+      + (canSeePrivate(o) ? esc(o.publisher_name || '未知') : maskName(o.publisher_name, o.publisher_student_id))
+      + '</a>'
+      + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '')
+      + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '')
+      + (o.location ? ' · 📍' + esc(o.location) : '')
+      + '</div></div>'
       + thumbHTML
       + '<div class="order-card-title">' + esc(o.title) + urgencyBadge + '</div>'
       + (o.description ? '<div class="order-card-desc">' + esc(o.description) + '</div>' : '')
