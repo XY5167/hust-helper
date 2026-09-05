@@ -722,8 +722,10 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .wheel-add-row{display:flex;gap:6px;align-items:center;margin:0 0 10px}
 .wheel-add-row input{flex:1 1 auto;min-width:0;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font-size:.85rem;background:var(--bg-card);color:var(--text)}
 .wheel-add-row input:focus{outline:none;border-color:var(--primary)}
-.wheel-actions{display:flex;gap:8px;justify-content:center;align-items:center}
-#wheelSpinBtn{min-width:110px;font-size:1rem}
+.wheel-actions{display:flex;gap:10px;justify-content:center;align-items:center;margin:8px 0 6px;flex-wrap:wrap;min-height:44px}
+#wheelSpinBtn,#wheelSpinMain{min-width:120px;font-size:1rem;font-weight:700;padding:11px 24px;border-radius:99px;box-shadow:0 6px 18px rgba(24,95,165,.35)}
+#wheelSpinMain:hover,#wheelSpinBtn:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(24,95,165,.42)}
+#wheelSpinMain:disabled,#wheelSpinBtn:disabled{opacity:.65;transform:none;cursor:not-allowed}
 .wheel-ai-note{text-align:center;font-size:.74rem;color:var(--text-dim,#888);margin:4px 0 0;min-height:16px}
 .ai-panel{position:fixed;right:20px;bottom:92px;z-index:201;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 130px),calc(100dvh - 130px));background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);display:none;flex-direction:column;overflow:hidden}
 .ai-panel.open{display:flex;animation:aiPop .18s var(--ease)}
@@ -9314,6 +9316,11 @@ if ('serviceWorker' in navigator) {
       <canvas id="wheelCanvas" width="280" height="280"></canvas>
     </div>
 
+    <!-- 主开转按钮 -->
+    <div class="wheel-spin-row" style="text-align:center;margin:8px 0 10px">
+      <button class="btn btn-brand" id="wheelSpinMain" onclick="spinWheel()" style="min-width:140px;padding:12px 28px;border-radius:99px;font-size:1.05rem;font-weight:700;box-shadow:0 6px 18px rgba(24,95,165,.35)">🎯 开转</button>
+    </div>
+
     <!-- 结果 -->
     <div class="wheel-result" id="wheelResult">👆 点「开转」试试手气</div>
 
@@ -9932,7 +9939,9 @@ if ('serviceWorker' in navigator) {
     if(N < 2){ if(window.toast) toast('至少需要 2 个选项才能转～','error'); return; }
     st.spinning = true;
     const btn = document.getElementById('wheelSpinBtn');
+    const mainBtn = document.getElementById('wheelSpinMain');
     if(btn) btn.disabled = true;
+    if(mainBtn) mainBtn.disabled = true;
     const res = document.getElementById('wheelResult');
     if(res){ res.textContent = '🎡 转起来啦…'; res.classList.remove('big'); }
     // 选中目标扇
@@ -9956,6 +9965,7 @@ if ('serviceWorker' in navigator) {
   function wheelSettle(idx, N){
     st.spinning = false;
     const btn = document.getElementById('wheelSpinBtn'); if(btn) btn.disabled = false;
+    const mainBtn = document.getElementById('wheelSpinMain'); if(mainBtn) mainBtn.disabled = false;
     const win = st.opts[idx];
     const res = document.getElementById('wheelResult');
     if(res){ res.textContent = '🎉 就决定是：' + win + '！'; res.classList.remove('big'); void res.offsetWidth; res.classList.add('big'); }
