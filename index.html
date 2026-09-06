@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.1">
+<meta name="version" content="1.42.2">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -578,6 +578,54 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
   #page-task .filter-bar::-webkit-scrollbar{display:none}
   .task-fab{right:14px;bottom:78px;padding:12px 16px;font-size:.9rem}
 }
+
+/* v1.42.2 原型风格：白底 market header / 搜索栏 / 分类 chips / 双列瀑布 / 空状态 */
+/* 互助模式：显示渐变蓝 hero；二手模式：显示白底 market header */
+#page-task .task-hero{position:relative;overflow:hidden}
+#page-task .task-hero-blue{display:block}
+#page-task .task-hero.task-hero-market{background:transparent;box-shadow:none;border-radius:0;padding:0}
+#page-task .task-hero.task-hero-market .task-hero-blue{display:none}
+#page-task .task-hero-market-inner{display:none;background:#fff;border-bottom:1px solid var(--border);padding:14px 0}
+#page-task .task-hero.task-hero-market .task-hero-market-inner{display:block}
+#page-task .task-market-head{display:flex;align-items:center;gap:12px}
+#page-task .task-market-logo{font-size:1.35rem;font-weight:800;color:var(--primary);letter-spacing:-0.02em;flex:0 0 auto}
+#page-task .task-market-search{flex:1;display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f3f4f6;border-radius:99px;border:1px solid #e5e7eb}
+#page-task .task-market-search-ico{font-size:.95rem;opacity:.45}
+#page-task .task-market-search-input{flex:1;border:none;outline:none;background:transparent;font-size:.9rem;color:var(--text)}
+#page-task .task-market-search-input::placeholder{color:#9ca3af}
+/* 二手模式下隐藏原搜索栏（顶部搜索已替代） */
+#page-task .task-hero-market+.container #taskSearchBar{display:none}
+/* 排序 chips */
+#page-task .task-sort-chips{margin-bottom:10px}
+#page-task .task-sort-chips .filter-btn{font-size:.8rem;padding:5px 14px}
+/* 分类 chips 强化（圆角胶囊） */
+#page-task .filter-bar{gap:8px}
+#page-task .filter-btn{padding:6px 13px;font-size:.8rem;border-radius:99px;border:1px solid #e5e7eb;background:#f9fafb;color:var(--text-secondary);transition:all .15s}
+#page-task .filter-btn.active{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(26,111,212,.22)}
+/* 双列瀑布：桌面强制 2 列 */
+#page-task .order-grid{grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}
+@media(min-width:900px){#page-task .order-grid{grid-template-columns:repeat(3,1fr);gap:14px}}
+@media(max-width:540px){#page-task .order-grid{grid-template-columns:1fr}}
+/* 卡片封面成色 badge */
+#page-task .order-card{position:relative;background:#fff;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.03);transition:transform .15s,box-shadow .15s}
+#page-task .order-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.08)}
+#page-task .order-card-cover-wrap{position:relative;width:100%;height:160px;background:var(--surface-2)}
+#page-task .order-card-cover{width:100%;height:100%;object-fit:cover;display:block}
+#page-task .order-card-condition{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;font-size:.72rem;padding:3px 8px;border-radius:99px}
+#page-task .order-card-body{padding:10px 12px 12px}
+#page-task .order-card-title{font-size:.95rem;font-weight:600;line-height:1.35;margin-bottom:4px;color:var(--text)}
+#page-task .order-card-desc{font-size:.78rem;color:var(--text-muted);margin-bottom:8px}
+#page-task .order-card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px}
+#page-task .order-card-price{font-size:1.1rem;font-weight:700;color:var(--primary)}
+#page-task .order-card-original{font-size:.78rem;color:var(--text-muted);text-decoration:line-through;margin-left:4px}
+#page-task .order-card-location{font-size:.72rem;color:var(--text-muted)}
+#page-task .order-card-author{margin:8px 0 6px}
+#page-task .order-card-footer{margin-top:8px;padding-top:8px;border-top:1px solid var(--border-light)}
+/* 空状态原型风格 */
+#page-task .empty-state{padding:48px 16px;text-align:center;color:var(--text-muted)}
+#page-task .empty-state-icon{font-size:3.2rem;margin-bottom:12px;opacity:.85}
+#page-task .empty-state-title{font-size:1rem;color:var(--text);font-weight:500;margin-bottom:6px}
+#page-task .empty-state-hint{font-size:.82rem;color:var(--text-muted);margin-bottom:16px}
 
 /* v1.41.0 二手教材 AI 分类标签 + 科目筛选条 */
 .book-meta-tag{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
@@ -1431,18 +1479,33 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 </section>
 
 <section class="page" id="page-task" style="display:none">
-  <!-- 蓝色顶部区：与首页 hero、我的页蓝卡统一 -->
+  <!-- v1.42.2 顶部区：互助模式渐变蓝 hero，二手模式白底市场 header -->
   <div class="task-hero">
-    <div class="container">
-      <div class="task-hero-head">
-        <div class="task-hero-icon cat-task" id="taskHeroIcon">🏃</div>
-        <div>
-          <h2 class="task-hero-title" id="taskHeroTitle">跑腿代办</h2>
-          <p class="task-hero-sub" id="taskHeroSub">校园跑腿、代取快递、帮买帮送，找人接单</p>
+    <!-- 互助模式：渐变蓝 hero -->
+    <div class="task-hero-blue">
+      <div class="container">
+        <div class="task-hero-head">
+          <div class="task-hero-icon cat-task" id="taskHeroIcon">🏃</div>
+          <div>
+            <h2 class="task-hero-title" id="taskHeroTitle">跑腿代办</h2>
+            <p class="task-hero-sub" id="taskHeroSub">校园跑腿、代取快递、帮买帮送，找人接单</p>
+          </div>
+        </div>
+        <div class="task-hero-stats" id="taskHeroStats">
+          <span class="task-hero-stat">✨ 切换下方分类，发现校园需求</span>
         </div>
       </div>
-      <div class="task-hero-stats" id="taskHeroStats">
-        <span class="task-hero-stat">✨ 切换下方分类，发现校园需求</span>
+    </div>
+    <!-- 二手模式：白底 market header（原型风格：logo + 居中搜索） -->
+    <div class="task-hero-market-inner" style="display:none">
+      <div class="container">
+        <div class="task-market-head">
+          <div class="task-market-logo">hust-helper</div>
+          <div class="task-market-search">
+            <span class="task-market-search-ico">🔍</span>
+            <input type="text" id="marketSearchInput" class="task-market-search-input" placeholder="搜书名、物品、科目、跑腿任务..." oninput="syncMarketSearch(this.value);resetTaskPageAndApply()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchEnterFeedback(document.getElementById('taskSearchInput'));">
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1490,7 +1553,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <button class="filter-btn" data-filter="carpool" onclick="filterOrders('find','carpool')">🚗 出行拼车</button>
       <button class="filter-btn" data-filter="survey" onclick="filterOrders('find','survey')">📋 问卷招募</button>
     </div>
-    <!-- 搜索和排序 -->
+    <!-- v1.42.2 原型风格：搜索 + 排序 chips（保留原 select 作数据绑定） -->
     <div class="task-searchbar" id="taskSearchBar">
       <span class="task-search-ico">🔍</span>
       <input type="text" id="taskSearchInput" class="task-search-input" placeholder="搜索标题 / 描述 / 地点..." oninput="resetTaskPageAndApply()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchEnterFeedback(this);}">
@@ -1502,14 +1565,20 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <option value="东校区">东校区</option>
         <option value="西校区">西校区</option>
       </select>
-      <select id="taskSortSelect" class="task-select" onchange="resetTaskPageAndApply()">
-        <option value="newest">🕐 最新</option>
-        <option value="dorm_first">🏠 同楼栋</option>
+      <select id="taskSortSelect" class="task-select" style="display:none" onchange="resetTaskPageAndApply()">
+        <option value="newest">🕐 综合</option>
+        <option value="dorm_first">🏠 同校区</option>
         <option value="oldest">🕐 最早</option>
         <option value="price_high">💰 价高</option>
         <option value="price_low">💰 价低</option>
       </select>
       <button class="btn btn-outline btn-sm" id="btnRecOnly" onclick="toggleRecOnly()" style="display:none">🎯 推荐</button>
+    </div>
+    <div class="filter-bar task-sort-chips" id="taskSortChips">
+      <button class="filter-btn active" data-sort="newest" onclick="switchTaskSort('newest')">综合</button>
+      <button class="filter-btn" data-sort="newest" onclick="switchTaskSort('newest')">最新</button>
+      <button class="filter-btn" data-sort="price_low" onclick="switchTaskSort('price_low')">价格</button>
+      <button class="filter-btn" data-sort="dorm_first" onclick="switchTaskSort('dorm_first')">同校区</button>
     </div>
     <div class="order-grid" id="taskOrders"></div>
     <div id="taskPagination"></div>
@@ -2330,7 +2399,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.1';
+const APP_VERSION = '1.42.2';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3694,12 +3763,13 @@ function renderOrders(orders) {
   const pager = document.getElementById('taskPagination');
 
   if (orders.length === 0) {
-    const emptyMap = { task: '暂无跑腿订单，来做第一个发布者吧', goods: '暂无物品流转信息，快来发布吧', qa: '暂无问答，来提出你的问题吧', find: '暂无找人信息，快来发布组队/拼车/招募吧' };
-    const hintMap = { task: '成为第一个发布者，解决身边的小麻烦', goods: '让闲置物品找到新主人', qa: '提出问题，热心的学长学姐会帮你', find: '组队、拼车、招募，一键发起' };
+    const emptyMap = { task: '暂无跑腿订单', goods: '暂无闲置物品', qa: '暂无问答', find: '暂无找人信息' };
+    const hintMap = { task: '点击右下角发布第一个需求', goods: '点击右下角发布闲置物品', qa: '点击右下角去提问', find: '点击右下角发布组队/拼车/招募' };
     const actMap = { task: { label: '发布需求', fn: 'showPublishModal()' }, goods: { label: '发布物品', fn: "showPublishModal('secondhand')" }, qa: { label: '去提问', fn: "showPublishModal('qa')" }, find: { label: '发布找人', fn: "showPublishModal('find')" } };
     const act = actMap[_cachedType] || actMap.task;
-    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>' + (emptyMap[_cachedType] || '暂无匹配内容') + '</p>'
-      + '<p class="hint">' + (hintMap[_cachedType] || '点击按钮立即发布') + '</p>'
+    // v1.42.2 空状态原型风格：简洁图标 + 主色 CTA
+    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p class="empty-state-title">' + (emptyMap[_cachedType] || '暂无匹配内容') + '</p>'
+      + '<p class="empty-state-hint">' + (hintMap[_cachedType] || '点击按钮立即发布') + '</p>'
       + '<button class="btn btn-brand" onclick="' + act.fn + '">' + act.label + '</button></div>';
     if (pager) pager.innerHTML = '';
     return;
@@ -3725,8 +3795,8 @@ function renderOrders(orders) {
     // v1.42.0 信息流卡片：仅取首图作封面（封面渲染在卡片顶部，见下方 order-card-cover）
     const imgList = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     return '<div class="order-card' + (imgList.length ? ' has-cover' : '') + '" onclick="showDetail(' + o._issue_number + ')">'
-      // v1.42.0 信息流卡片：首图作封面（仅二手/互助，#page-task 作用域），无图则不显示封面
-      + (imgList.length ? '<img class="order-card-cover" src="' + safeImgSrc(imgList[0]) + '" loading="lazy" alt="">' : '')
+      // v1.42.2 信息流卡片：首图作封面 + 成色 badge
+      + (imgList.length ? '<div class="order-card-cover-wrap"><img class="order-card-cover" src="' + safeImgSrc(imgList[0]) + '" loading="lazy" alt=""><span class="order-card-condition">' + (o.condition || '9成新') + '</span></div>' : '')
       + '<div class="order-card-body">'
       + '<div class="order-card-header">'
       + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + recTag + dormTag
@@ -3759,7 +3829,7 @@ function renderOrders(orders) {
       + '<div class="order-card-meta">'
       + (o.type === 'qa' || o.type === 'academic'
           ? (o.bounty > 0 ? '<span class="order-card-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '</span>' : '<span style="color:var(--text-muted);font-size:.85rem">免费互助</span>')
-          : (o.type === 'find' ? '' : '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>'))
+          : (o.type === 'find' ? '' : '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.original_price > 0 ? '<span class="order-card-original">¥' + o.original_price.toFixed(2) + '</span>' : '')))
       + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
       + (o.gender_limit && o.gender_limit !== 'any' ? '<span class="gender-badge">👤 ' + (o.gender_limit === 'male' ? '仅限男生' : '仅限女生') + '</span>' : '')
       + (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : '')
@@ -3940,25 +4010,18 @@ function updateGoodsSubTabUI() {
 function updateGoodsCategoryFilters() {
   const bar = document.getElementById('goodsCategoryFilters');
   if (!bar) return;
-  const sub = S.goodsSubTab || 'all';
-  let buttons = '';
-  if (sub === 'sale') {
-    buttons = '<button class="filter-btn active" data-filter="all" onclick="filterGoodsCat(\'all\')">全部</button>'
-      + '<button class="filter-btn" data-filter="book" onclick="filterGoodsCat(\'book\')">📚 教材书籍</button>'
-      + '<button class="filter-btn" data-filter="electronic" onclick="filterGoodsCat(\'electronic\')">💻 电子产品</button>'
-      + '<button class="filter-btn" data-filter="daily" onclick="filterGoodsCat(\'daily\')">🏠 生活用品</button>'
-      + '<button class="filter-btn" data-filter="other" onclick="filterGoodsCat(\'other\')">📌 其他</button>';
-  } else if (sub === 'rent') {
-    buttons = '<button class="filter-btn active" data-filter="all" onclick="filterGoodsCat(\'all\')">全部</button>'
-      + '<button class="filter-btn" data-filter="textbook" onclick="filterGoodsCat(\'textbook\')">📖 教材参考书</button>'
-      + '<button class="filter-btn" data-filter="device" onclick="filterGoodsCat(\'device\')">📱 数码设备</button>'
-      + '<button class="filter-btn" data-filter="sports" onclick="filterGoodsCat(\'sports\')">⚽ 体育器材</button>'
-      + '<button class="filter-btn" data-filter="tool" onclick="filterGoodsCat(\'tool\')">🔧 生活工具</button>'
-      + '<button class="filter-btn" data-filter="other" onclick="filterGoodsCat(\'other\')">📌 其他</button>';
-  } else {
-    buttons = '<span style="font-size:.82rem;color:var(--text-muted);padding:4px 8px">选择「出售转让」或「短期租借」后查看品类</span>';
-  }
-  bar.innerHTML = buttons;
+  // v1.42.2：二手分类统一为原型风格的固定 chips（不再依赖出售/租借子 tab）
+  const cats = [
+    { k: 'all', l: '全部' },
+    { k: 'book', l: '📚 教材书籍' },
+    { k: 'electronic', l: '💻 电子产品' },
+    { k: 'daily', l: '🏠 生活用品' },
+    { k: 'sports', l: '⚽ 运动器材' },
+    { k: 'tool', l: '🔧 生活工具' },
+    { k: 'other', l: '📌 其他' }
+  ];
+  const cur = S.goodsCategory || 'all';
+  bar.innerHTML = cats.map(c => '<button class="filter-btn' + (cur === c.k ? ' active' : '') + '" data-filter="' + c.k + '" onclick="filterGoodsCat(\'' + c.k + '\')">' + c.l + '</button>').join('');
 }
 
 function filterGoodsCat(cat) {
@@ -4027,20 +4090,41 @@ function switchTaskTab(tab) {
 
 // ============ 列表引擎双模式：二手交易 / 互助大厅 ============
 // 二手(ershou) 与 互助(help) 共用 page-task 列表引擎，通过本函数切换底层 tab 与筛选栏
+function syncMarketSearch(v) {
+  const el = document.getElementById('taskSearchInput');
+  if (el) el.value = v;
+}
+function switchTaskSort(sort) {
+  const sel = document.getElementById('taskSortSelect');
+  if (sel) {
+    sel.value = sort;
+    document.querySelectorAll('#taskSortChips .filter-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === sort));
+    resetTaskPageAndApply();
+  }
+}
 function applyListingMode(mode) {
   S.listingMode = mode;
   const isErsou = mode === 'ershou';
   const setDisp = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? 'flex' : 'none'; };
-  // 顶栏：二手模式隐藏板块 tab、显示「长期/短期」；互助模式反之
+  // 顶栏：二手模式隐藏板块 tab、显示分类 chips；互助模式反之
   setDisp('taskTabBar', !isErsou);
-  setDisp('goodsFilters', isErsou);
-  // hero 文案
+  setDisp('goodsFilters', false); // v1.42.2：出售/租借二级 tab 隐藏，分类 chips 统一在 goodsCategoryFilters
+  setDisp('goodsCategoryFilters', isErsou); // 二手模式始终显示分类 chips
+  // hero 样式切换：互助模式用渐变蓝，二手模式用白底市场 header
+  const hero = document.querySelector('#page-task .task-hero');
+  if (hero) hero.classList.toggle('task-hero-market', isErsou);
   const heroIcon = document.getElementById('taskHeroIcon');
   const heroTitle = document.getElementById('taskHeroTitle');
   const heroSub = document.getElementById('taskHeroSub');
-  if (heroIcon) { heroIcon.textContent = isErsou ? '🛒' : '🤝'; heroIcon.className = 'task-hero-icon ' + (isErsou ? 'cat-goods' : 'cat-task'); }
-  if (heroTitle) heroTitle.textContent = isErsou ? '二手交易' : '互助大厅';
-  if (heroSub) heroSub.textContent = isErsou ? '出售转让 · 短期租借，让闲置流动起来' : '跑腿代办 · 有问必答 · 找人组队，校园互帮互助';
+  if (isErsou) {
+    if (heroIcon) heroIcon.textContent = '🛒';
+    if (heroTitle) heroTitle.textContent = '二手交易';
+    if (heroSub) heroSub.textContent = '出售转让 · 短期租借';
+  } else {
+    if (heroIcon) { heroIcon.textContent = '🤝'; heroIcon.className = 'task-hero-icon cat-task'; }
+    if (heroTitle) heroTitle.textContent = '互助大厅';
+    if (heroSub) heroSub.textContent = '跑腿代办 · 有问必答 · 找人组队，校园互帮互助';
+  }
   // 排序选项：二手支持价格排序
   const sortSel = document.getElementById('taskSortSelect');
   if (sortSel && isErsou) {
