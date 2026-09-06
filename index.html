@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.3">
+<meta name="version" content="1.42.4">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -599,7 +599,8 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 #page-task .task-sort-chips{margin-bottom:10px}
 #page-task .task-sort-chips .filter-btn{font-size:.8rem;padding:5px 14px}
 /* 分类 chips 强化（圆角胶囊） */
-#page-task .filter-bar{gap:8px}
+#page-task .filter-bar{gap:8px;margin-bottom:4px}
+#page-task #goodsFilters{margin-bottom:8px}
 #page-task .filter-btn{padding:6px 13px;font-size:.8rem;border-radius:99px;border:1px solid #e5e7eb;background:#f9fafb;color:var(--text-secondary);transition:all .15s}
 #page-task .filter-btn.active{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(26,111,212,.22)}
 /* 双列瀑布：桌面强制 2 列 */
@@ -2399,7 +2400,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.3';
+const APP_VERSION = '1.42.4';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -4106,9 +4107,9 @@ function applyListingMode(mode) {
   S.listingMode = mode;
   const isErsou = mode === 'ershou';
   const setDisp = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? 'flex' : 'none'; };
-  // 顶栏：二手模式隐藏板块 tab、显示分类 chips；互助模式反之
+  // 顶栏：二手模式隐藏板块 tab、显示出售/租借子 tab + 分类 chips；互助模式反之
   setDisp('taskTabBar', !isErsou);
-  setDisp('goodsFilters', false); // v1.42.2：出售/租借二级 tab 隐藏，分类 chips 统一在 goodsCategoryFilters
+  setDisp('goodsFilters', isErsou); // v1.42.4：恢复「全部/出售转让/短期租借」二级 tab
   setDisp('goodsCategoryFilters', isErsou); // 二手模式始终显示分类 chips
   // v1.42.3 统一风格：二手/互助均使用白底市场 header
   const hero = document.querySelector('#page-task .task-hero');
@@ -4132,9 +4133,9 @@ function applyListingMode(mode) {
     sortSel.value = 'newest';
   }
   if (isErsou) {
-    // 二手模式：仅显示长期/短期 + 品类筛选，隐藏其余
+    // 二手模式：显示出售/租借子 tab + 品类筛选，隐藏其余
     setDisp('taskFilters', false); setDisp('qaFilters', false); setDisp('findFilters', false);
-    setDisp('goodsCategoryFilters', true);
+    setDisp('goodsFilters', true); setDisp('goodsCategoryFilters', true);
     S.taskTab = 'goods';
     if (!S.goodsSubTab) S.goodsSubTab = 'all';
     switchGoodsSubTab(S.goodsSubTab);
