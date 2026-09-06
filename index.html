@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.2">
+<meta name="version" content="1.42.3">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -579,8 +579,8 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
   .task-fab{right:14px;bottom:78px;padding:12px 16px;font-size:.9rem}
 }
 
+/* v1.42.3 统一风格：二手/互助均使用白底 market header，与原型保持一致 */
 /* v1.42.2 原型风格：白底 market header / 搜索栏 / 分类 chips / 双列瀑布 / 空状态 */
-/* 互助模式：显示渐变蓝 hero；二手模式：显示白底 market header */
 #page-task .task-hero{position:relative;overflow:hidden}
 #page-task .task-hero-blue{display:block}
 #page-task .task-hero.task-hero-market{background:transparent;box-shadow:none;border-radius:0;padding:0}
@@ -1479,7 +1479,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 </section>
 
 <section class="page" id="page-task" style="display:none">
-  <!-- v1.42.2 顶部区：互助模式渐变蓝 hero，二手模式白底市场 header -->
+  <!-- v1.42.3 顶部区：二手/互助统一白底 market header，渐变蓝 hero 仅作降级保留 -->
   <div class="task-hero">
     <!-- 互助模式：渐变蓝 hero -->
     <div class="task-hero-blue">
@@ -2399,7 +2399,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.2';
+const APP_VERSION = '1.42.3';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -4110,9 +4110,9 @@ function applyListingMode(mode) {
   setDisp('taskTabBar', !isErsou);
   setDisp('goodsFilters', false); // v1.42.2：出售/租借二级 tab 隐藏，分类 chips 统一在 goodsCategoryFilters
   setDisp('goodsCategoryFilters', isErsou); // 二手模式始终显示分类 chips
-  // hero 样式切换：互助模式用渐变蓝，二手模式用白底市场 header
+  // v1.42.3 统一风格：二手/互助均使用白底市场 header
   const hero = document.querySelector('#page-task .task-hero');
-  if (hero) hero.classList.toggle('task-hero-market', isErsou);
+  if (hero) hero.classList.add('task-hero-market');
   const heroIcon = document.getElementById('taskHeroIcon');
   const heroTitle = document.getElementById('taskHeroTitle');
   const heroSub = document.getElementById('taskHeroSub');
