@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.4">
+<meta name="version" content="1.42.5">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -937,7 +937,7 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 @keyframes micPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}70%{box-shadow:0 0 0 8px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
 @media (max-width:768px){
   .ai-fab{bottom:84px}
-  .wheel-fab{right:84px;bottom:84px}
+  .wheel-fab{left:14px;bottom:84px} /* v1.42.5 移到左下角，避免与右下角 task-fab 重合 */
   .ai-panel{bottom:150px;right:12px;height:calc(100vh - 180px);height:calc(100dvh - 180px);width:calc(100vw - 24px)}
 }
 #updateBanner{position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#1f2937;display:flex;align-items:center;justify-content:center;gap:12px;padding:9px 14px;font-size:.85rem;box-shadow:0 4px 12px rgba(245,158,11,.3);animation:bannerSlide .25s var(--ease)}
@@ -2400,7 +2400,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.4';
+const APP_VERSION = '1.42.5';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
