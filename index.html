@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.0">
+<meta name="version" content="1.42.1">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -543,6 +543,41 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 #page-task .order-card-meta{flex-wrap:wrap;gap:4px;margin-top:2px}
 .campus-badge{font-size:.68rem;background:#e0f2fe;color:#0369a1;padding:1px 6px;border-radius:99px;white-space:nowrap}
 .gender-badge{font-size:.7rem;background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:99px;white-space:nowrap}
+
+/* v1.42.1 外框重设计：hero / 搜索栏 / 筛选 chips / FAB / 空状态 / 响应式（仅 #page-task 作用域） */
+#page-task .task-hero{background:linear-gradient(135deg,#1A6FD4,#1252A0);padding:18px 0 22px;border-radius:0 0 var(--radius-lg) var(--radius-lg);box-shadow:0 4px 16px rgba(26,111,212,.18)}
+#page-task .task-hero-head{gap:12px;margin-bottom:6px}
+#page-task .task-hero-icon{width:46px;height:46px;border-radius:14px;font-size:22px;background:rgba(255,255,255,.18);box-shadow:0 2px 8px rgba(0,0,0,.12)}
+#page-task .task-hero-title{font-size:1.28rem;font-weight:700;margin:0 0 3px}
+#page-task .task-hero-sub{font-size:.8rem;opacity:.92}
+#page-task .task-hero-stats{margin-top:8px}
+#page-task .task-hero-stat{display:inline-block;background:rgba(255,255,255,.16);padding:4px 12px;border-radius:99px;font-size:.76rem}
+/* 搜索栏组件化：白底圆角 pill + 前置图标 */
+#page-task .task-searchbar{display:flex;gap:8px;align-items:center;margin:14px 0 14px;padding:6px 8px 6px 14px;background:#fff;border:1px solid var(--border);border-radius:99px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+#page-task .task-search-ico{font-size:.95rem;opacity:.45;flex:0 0 auto}
+#page-task .task-search-input{flex:1;min-width:120px;border:none;outline:none;background:transparent;font-size:.88rem;padding:8px 0;color:var(--text)}
+#page-task .task-select{padding:7px 10px;border:1px solid var(--border);border-radius:99px;font-size:.8rem;background:#f5f8fc;color:var(--text-secondary);cursor:pointer}
+#page-task #btnRecOnly{margin-left:2px}
+/* 筛选 chips 强化：选中态渐变蓝 */
+#page-task .filter-btn{border-radius:99px;transition:all .15s}
+#page-task .filter-btn.active{background:linear-gradient(135deg,#1A6FD4,#1252A0);border-color:transparent;color:#fff;box-shadow:0 2px 8px rgba(26,111,212,.25)}
+/* 发布 FAB（仅 #page-task） */
+.task-fab{position:fixed;right:18px;bottom:84px;z-index:120;display:flex;align-items:center;gap:6px;padding:13px 20px;border:none;border-radius:99px;background:linear-gradient(135deg,#1A6FD4,#1252A0);color:#fff;font-size:.95rem;font-weight:600;box-shadow:0 6px 18px rgba(26,111,212,.4);cursor:pointer;transition:transform .15s;font-family:inherit}
+.task-fab:active{transform:scale(.96)}
+/* 空状态美化（仅 #page-task） */
+#page-task .empty-state{padding:64px 16px}
+#page-task .empty-state-icon{font-size:4rem;margin-bottom:16px;filter:drop-shadow(0 4px 10px rgba(26,111,212,.25))}
+#page-task .empty-state p{font-size:1.05rem}
+#page-task .empty-state .btn-brand{background:linear-gradient(135deg,#1A6FD4,#1252A0);border:none;box-shadow:0 4px 14px rgba(26,111,212,.3)}
+
+@media(max-width:768px){
+  #page-task .task-searchbar{flex-wrap:wrap;border-radius:16px;padding:10px 12px}
+  #page-task .task-search-input{min-width:100%;order:-1}
+  #page-task .task-select{flex:1;min-width:0}
+  #page-task .filter-bar{overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+  #page-task .filter-bar::-webkit-scrollbar{display:none}
+  .task-fab{right:14px;bottom:78px;padding:12px 16px;font-size:.9rem}
+}
 
 /* v1.41.0 二手教材 AI 分类标签 + 科目筛选条 */
 .book-meta-tag{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
@@ -1456,9 +1491,10 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <button class="filter-btn" data-filter="survey" onclick="filterOrders('find','survey')">📋 问卷招募</button>
     </div>
     <!-- 搜索和排序 -->
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap" id="taskSearchBar">
-      <input type="text" id="taskSearchInput" placeholder="🔍 搜索标题/描述/地点..." style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card)" oninput="resetTaskPageAndApply()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchEnterFeedback(this);}">
-      <select id="taskDormFilter" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card);cursor:pointer" onchange="resetTaskPageAndApply()">
+    <div class="task-searchbar" id="taskSearchBar">
+      <span class="task-search-ico">🔍</span>
+      <input type="text" id="taskSearchInput" class="task-search-input" placeholder="搜索标题 / 描述 / 地点..." oninput="resetTaskPageAndApply()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchEnterFeedback(this);}">
+      <select id="taskDormFilter" class="task-select" onchange="resetTaskPageAndApply()">
         <option value="">📍 全部区域</option>
         <option value="紫菘">紫菘</option>
         <option value="韵苑">韵苑</option>
@@ -1466,18 +1502,19 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <option value="东校区">东校区</option>
         <option value="西校区">西校区</option>
       </select>
-      <select id="taskSortSelect" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg-card);cursor:pointer" onchange="resetTaskPageAndApply()">
-        <option value="newest">🕐 最新发布</option>
-        <option value="dorm_first">🏠 同楼栋优先</option>
-        <option value="oldest">🕐 最早发布</option>
-        <option value="price_high">💰 价格从高到低</option>
-        <option value="price_low">💰 价格从低到高</option>
+      <select id="taskSortSelect" class="task-select" onchange="resetTaskPageAndApply()">
+        <option value="newest">🕐 最新</option>
+        <option value="dorm_first">🏠 同楼栋</option>
+        <option value="oldest">🕐 最早</option>
+        <option value="price_high">💰 价高</option>
+        <option value="price_low">💰 价低</option>
       </select>
-      <button class="btn btn-outline btn-sm" id="btnRecOnly" onclick="toggleRecOnly()" style="display:none">🎯 只看推荐</button>
+      <button class="btn btn-outline btn-sm" id="btnRecOnly" onclick="toggleRecOnly()" style="display:none">🎯 推荐</button>
     </div>
     <div class="order-grid" id="taskOrders"></div>
     <div id="taskPagination"></div>
   </div>
+  <button class="task-fab" onclick="taskFabPublish()" title="发布">＋ 发布</button>
 </section>
 
 
@@ -2293,7 +2330,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.0';
+const APP_VERSION = '1.42.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -4025,6 +4062,13 @@ function applyListingMode(mode) {
   }
   updateRecOnlyBtn();
 }
+
+// v1.42.1 发布 FAB：根据当前 listingMode 打开对应发布框
+function taskFabPublish() {
+  if (S.listingMode === 'ershou') showPublishModal('secondhand');
+  else showPublishModal();
+}
+window.taskFabPublish = taskFabPublish;
 
 // ============ DETAIL ============
 async function showDetail(issueNum) {
