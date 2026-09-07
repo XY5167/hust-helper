@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.9">
+<meta name="version" content="1.42.10">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2409,7 +2409,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.9';
+const APP_VERSION = '1.42.10';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -4173,9 +4173,9 @@ async function showDetail(issueNum) {
   ct.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
 
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum, {
-      headers: {}
-    });
+    // v1.42.10：改用 ghApi('/api/issue/N') 走语义路由，免登录且带缓存
+    // 原来裸 fetch /gh/* 触发后端 v1.14.0 的 401 安全检查（要求 Bearer Token）
+    const res = await ghApi('/api/issue/' + issueNum, 'GET', null, { retries: 1, timeout: 10000 });
     // v1.42.7：细分错误类型，404/401/网络错误给不同提示 + 重试按钮
     if (res.status === 404) { ct.innerHTML = '<div class="empty-state"><p>订单不存在或已被删除</p><p style="font-size:.85rem;color:var(--text-secondary);margin-top:8px">可能原因：订单刚发布尚未同步、已被发布者删除、或者 issue 编号异常</p><button class="btn btn-sm btn-outline" style="margin-top:12px" onclick="closeDetailModal()">关闭</button></div>'; return; }
     // v1.42.8：401/403 不再误伤为"请重新登录"——这是后端 SCF 代理/PAT 问题，与用户登录态无关
