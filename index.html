@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.11">
+<meta name="version" content="1.42.12">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2409,7 +2409,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.11';
+const APP_VERSION = '1.42.12';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2556,6 +2556,32 @@ function setAuthCookies() {
 function getCookieToken() { return getCookie('hust_token'); }
 function getCookieUid() { return getCookie('hust_uid'); }
 function clearAuthCookies() { setCookie('hust_token', '', -1); setCookie('hust_uid', '', -1); }
+
+// ============ v1.42.12 全局 fetch 鉴权补丁（一处改动覆盖 39 处裸 fetch）============
+// 背景：API_BASE 指向后端 /gh/* 透传；v1.14.0 起后端对单条 issue 读取（/issues/N）强制 Bearer Token，
+//       否则返回 401。前端历史遗留 39 处裸 fetch 用 headers:{} 未带 token，导致信用分变动、私信拉黑校验、
+//       完成订单/交接码/取消/确认收货、管理员审核/跑腿认证/投诉处理、评价、自动结算等功能静默失效。
+// 方案：统一拦截所有指向 API_BASE 的 fetch 并注入 Authorization，避免逐个修改 39 处调用点。
+(function patchFetchAuth() {
+  if (typeof window === "undefined" || !window.fetch) return;
+  var _origFetch = window.fetch;
+  window.fetch = function (input, init) {
+    try {
+      var url = (typeof input === "string") ? input : ((input && input.url) || "");
+      if (url && typeof API_BASE !== "undefined" && API_BASE && url.indexOf(API_BASE) === 0) {
+        var tk = (typeof getToken === "function") ? getToken() : null;
+        if (tk) {
+          init = init || {};
+          var h = Object.assign({}, init.headers || {});
+          var hasAuth = Object.keys(h).some(function (k) { return String(k).toLowerCase() === "authorization"; });
+          if (!hasAuth) h["Authorization"] = "Bearer " + tk;
+          init.headers = h;
+        }
+      }
+    } catch (e) { /* 补丁异常不应影响原请求 */ }
+    return _origFetch(input, init);
+  };
+})();
 
 function ghApi(path, method, body, reqOpts) {
   const ro = reqOpts || {};
