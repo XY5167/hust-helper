@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.6">
+<meta name="version" content="1.42.7">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2294,7 +2294,12 @@ const SENSITIVE_WORDS = new Set([
   '信用卡套现','套现','洗钱','比特币','虚拟币',
   '招嫖','色情交易','黄片','裸聊',
   '点赞返利','培训贷','美容贷','医美贷',
-  '虚开','走私','烟草','香烟','电子烟'
+  '虚开','走私','烟草','香烟','电子烟',
+  // v1.42.7 扩充脏话词（解决"你踏马的"等变体漏网）
+  '你妈','踏马','特么','妈卖批','草你','草尼玛','妈逼','装逼',
+  'tmd','cnm','nmsl','nmb','sb','rz','nc',
+  '智障','脑残','废物','贱人','滚蛋','滚','麻痹','脑瘫','弱智','去死','死全家','欠揍',
+  'fuckyou','asshole','bitch','bastard','dick','dickhead'
 ]);
 const SENSITIVE_MIN_LEN = 2, SENSITIVE_MAX_LEN = 10;
 function checkSensitive(text) {
@@ -2322,6 +2327,9 @@ function checkContactLeak(text) {
 }
 // v1.39.0 AI 内容安全预检（发帖/发布前调用）。fail-open：任何异常都按 safe 放行，绝不因 AI 故障阻断正常发帖。
 async function aiModerate(title, content) {
+  // v1.42.7：本地字典命中直接 block（节省 AI 额度，命中即返回）
+  const hit = checkSensitive(((title || '') + ' ' + (content || '')).slice(0, 500));
+  if (hit) return { verdict: 'block', confidence: 1, reason: '命中敏感词：' + hit, suggestion: '请文明用语，修改后再发布' };
   try {
     const res = await ghApi('/api/ai/moderate', 'POST', { title: title || '', content: content || '' });
     if (res && res.ok) {
@@ -2401,7 +2409,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.5';
+const APP_VERSION = '1.42.7';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3238,7 +3246,8 @@ function applyStats(d) {
   set('statUsers', users);
   set('forumStatOrders', orders);
   set('forumBizTaskCount', ok ? d.orders : '—');
-  set('forumStatOnline', ok ? (Math.max(1, Math.round((d.orders || 0) / 3)) + '+') : '—');
+  // v1.42.7：在线同学改用注册用户数估算（d.users/10），避免订单少就显示 1 的尴尬
+  set('forumStatOnline', ok ? (Math.max(1, Math.min(99, Math.round((d.users || 0) / 10))) + '+') : '—');
   set('liveUsers', users);
   // 轻量降级态：仅在统计卡片上标记，不打扰用户
   const box = document.querySelector('.forum-stats');
@@ -4167,7 +4176,10 @@ async function showDetail(issueNum) {
     const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + issueNum, {
       headers: {}
     });
-    if (!res.ok) { ct.innerHTML = '<p>订单不存在</p>'; return; }
+    // v1.42.7：细分错误类型，404/401/网络错误给不同提示 + 重试按钮
+    if (res.status === 404) { ct.innerHTML = '<div class="empty-state"><p>订单不存在或已被删除</p><p style="font-size:.85rem;color:var(--text-secondary);margin-top:8px">可能原因：订单刚发布尚未同步、已被发布者删除、或者 issue 编号异常</p><button class="btn btn-sm btn-outline" style="margin-top:12px" onclick="closeDetailModal()">关闭</button></div>'; return; }
+    if (res.status === 401 || res.status === 403) { ct.innerHTML = '<div class="empty-state"><p>登录已过期，请刷新页面重新登录</p><button class="btn btn-sm btn-primary" style="margin-top:12px" onclick="location.reload()">刷新页面</button></div>'; return; }
+    if (!res.ok) { ct.innerHTML = '<div class="empty-state"><p>加载失败（HTTP ' + res.status + '）</p><button class="btn btn-sm btn-outline" style="margin-top:12px" onclick="showDetail(' + issueNum + ')">🔄 重试</button></div>'; return; }
     const issue = await res.json();
     const o = JSON.parse(issue.body);
     o._issue_number = issueNum;
@@ -8806,12 +8818,13 @@ function _fallbackCopy(text, okMsg) {
 }
 
 // ===== v1.21.0 本地 OCR 兜底（Tesseract.js，纯浏览器，不耗后端额度）=====
-// 动态加载：jsdelivr → unpkg → cdnjs 依次尝试，成功缓存全局 Tesseract
+// v1.42.7：优先加载自托管资源（icons/tesseract/），失败兜底 CDN
 let _tesseractPromise = null;
 function loadTesseract() {
   if (window.Tesseract) return Promise.resolve(window.Tesseract);
   if (_tesseractPromise) return _tesseractPromise;
   const urls = [
+    'icons/tesseract/tesseract.min.js', // v1.42.7 自托管优先
     'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
     'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js'
@@ -8831,14 +8844,24 @@ function loadTesseract() {
   return _tesseractPromise;
 }
 
-// 本地 OCR：识别图片文字（首次需下载中文模型约 10-15MB，IndexedDB 缓存，二次快）
+// 本地 OCR：识别图片文字（首次需下载中文模型约 20MB，IndexedDB 缓存，二次快）
+// v1.42.7：workerPath/corePath/langPath 优先自托管，避免 unpkg 0% 卡死
 async function localOcrText(file, onProgress) {
   const T = await loadTesseract();
   let worker = null;
   try {
-    worker = await T.createWorker('chi_sim', 1, {
+    // 尝试自托管路径；如果 script 来自 CDN 也能 fallback（只要 workerPath 404，tesseract.js 会回退默认）
+    const selfHosted = (typeof location !== 'undefined') && location.protocol.startsWith('http');
+    const opts = {
       logger: function(m) { if (typeof onProgress === 'function') onProgress(m); }
-    });
+    };
+    if (selfHosted) {
+      opts.workerPath = 'icons/tesseract/worker.min.js';
+      opts.corePath = 'icons/tesseract/';
+      opts.langPath = 'icons/tesseract/';
+      opts.gzip = true;
+    }
+    worker = await T.createWorker('chi_sim', 1, opts);
     // v1.21.1：PSM=11 稀疏文字模式更适合书封面/海报（默认 3 在大图案+大字混排时切碎识别）
     try { await worker.setParameters({ tessedit_pageseg_mode: '11' }); } catch (e) {}
     const ret = await worker.recognize(file);
@@ -8871,15 +8894,19 @@ function keywordsFromText(text) {
 
 // 本地 OCR 兜底总入口：后端失败 / 额度不足时调用（纯浏览器，不耗额度）
 // 成功返回 true（关键词已出 + 文本并入润色），失败返回 false（已退回文件名/手动引导）
+// v1.42.7：加 30s 超时，避免国内网络下 chi_sim 模型卡 0% 永远不返回
 async function localOcrFallback(file, idx, badge, st, reason) {
-  if (st) st.textContent = '第 ' + (idx + 1) + ' 张' + (reason ? '（' + reason + '）' : '') + '，尝试本地识别…';
+  if (st) st.textContent = '第 ' + (idx + 1) + ' 张' + (reason ? '（' + reason + '）' : '') + '，尝试本地识别（首次需下载中文模型约 20MB，30s 超时）…';
   let localText = '', localErr = '';
   try {
-    localText = await localOcrText(file, function(m) {
+    // 30s 超时兜底
+    const ocrPromise = localOcrText(file, function(m) {
       if (!st || !m || typeof m.progress !== 'number') return;
       if (m.status === 'recognizing text') st.textContent = '第 ' + (idx + 1) + ' 张本地识别中 ' + Math.round(m.progress * 100) + '%…';
       else if (/download|load|init/i.test(m.status || '')) st.textContent = '本地识别模型' + (m.status || '加载中') + ' ' + Math.round(m.progress * 100) + '%…';
     });
+    const timeoutPromise = new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('OCR_TIMEOUT')); }, 30000); });
+    localText = await Promise.race([ocrPromise, timeoutPromise]);
   } catch (le) { localErr = (le && le.message) ? le.message : 'LOCAL_OCR_FAIL'; }
   const localWords = localText ? keywordsFromText(localText) : [];
   if (localWords.length) {
@@ -8898,7 +8925,9 @@ async function localOcrFallback(file, idx, badge, st, reason) {
   fallbackWords.forEach(k => addOcrChip(k));
   const hint = ocrFallbackHint();
   if (st) {
-    if (localErr === 'TESSERACT_CDN_FAIL') {
+    if (localErr === 'OCR_TIMEOUT') {
+      st.textContent = '第 ' + (idx + 1) + ' 张本地识别超时（30s），可能网络慢或模型文件大。可手动输入关键词（如：' + hint + '）';
+    } else if (localErr === 'TESSERACT_CDN_FAIL') {
       st.textContent = '第 ' + (idx + 1) + ' 张识别失败：本地识别模型下载失败（网络），请检查网络后手动输入关键词（如：' + hint + '）';
     } else if (fallbackWords.length) {
       st.textContent = '第 ' + (idx + 1) + ' 张识别失败（' + reason + '），本地也未能识别，已用文件名识别，可手动补充关键词（如：' + hint + '）';

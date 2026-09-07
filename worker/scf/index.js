@@ -49,6 +49,40 @@ const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
 const VERSION = '1.41.0';
 
+// v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
+// 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
+const SERVER_SENSITIVE_WORDS = new Set([
+  '代写','代考','替考','代做','代课','论文代写','作业代写','毕业设计代做',
+  '枪手','作弊','抄袭','考试答案','四六级答案',
+  '赌博','赌球','吸毒','毒品','大麻','摇头丸','冰毒',
+  '高利贷','裸贷','校园贷','套路贷','刷单','传销',
+  '约炮','嫖娼','卖淫','一夜情','包养','援交',
+  '傻逼','草泥马','操你','fuck','shit',
+  '枪支','弹药','管制刀具','迷药','安眠药',
+  '自杀','自残','跳楼',
+  '垫付','先付款','先交钱','押金','保证金','刷单返利','扫码付款','私下转账','私下交易','定金不退','预付定金','先打款',
+  '办证','假证','刻章','学历造假','成绩修改','改分','代注册',
+  '信用卡套现','套现','洗钱','比特币','虚拟币',
+  '招嫖','色情交易','黄片','裸聊',
+  '点赞返利','培训贷','美容贷','医美贷',
+  '虚开','走私','烟草','香烟','电子烟',
+  '你妈','踏马','特么','妈卖批','草你','草尼玛','妈逼','装逼',
+  'tmd','cnm','nmsl','nmb','sb','rz','nc',
+  '智障','脑残','废物','贱人','滚蛋','滚','麻痹','脑瘫','弱智','去死','死全家','欠揍',
+  'fuckyou','asshole','bitch','bastard','dick','dickhead'
+]);
+function checkSensitiveServer(text) {
+  if (!text) return null;
+  const t = String(text).toLowerCase();
+  for (let len = 2; len <= 10; len++) {
+    for (let i = 0; i <= t.length - len; i++) {
+      const sub = t.substring(i, i + len);
+      if (SERVER_SENSITIVE_WORDS.has(sub)) return sub;
+    }
+  }
+  return null;
+}
+
 // 白名单：仅放行本仓库的 issues（含子路径 /comments），拒绝其它仓库/敏感路径
 const REPO_ESC = REPO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const GH_WHITELIST = new RegExp('^/repos/' + REPO_ESC + '/issues(/|\\?|$)');
@@ -886,6 +920,9 @@ const server = http.createServer(async (req, res) => {
           const content = (ghBody && ghBody.content || '').toString().trim();
           const kind = (ghBody && ghBody.type || 'post').toString().trim();
           if (!content && !title) return sendJSON(res, 400, { error: 'INVALID_INPUT' }, headers);
+          // v1.42.7：本地字典命中直接 block（兜底防前端被绕过 + 省 AI 额度）
+          const hit = checkSensitiveServer(((title || '') + ' ' + (content || '')).slice(0, 500));
+          if (hit) return sendJSON(res, 200, { ok: true, verdict: 'block', confidence: 99, reason: '命中敏感词：' + hit, suggestion: '请文明用语，修改后再发布' });
           const sysPrompt = '你是华中科技大学(HUST)校园互助平台的发帖内容安全审核助手，负责在内容发布前做第一轮风险识别，维护校园互助环境。' +
             '需要识别的违规类型：' +
             '1) 广告引流：引导到淘宝/拼多多/抖音/闲鱼/校外商家等平台，或为他人店铺拉客；' +
