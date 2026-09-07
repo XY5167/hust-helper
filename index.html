@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.7">
+<meta name="version" content="1.42.8">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2409,7 +2409,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.7';
+const APP_VERSION = '1.42.8';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3246,8 +3246,10 @@ function applyStats(d) {
   set('statUsers', users);
   set('forumStatOrders', orders);
   set('forumBizTaskCount', ok ? d.orders : '—');
-  // v1.42.7：在线同学改用注册用户数估算（d.users/10），避免订单少就显示 1 的尴尬
-  set('forumStatOnline', ok ? (Math.max(1, Math.min(99, Math.round((d.users || 0) / 10))) + '+') : '—');
+  // v1.42.8：基数小时显示真实值，基数大时给活跃度估算（避免 d.users=4 时永远显示 1+）
+  const totalUsers = ok ? (d.users || 0) : 0;
+  const online = totalUsers <= 10 ? totalUsers : Math.max(1, Math.min(99, Math.round(totalUsers / 3)));
+  set('forumStatOnline', ok ? (online + '+') : '—');
   set('liveUsers', users);
   // 轻量降级态：仅在统计卡片上标记，不打扰用户
   const box = document.querySelector('.forum-stats');
@@ -4178,7 +4180,8 @@ async function showDetail(issueNum) {
     });
     // v1.42.7：细分错误类型，404/401/网络错误给不同提示 + 重试按钮
     if (res.status === 404) { ct.innerHTML = '<div class="empty-state"><p>订单不存在或已被删除</p><p style="font-size:.85rem;color:var(--text-secondary);margin-top:8px">可能原因：订单刚发布尚未同步、已被发布者删除、或者 issue 编号异常</p><button class="btn btn-sm btn-outline" style="margin-top:12px" onclick="closeDetailModal()">关闭</button></div>'; return; }
-    if (res.status === 401 || res.status === 403) { ct.innerHTML = '<div class="empty-state"><p>登录已过期，请刷新页面重新登录</p><button class="btn btn-sm btn-primary" style="margin-top:12px" onclick="location.reload()">刷新页面</button></div>'; return; }
+    // v1.42.8：401/403 不再误伤为"请重新登录"——这是后端 SCF 代理/PAT 问题，与用户登录态无关
+    if (res.status === 401 || res.status === 403) { ct.innerHTML = '<div class="empty-state"><p>加载失败（HTTP ' + res.status + '）</p><p style="font-size:.85rem;color:var(--text-secondary);margin-top:8px">后端代理暂时无法访问，请稍后再试</p><button class="btn btn-sm btn-outline" style="margin-top:12px" onclick="showDetail(' + issueNum + ')">🔄 重试</button></div>'; return; }
     if (!res.ok) { ct.innerHTML = '<div class="empty-state"><p>加载失败（HTTP ' + res.status + '）</p><button class="btn btn-sm btn-outline" style="margin-top:12px" onclick="showDetail(' + issueNum + ')">🔄 重试</button></div>'; return; }
     const issue = await res.json();
     const o = JSON.parse(issue.body);
