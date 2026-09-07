@@ -47,7 +47,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.41.3';
+const VERSION = '1.41.4';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -1076,6 +1076,25 @@ const server = http.createServer(async (req, res) => {
           return sendJSON(res, 200, { ok: true, ai_extract: aiExtract, matches });
         }
 
+        // ---- v1.41.4 写操作鉴权 ----
+        // 此前 /api/* 的 POST/PATCH/DELETE 完全不校验身份：任何人拿到 SCF 地址即可
+        // 创建假订单、篡改他人订单状态、删除评论（实测无 token PATCH 直达 GitHub 返回 404 而非 401）。
+        // 注册/登录走 /api/register、/api/login 自建端点，不经过此处，因此可安全要求 Bearer。
+        // 应急回退：设置环境变量 AUTH_WRITE_OFF=1 可临时关闭该校验。
+        if (process.env.AUTH_WRITE_OFF !== '1') {
+          const isWriteEndpoint =
+            (method === 'POST' && path === '/api/issues') ||
+            (method === 'POST' && /^\/api\/comments\/\d+$/.test(path)) ||
+            (method === 'PATCH' && /^\/api\/issue\/\d+$/.test(path)) ||
+            (method === 'DELETE' && /^\/api\/issue\/\d+\/comments\/\d+$/.test(path));
+          if (isWriteEndpoint) {
+            const _tk = bearerPayload(req);
+            if (!_tk) {
+              return sendJSON(res, 401, { error: 'UNAUTHORIZED', hint: '写操作需要登录态' }, headers);
+            }
+          }
+        }
+
         let ghPath = '';
         if (method === 'POST' && path === '/api/issues') {
           ghPath = `/repos/${REPO}/issues`;
@@ -1085,13 +1104,37 @@ const server = http.createServer(async (req, res) => {
         } else if (method === 'PATCH' && /^\/api\/issue\/(\d+)$/.test(path)) {
           const num = path.split('/api/issue/')[1];
           ghPath = `/repos/${REPO}/issues/${num}`;
-          // 写保护：合并保留 password_hash
-          if (ghBody && ghBody.body) {
+          // v1.41.4：单次 GET 同时服务两件事
+          //   (a) 乐观锁 CAS：客户端可传 _expect:{status:'open'} 等字段断言，后端在同一次请求内
+          //       读→比对→写入，避免前端「读-改-写」竞态（两人同时抢同一单都会成功）。
+          //   (b) 写保护：合并保留 password_hash
+          const needExpect = !!(ghBody && ghBody._expect && typeof ghBody._expect === 'object');
+          const needPwd = !!(ghBody && ghBody.body);
+          if (needExpect || needPwd) {
             const cur = await ghProxy(ghPath, 'GET', null);
-            if (cur.status === 200 && issueHasUserLabel(cur.data)) {
-              ghBody = Object.assign({}, ghBody, { body: protectPasswordField(ghBody.body, cur.data.body) });
+            if (cur.status === 200 && cur.data) {
+              if (needPwd && issueHasUserLabel(cur.data)) {
+                ghBody = Object.assign({}, ghBody, { body: protectPasswordField(ghBody.body, cur.data.body) });
+              }
+              if (needExpect) {
+                let curObj = {};
+                try { curObj = JSON.parse(cur.data.body || '{}'); } catch (e) { curObj = {}; }
+                const conflicts = {};
+                for (const k of Object.keys(ghBody._expect)) {
+                  const want = JSON.stringify(ghBody._expect[k]);
+                  const got = JSON.stringify(curObj[k] === undefined ? null : curObj[k]);
+                  if (want !== got) conflicts[k] = { expect: ghBody._expect[k], actual: curObj[k] === undefined ? null : curObj[k] };
+                }
+                if (Object.keys(conflicts).length) {
+                  return sendJSON(res, 409, { error: 'CONFLICT', conflicts }, headers);
+                }
+              }
+            } else if (needExpect) {
+              return sendJSON(res, 502, { error: 'CAS_READ_FAILED' }, headers);
             }
           }
+          // 剔除内部字段，避免写入 GitHub
+          if (ghBody && ghBody._expect) { ghBody = Object.assign({}, ghBody); delete ghBody._expect; }
         } else if (method === 'DELETE' && /^\/api\/issue\/\d+\/comments\/\d+$/.test(path)) {
           const parts = path.split('/api/issue/')[1].split('/');
           ghPath = `/repos/${REPO}/issues/comments/${parts[1]}`;

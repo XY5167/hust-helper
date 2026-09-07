@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.12">
+<meta name="version" content="1.42.13">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2409,7 +2409,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.12';
+const APP_VERSION = '1.42.13';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2733,10 +2733,23 @@ async function ghCreateIssue(title, body, labels) {
   return res.json();
 }
 
-async function ghUpdateIssue(number, body) {
+async function ghUpdateIssue(number, body, expect) {
   if (USE_PROXY) {
-    const res = await ghApi('/api/issue/' + number, 'PATCH', { body });
-    if (!res.ok) throw new Error('Update failed ' + res.status);
+    const payload = { body };
+    // v1.42.13 乐观锁：expect 为字段断言对象（如 {status:'open'}），由后端 v1.41.4+ 在同一次请求内
+    // 读→比对→写入，消除前端「读-改-写」竞态（两人同时抢同一单都成功的问题）。
+    if (expect && typeof expect === 'object') payload._expect = expect;
+    const res = await ghApi('/api/issue/' + number, 'PATCH', payload);
+    if (!res.ok) {
+      if (res.status === 409) {
+        const detail = await res.json().catch(function () { return {}; });
+        const err = new Error('CONFLICT');
+        err.code = 'CONFLICT';
+        err.conflicts = detail.conflicts || {};
+        throw err;
+      }
+      throw new Error('Update failed ' + res.status);
+    }
     return res.json();
   }
   const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + number, {
@@ -3833,7 +3846,7 @@ function renderOrders(orders) {
     const imgList = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     return '<div class="order-card' + (imgList.length ? ' has-cover' : '') + '" onclick="showDetail(' + o._issue_number + ')">'
       // v1.42.2 信息流卡片：首图作封面 + 成色 badge
-      + (imgList.length ? '<div class="order-card-cover-wrap"><img class="order-card-cover" src="' + safeImgSrc(imgList[0]) + '" loading="lazy" alt=""><span class="order-card-condition">' + (o.condition || '9成新') + '</span></div>' : '')
+      + (imgList.length ? '<div class="order-card-cover-wrap"><img class="order-card-cover" src="' + safeImgSrc(imgList[0]) + '" loading="lazy" alt=""><span class="order-card-condition">' + esc(o.condition || '9成新') + '</span></div>' : '')
       + '<div class="order-card-body">'
       + '<div class="order-card-header">'
       + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + recTag + dormTag
@@ -6602,9 +6615,9 @@ async function confirmTakeOrder() {
     return;
   }
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
-      headers: {}
-    });
+    // v1.42.13：改走 /api/* 语义路由（免登录校验），避免裸 fetch 触发 401
+    const res = await ghApi('/api/issue/' + inum, 'GET');
+    if (!res.ok) throw new Error('读取订单失败 HTTP ' + res.status);
     const issue = await res.json();
     const o = JSON.parse(issue.body);
     if (o.status !== 'open') { toast('订单已被接取', 'error'); return; }
@@ -6624,7 +6637,8 @@ async function confirmTakeOrder() {
     o.estimate_finish = est.iso;
     o.estimate_finish_label = est.label;
     o.estimate_finish_prompted_at = new Date().toISOString();
-    await ghUpdateIssue(inum, JSON.stringify(o));
+    // v1.42.13：带乐观锁写入 —— 只有当前状态仍是 open 才写入成功，否则后端返回 409
+    await ghUpdateIssue(inum, JSON.stringify(o), { status: 'open' });
     toast('接单成功！预计 ' + est.label + ' 完成，请提醒对方查看你的收款信息', 'success');
     closeDetailModal();
     closeEstimateModal();
@@ -6637,7 +6651,18 @@ async function confirmTakeOrder() {
     if (S.page === 'my') loadMyOrders();
     else if (S.page === 'task') { /* 已通过缓存更新，但异步再拉一次确保数据一致 */ setTimeout(() => refreshCurrentTab(), 1500); }
     cacheBust('stats'); loadStats();
-  } catch(e) { toast(e.message, 'error'); }
+  } catch(e) {
+    // v1.42.13：乐观锁冲突 = 期间订单已被他人接走/改动
+    if (e && e.code === 'CONFLICT') {
+      toast('手慢一步，该订单状态已变化（可能已被抢走），正在刷新…', 'error');
+      _pendingTakeNum = null;
+      try { closeEstimateModal(); } catch (x) {}
+      try { closeDetailModal(); } catch (x) {}
+      setTimeout(function () { refreshCurrentTab(); }, 800);
+    } else {
+      toast(e.message, 'error');
+    }
+  }
 }
 
 // 乐观更新我的订单缓存并立即重渲染（点击即响应，不等后台同步）
@@ -6851,11 +6876,16 @@ async function disputeAwaitingOrder(inum) {
 async function cancelOrder(inum) {
   if (!confirm('确定取消此订单？')) return;
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
-      headers: {}
-    });
+    // v1.42.13：改走 /api/* 语义路由（免登录校验），避免裸 fetch 触发 401
+    const res = await ghApi('/api/issue/' + inum, 'GET');
+    if (!res.ok) throw new Error('读取订单失败 HTTP ' + res.status);
     const issue = await res.json();
     const o = JSON.parse(issue.body);
+    // v1.42.13：终态保护 —— 已完成/待确认的订单不允许再改回取消，
+    // 否则发布者可在服务完成后单方面抹掉交易记录（此前无拦截）。
+    if (o.status === 'completed') { toast('订单已完成，不能再取消', 'error'); return; }
+    if (o.status === 'awaiting_confirm') { toast('订单待双方确认，不能取消；如有争议请发起投诉', 'error'); return; }
+    if (o.status === 'cancelled') { toast('订单已取消', 'info'); return; }
 
     // 信用分扣分逻辑
     const uid = S.user._issue_number || S.user.student_id;
