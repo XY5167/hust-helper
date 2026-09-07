@@ -47,7 +47,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.41.2';
+const VERSION = '1.41.3';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -915,6 +915,18 @@ const server = http.createServer(async (req, res) => {
               const parsed = extractJson(content);
               if (parsed && Array.isArray(parsed.keywords)) {
                 keywords = parsed.keywords.map(k => String(k).trim().slice(0, 10)).filter(k => k.length >= 2).slice(0, 8);
+                // v1.41.3 后处理：过滤图片元数据/相机水印/纯数字短码等噪音
+                // （GLM 有时会照搬 OCR 文字里的 "IMG_20260907_211109" 之类的相机烧入水印 / 文件名时间戳）
+                keywords = keywords.filter(k => {
+                  if (/^\d+$/.test(k)) return false;                              // 纯数字
+                  if (/^IMG[\s_\-_]?\d/i.test(k)) return false;                  // IMG_数字 / IMG-数字 / IMG 数字
+                  if (/^DSC[\s_\-_]?\d/i.test(k)) return false;                  // DSC_数字
+                  if (/^Screenshot[\s_\-_]?\d/i.test(k)) return false;           // Screenshot_数字
+                  if (/^image[\s_\-_]?\d/i.test(k)) return false;                // image_数字
+                  if (/^\d{6,}$/.test(k)) return false;                           // 6+ 位时间戳
+                  if (!/[\u4e00-\u9fa5]/.test(k) && /^[A-Za-z]{1,3}$/.test(k)) return false; // 1-3 字符纯字母噪音（如 IMG/DSC）
+                  return true;
+                });
               }
               // v1.41.0 书籍自动分类：书名 / 科目 / 年级 / 书类型，供二手教材按科目聚合与搜索
               if (parsed && parsed.book && typeof parsed.book === 'object') {

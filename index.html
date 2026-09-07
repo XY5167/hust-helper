@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.10">
+<meta name="version" content="1.42.11">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2409,7 +2409,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.10';
+const APP_VERSION = '1.42.11';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -6115,10 +6115,10 @@ async function loadVipManagement() {
 async function activateVip(inum, name) {
   if (!confirm('确认为「' + name + '」开通 1 个月会员（¥1）？')) return;
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
-      headers: {}
-    });
-    const issue = await res.json();
+    // v1.42.11：改用 ghApi 走 /api/* 语义路由，避免 v1.14.0 后端对 /gh/* 单条 issue 透传强校验 Bearer Token 致 401
+    const r = await ghApi('/api/issue/' + inum);
+    if (!r.ok) throw new Error('HTTP_' + r.status);
+    const issue = await r.json();
     const u = JSON.parse(issue.body);
     const now = new Date();
     // 如果已有有效会员，从到期日开始续；否则从今天开始
@@ -6144,10 +6144,10 @@ async function extendVip(inum, name) {
 async function cancelVip(inum, name) {
   if (!confirm('确定取消「' + name + '」的会员资格？')) return;
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
-      headers: {}
-    });
-    const issue = await res.json();
+    // v1.42.11：同 activateVip，改用 ghApi 走 /api/* 语义路由
+    const r = await ghApi('/api/issue/' + inum);
+    if (!r.ok) throw new Error('HTTP_' + r.status);
+    const issue = await r.json();
     const u = JSON.parse(issue.body);
     u.vip_expire = null;
     await ghUpdateIssue(inum, JSON.stringify(u));
@@ -8940,14 +8940,29 @@ async function localOcrFallback(file, idx, badge, st, reason) {
 }
 
 // 后端未部署新版 / 调用失败时的本地兜底：从文件名提取关键词
-// 过滤无意义文件名（纯数字、UUID、时间戳），避免把 1787711316900.jpg 当成关键词
+// v1.42.11：增强过滤——手机拍照默认名（如 IMG_20260907_211109.jpg）只切出"IMG/20260907/211109"这种图片元数据噪音，
+//  全自动进 chip 反而让用户要手动删。故先检测典型相机默认名整名 → 直接 return []，让用户主动手动输入；
+//  part 级再加 纯数字 / 1-3 字符纯字母 / 6+ 位时间戳 过滤，与后端 /api/ai/ocr keywords 保持一致严格度
 function mockOcrKeywords(file) {
   const raw = (file.name || '').replace(/\.[a-z0-9]+$/i, '').trim();
   // 长度小于 3、纯数字、UUID、16位以上时间戳 都视为无意义
   if (!raw || raw.length < 3 || /^\d+$/.test(raw) || /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(raw) || /^\d{15,}$/.test(raw)) {
     return [];
   }
-  return raw.split(/[\s_\-·,，.。()（）【】\[\]]+/).filter(w => w.length >= 2 && w.length <= 10).slice(0, 4);
+  // 典型手机/相机默认名（IMG_数字_数字、IMG数字、DSC数字、Screenshot_数字、image_数字、P_数字 等） → 不自动填
+  if (/^IMG[\s_\-_]?\d/i.test(raw) || /^DSC[\s_\-_]?\d/i.test(raw) || /^Screenshot[\s_\-_]?\d/i.test(raw)
+      || /^image[\s_\-_]?\d/i.test(raw) || /^P[\s_\-_]?\d/i.test(raw) || /^VID[\s_\-_]?\d/i.test(raw)
+      || /^\d{4}[\s_\-_]?\d{2}[\s_\-_]?\d{2}[\s_\-_]?\d{2}/.test(raw)) {
+    return [];
+  }
+  // part 级过滤：纯数字 / 1-3 字符纯字母 / 6+ 位时间戳 全部剔除
+  return raw.split(/[\s_\-·,，.。()（）【】\[\]]+/).filter(w => {
+    if (!w || w.length < 2 || w.length > 10) return false;
+    if (/^\d+$/.test(w)) return false;                          // 纯数字
+    if (/^\d{6,}$/.test(w)) return false;                       // 6+ 位时间戳
+    if (!/[\u4e00-\u9fa5]/.test(w) && /^[A-Za-z]{1,3}$/.test(w)) return false;  // 1-3 字符纯字母噪音
+    return true;
+  }).slice(0, 4);
 }
 
 // 根据发布类型给出手动输入关键词示例，帮用户补全"工程制图"这类信息
