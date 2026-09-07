@@ -47,7 +47,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.41.0';
+const VERSION = '1.41.1';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -307,6 +307,12 @@ async function callHunyuan(messages) {
       if (msg.content && String(msg.content).trim()) return String(msg.content);
       if (msg.reasoning_content && String(msg.reasoning_content).trim()) return String(msg.reasoning_content);
       throw new Error('LLM_EMPTY');
+      // v1.41.1：把 AbortError 转成可读错误（原来透传 "This operation was aborted"，前端看不懂）
+    } catch (er) {
+      if (er && (er.name === 'AbortError' || /abort/i.test(String((er && er.message) || '')))) {
+        throw new Error('LLM_TIMEOUT: 请求 ' + TOKENHUB_MODEL + ' 12s 无响应 —— 请核对 SCF 环境变量 BASE_URL/MODEL/API_KEY（当前 baseUrl=' + TOKENHUB_BASE_URL + ', model=' + TOKENHUB_MODEL + '）');
+      }
+      throw er;
     } finally { clearTimeout(timer); }
   }
   throw new Error('LLM_RETRY_EXHAUSTED');
@@ -582,8 +588,13 @@ const server = http.createServer(async (req, res) => {
   }
 
   // 健康检查（无需 token，供前端/运维探测）
+  // v1.41.1：附带 AI 通道配置诊断（key 是否配、实际生效的 baseUrl/model）
   if (path === '/health') {
-    return sendJSON(res, 200, { status: 'ok', version: VERSION, hasToken: !!GITHUB_TOKEN, ts: Date.now() }, headers);
+    return sendJSON(res, 200, {
+      status: 'ok', version: VERSION, hasToken: !!GITHUB_TOKEN,
+      ai: { key: !!TOKENHUB_API_KEY, baseUrl: TOKENHUB_BASE_URL, model: TOKENHUB_MODEL },
+      ts: Date.now()
+    }, headers);
   }
 
   // ---- /api/* 语义路由（带缓存、分页）----
@@ -638,6 +649,43 @@ const server = http.createServer(async (req, res) => {
           const all = await ghIssuesAll('user', 'all');
           const list = all.map(i => { const u = desensitizeUser(JSON.parse(i.body)); u._issue_number = i.number; return u; });
           return sendJSON(res, 200, list, headers);
+        }
+        // v1.41.1：AI 通道自检 —— 用当前环境变量真实调用一次 LLM，
+        // 把失败原因（未配 key / 401 / 模型不存在 / 超时）原样返回，方便远程定位
+        if (path === '/api/ai/diag') {
+          if (!TOKENHUB_API_KEY) {
+            return sendJSON(res, 200, { version: VERSION, ok: false, stage: 'config', error: 'TOKENHUB_API_KEY 未配置' }, headers);
+          }
+          const ctl = new AbortController();
+          const timer = setTimeout(() => ctl.abort(), 8000);
+          let probe;
+          try {
+            const r = await fetch(TOKENHUB_BASE_URL + '/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + TOKENHUB_API_KEY, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: TOKENHUB_MODEL, messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 }),
+              signal: ctl.signal
+            });
+            const body = await r.json().catch(() => ({}));
+            const errMsg = (body.error && (body.error.message || body.error.code)) || body.message || '';
+            probe = {
+              ok: r.ok,
+              stage: r.ok ? 'success' : 'llm_error',
+              http: r.status,
+              model: TOKENHUB_MODEL,
+              error: r.ok ? null : (errMsg ? String(errMsg) : ('HTTP ' + r.status))
+            };
+          } catch (e) {
+            probe = {
+              ok: false,
+              stage: 'network',
+              model: TOKENHUB_MODEL,
+              error: (e && e.name === 'AbortError')
+                ? 'LLM_TIMEOUT：8 秒无响应。SCF 无法访问该 baseUrl（需确认域名可达/出网），或模型名不存在导致网关挂起'
+                : String((e && e.message) || e)
+            };
+          } finally { clearTimeout(timer); }
+          return sendJSON(res, 200, { version: VERSION, config: { baseUrl: TOKENHUB_BASE_URL, model: TOKENHUB_MODEL, hasKey: !!TOKENHUB_API_KEY }, probe: probe }, headers);
         }
         if (statsMatch) {
           const ck = 'stats';
