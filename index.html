@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.5">
+<meta name="version" content="1.42.6">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -821,9 +821,10 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .email-verified-badge{color:var(--success);font-size:.8rem;font-weight:600}
 
 /* ===== AI 互助小助手 (ai+opc) ===== */
-.ai-fab{position:fixed;right:20px;bottom:24px;z-index:200;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,#6366f1,#1a73e8);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
+.ai-fab{position:fixed;right:20px;bottom:24px;z-index:200;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,#6366f1,#1a73e8);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease);touch-action:none;-webkit-user-select:none;user-select:none;will-change:transform,right,bottom}
 .ai-fab:hover{transform:translateY(-3px) scale(1.05);box-shadow:var(--shadow-xl)}
 .ai-fab:active{transform:scale(.95)}
+.ai-fab.dragging{transition:none;opacity:.9;cursor:grabbing;z-index:210}
 
 /* v1.40.0 失物招领 AI 匹配角标 + 详情匹配区 */
 .forum-ai-badge{display:inline-block;margin:6px 0 0;padding:5px 12px;background:linear-gradient(135deg,#f0f7ff 0%,#e6f1ff 100%);border:1px solid #b8d8ff;border-radius:99px;color:#185fa5;font-size:12px;font-weight:600;letter-spacing:.2px}
@@ -9727,7 +9728,7 @@ if ('serviceWorker' in navigator) {
 </script>
 
 <!-- AI 互助小助手 (ai+opc) -->
-<button class="ai-fab" id="aiFab" onclick="toggleAiChat()" aria-label="AI 互助小助手" title="互助AI 小助手"><img src="icons/ai-avatar.png" alt="AI" style="width:32px;height:32px;border-radius:50%;object-fit:cover"></button>
+<button class="ai-fab" id="aiFab" aria-label="AI 互助小助手" title="互助AI 小助手（可拖动）"><img src="icons/ai-avatar.png" alt="AI" style="width:32px;height:32px;border-radius:50%;object-fit:cover;pointer-events:none"></button>
 <button class="wheel-fab" id="wheelFab" onclick="openWheel()" aria-label="幸运转盘" title="🎡 幸运转盘：今天吃什么等随机决策">🎡</button>
 <div class="ai-panel" id="aiPanel" role="dialog" aria-label="AI 互助小助手">
   <div class="ai-panel-header">
@@ -9877,6 +9878,73 @@ if ('serviceWorker' in navigator) {
   }
   function aiQuickAsk(btn){ const inp = document.getElementById('aiInput'); if(inp) inp.value = btn.textContent; sendAiMessage(); }
   window.toggleAiChat = toggleAiChat; window.sendAiMessage = sendAiMessage; window.aiQuickAsk = aiQuickAsk;
+
+  // v1.42.6：AI 助手按钮支持拖动，避免挡住底部内容；位置记忆到 localStorage
+  function initAiFabDrag(){
+    const btn = document.getElementById('aiFab');
+    if(!btn) return;
+    // 恢复上次保存的位置
+    const saved = localStorage.getItem('aiFabPos');
+    if(saved){
+      try{
+        const p = JSON.parse(saved);
+        if(typeof p.right === 'number' && typeof p.bottom === 'number'){
+          btn.style.right = p.right + 'px';
+          btn.style.bottom = p.bottom + 'px';
+          btn.style.left = 'auto';
+          btn.style.top = 'auto';
+        }
+      }catch(e){}
+    }
+    let dragging = false, moved = false, startX = 0, startY = 0, startR = 0, startB = 0;
+    btn.addEventListener('pointerdown', function(e){
+      if(e.pointerType === 'mouse' && e.button !== 0) return;
+      dragging = true; moved = false;
+      startX = e.clientX; startY = e.clientY;
+      const rect = btn.getBoundingClientRect();
+      startR = window.innerWidth - rect.right;
+      startB = window.innerHeight - rect.bottom;
+      btn.classList.add('dragging');
+      try{ btn.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    btn.addEventListener('pointermove', function(e){
+      if(!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if(Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+      const size = btn.offsetWidth || 56;
+      let newR = startR - dx;
+      let newB = startB - dy;
+      newR = Math.max(8, Math.min(window.innerWidth - size - 8, newR));
+      newB = Math.max(8, Math.min(window.innerHeight - size - 8, newB));
+      btn.style.right = newR + 'px';
+      btn.style.bottom = newB + 'px';
+      btn.style.left = 'auto';
+      btn.style.top = 'auto';
+    });
+    const endDrag = function(e){
+      if(!dragging) return;
+      dragging = false;
+      btn.classList.remove('dragging');
+      try{ btn.releasePointerCapture(e.pointerId); }catch(_){}
+      if(moved){
+        const rect = btn.getBoundingClientRect();
+        localStorage.setItem('aiFabPos', JSON.stringify({
+          right: Math.round(window.innerWidth - rect.right),
+          bottom: Math.round(window.innerHeight - rect.bottom)
+        }));
+      }
+    };
+    btn.addEventListener('pointerup', endDrag);
+    btn.addEventListener('pointercancel', endDrag);
+    // 区分点击与拖动：拖动时不打开面板
+    btn.addEventListener('click', function(e){
+      if(moved){ e.preventDefault(); e.stopPropagation(); moved = false; return; }
+      toggleAiChat();
+    });
+  }
+  window.initAiFabDrag = initAiFabDrag;
+  initAiFabDrag();
 
   // v1.38：AI 入口卡片 & 对话动作闭环
   function openAiAndAsk(q){

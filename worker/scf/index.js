@@ -41,10 +41,10 @@ const ADMIN_STUDENT_ID = process.env.ADMIN_STUDENT_ID || 'U202512533';
 const HUNYUAN_SECRET_ID = process.env.HUNYUAN_SECRET_ID || '';
 const HUNYUAN_SECRET_KEY = process.env.HUNYUAN_SECRET_KEY || '';
 const HUNYUAN_MODEL = process.env.HUNYUAN_MODEL || 'hunyuan-lite';
-// 2026-09 腾讯混元旧版模型下线，AI 对话/润色/审核/仲裁统一迁移至 TokenHub（OpenAI 兼容接口）
+// 2026-09 腾讯混元旧版模型下线；AI 默认走智谱 GLM-4.7-Flash 免费通道（OpenAI 兼容接口），可由 SCF 环境变量 TOKENHUB_API_KEY/BASE_URL/MODEL 覆盖
 const TOKENHUB_API_KEY = process.env.TOKENHUB_API_KEY || '';
-const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://tokenhub.tencentmaas.com/v1').replace(/\/$/, '');
-const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'hy3';
+const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4').replace(/\/$/, '');
+const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
 const VERSION = '1.41.0';
