@@ -47,7 +47,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.41.1';
+const VERSION = '1.41.2';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -277,12 +277,18 @@ async function callHunyuan(messages) {
     temperature: 0.7
   });
   const sleep = ms => new Promise(res => setTimeout(res, ms));
-  // 免费模型（如 GLM-4.7-Flash）偶发 429 限流：重试 1 次，退避 1s
-  // 注意：单请求总预算必须 < SCF 平台执行超时（约30s）：12s×2 + 1s ≈ 25s
-  const MAX_ATTEMPTS = 2;
+  // v1.41.2：智谱 GLM-4.7-Flash 免费模型高峰会返回两类限流——
+  //  「您的账户已达到速率限制」(账户 RPM 低) 与「该模型当前访问量过大」(排队慢/忙)。
+  //  策略：限流错误仅在「快速返回(<5s)」时递增退避重试（1.5s/3s，最多 3 次）；
+  //        慢响应(>15s 仍无返回=高峰排队)直接判 LLM_TIMEOUT，不再重试，
+  //        避免超 SCF 平台执行超时(~30s) 预算。
+  const MAX_ATTEMPTS = 3;
+  const REQ_TIMEOUT = 15000;
+  const BUSY_RE = /访问量过大|速率限制|请求频率|繁忙|稍后再试|too many|rate.?limit|busy|1305|\b429\b|503/i;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const startedAt = Date.now();
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 12000);
+    const timer = setTimeout(() => ctl.abort(), REQ_TIMEOUT);
     try {
       const r = await fetch(TOKENHUB_BASE_URL + '/chat/completions', {
         method: 'POST',
@@ -294,12 +300,16 @@ async function callHunyuan(messages) {
         signal: ctl.signal
       });
       const json = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        // 429 / 1305 = 限流，退避后重试
-        if (r.status === 429 || (json.error && (json.error.code === '1305' || String(json.error.code || '').indexOf('429') >= 0))) {
-          if (attempt < MAX_ATTEMPTS) { await sleep(1000); continue; }
+      const errMsg = (json.error && (json.error.message || json.error.code)) || (r.ok ? '' : ('HTTP ' + r.status));
+      const isBusy = (r.status === 429 || r.status === 503) || BUSY_RE.test(JSON.stringify(json));
+      if (!r.ok || isBusy) {
+        // 限流且快速失败 → 递增退避重试；否则直接把真实原因抛出去（如 key 错 401）
+        const elapsed = Date.now() - startedAt;
+        if (isBusy && elapsed < 5000 && attempt < MAX_ATTEMPTS) {
+          await sleep(attempt * 1500);
+          continue;
         }
-        throw new Error((json.error && json.error.message) || 'LLM_ERROR');
+        throw new Error(isBusy ? ('AI_BUSY: ' + (errMsg || '模型繁忙，请稍后再试')) : (errMsg || 'LLM_ERROR'));
       }
       if (!json.choices || !json.choices[0] || !json.choices[0].message) throw new Error('LLM_EMPTY');
       const msg = json.choices[0].message;
@@ -307,15 +317,15 @@ async function callHunyuan(messages) {
       if (msg.content && String(msg.content).trim()) return String(msg.content);
       if (msg.reasoning_content && String(msg.reasoning_content).trim()) return String(msg.reasoning_content);
       throw new Error('LLM_EMPTY');
-      // v1.41.1：把 AbortError 转成可读错误（原来透传 "This operation was aborted"，前端看不懂）
     } catch (er) {
+      // AbortError：15s 无响应 = 免费模型高峰排队/网络慢，转可读文案，不重试（重试只会再等 15s+）
       if (er && (er.name === 'AbortError' || /abort/i.test(String((er && er.message) || '')))) {
-        throw new Error('LLM_TIMEOUT: 请求 ' + TOKENHUB_MODEL + ' 12s 无响应 —— 请核对 SCF 环境变量 BASE_URL/MODEL/API_KEY（当前 baseUrl=' + TOKENHUB_BASE_URL + ', model=' + TOKENHUB_MODEL + '）');
+        throw new Error('LLM_TIMEOUT: 模型 ' + TOKENHUB_MODEL + ' ' + Math.round(REQ_TIMEOUT / 1000) + 's 无响应（免费模型高峰排队或网络慢），请稍后再试');
       }
       throw er;
     } finally { clearTimeout(timer); }
   }
-  throw new Error('LLM_RETRY_EXHAUSTED');
+  throw new Error('AI_BUSY: 模型繁忙，重试多次仍失败，请稍后再试');
 }
 
 // ---- 腾讯云 OCR 通用文字识别（GeneralBasicOCR，免费 1000 次/月）----
@@ -657,7 +667,7 @@ const server = http.createServer(async (req, res) => {
             return sendJSON(res, 200, { version: VERSION, ok: false, stage: 'config', error: 'TOKENHUB_API_KEY 未配置' }, headers);
           }
           const ctl = new AbortController();
-          const timer = setTimeout(() => ctl.abort(), 8000);
+          const timer = setTimeout(() => ctl.abort(), 12000);
           let probe;
           try {
             const r = await fetch(TOKENHUB_BASE_URL + '/chat/completions', {
@@ -668,12 +678,13 @@ const server = http.createServer(async (req, res) => {
             });
             const body = await r.json().catch(() => ({}));
             const errMsg = (body.error && (body.error.message || body.error.code)) || body.message || '';
+            const isBusy = /访问量过大|速率限制|请求频率|繁忙|稍后再试|too many|rate.?limit|busy|1305/i.test(JSON.stringify(body));
             probe = {
-              ok: r.ok,
-              stage: r.ok ? 'success' : 'llm_error',
+              ok: r.ok && !isBusy,
+              stage: (r.ok && !isBusy) ? 'success' : (isBusy ? 'busy' : 'llm_error'),
               http: r.status,
               model: TOKENHUB_MODEL,
-              error: r.ok ? null : (errMsg ? String(errMsg) : ('HTTP ' + r.status))
+              error: (r.ok && !isBusy) ? null : (errMsg ? String(errMsg) : ('HTTP ' + r.status))
             };
           } catch (e) {
             probe = {
@@ -681,7 +692,7 @@ const server = http.createServer(async (req, res) => {
               stage: 'network',
               model: TOKENHUB_MODEL,
               error: (e && e.name === 'AbortError')
-                ? 'LLM_TIMEOUT：8 秒无响应。SCF 无法访问该 baseUrl（需确认域名可达/出网），或模型名不存在导致网关挂起'
+                ? 'LLM_TIMEOUT：12 秒无响应。两种可能：①免费模型高峰排队（建议稍后重试）②SCF 无法访问该 baseUrl（需确认域名可达）'
                 : String((e && e.message) || e)
             };
           } finally { clearTimeout(timer); }
