@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.8">
+<meta name="version" content="1.42.9">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -1237,7 +1237,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         </div>
         <div class="forum-stat">
           <div class="forum-stat-num" id="forumStatOnline">0</div>
-          <div class="forum-stat-label">在线同学</div>
+          <div class="forum-stat-label">注册用户</div>
         </div>
         <div class="forum-stat">
           <div class="forum-stat-num" id="forumStatOrders">0</div>
@@ -2409,7 +2409,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.8';
+const APP_VERSION = '1.42.9';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3246,10 +3246,8 @@ function applyStats(d) {
   set('statUsers', users);
   set('forumStatOrders', orders);
   set('forumBizTaskCount', ok ? d.orders : '—');
-  // v1.42.8：基数小时显示真实值，基数大时给活跃度估算（避免 d.users=4 时永远显示 1+）
-  const totalUsers = ok ? (d.users || 0) : 0;
-  const online = totalUsers <= 10 ? totalUsers : Math.max(1, Math.min(99, Math.round(totalUsers / 3)));
-  set('forumStatOnline', ok ? (online + '+') : '—');
+  // v1.42.9：展示注册用户总数（真实在线检测需心跳+共享状态，GitHub Issues+无状态 SCF 架构做不了，放弃估算）
+  set('forumStatOnline', ok ? (d.users || 0) : '—');
   set('liveUsers', users);
   // 轻量降级态：仅在统计卡片上标记，不打扰用户
   const box = document.querySelector('.forum-stats');
