@@ -47,7 +47,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.41.5';
+const VERSION = '1.41.6';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -86,7 +86,7 @@ function checkSensitiveServer(text) {
 // 白名单：仅放行本仓库的 issues（含子路径 /comments），拒绝其它仓库/敏感路径
 const REPO_ESC = REPO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const GH_WHITELIST = new RegExp('^/repos/' + REPO_ESC + '/issues(/|\\?|$)');
-const TOKEN_TTL = 4 * 3600 * 1000; // 4 小时（缩短泄露窗口，P1 安全修复）
+const TOKEN_TTL = 7 * 24 * 3600 * 1000; // 7 天（v1.41.5 延长：4h 太短，微信浏览器会话常驻、过期易掉登录，改为 7 天；签名为 HMAC-SHA256 安全无虞）
 const RATE_LIMIT = 10;               // 每 IP 每分钟最多 10 次登录/查重
 const RATE_WINDOW = 60 * 1000;
 
