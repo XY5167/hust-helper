@@ -2409,7 +2409,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.16';
+const APP_VERSION = '1.42.17';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2554,8 +2554,17 @@ function tokenPayload() {
   const t = getToken();
   if (!t) return null;
   try {
-    const b = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'); // 修正：解析 payload 段([1])，原 [0] 是 header 不含 exp/role
-    const json = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b), c => c.charCodeAt(0))));
+    // 后端 signToken 生成 2 段式 token：body.signature（[0]=payload，[1]=签名）
+    // 健壮解析：优先取 [0]，失败再尝试 [1]，避免以后 token 格式变动又踩坑
+    const parts = t.split('.');
+    const seg = (parts[0] || t).replace(/-/g, '+').replace(/_/g, '/');
+    let json;
+    try {
+      json = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(seg), c => c.charCodeAt(0))));
+    } catch (e) {
+      const alt = (parts[1] || '').replace(/-/g, '+').replace(/_/g, '/');
+      json = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(alt), c => c.charCodeAt(0))));
+    }
     if (json.exp && Date.now() > json.exp) return null;
     return json;
   } catch (e) { return null; }
