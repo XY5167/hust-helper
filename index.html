@@ -3,7 +3,7 @@
 <head data-page-node-id="eYdSsfZZhBRoaWwxYXhf8r">
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
-<meta name="version" content="1.42.19" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.42.20" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -785,7 +785,10 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
   #taskTabBar{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;padding-bottom:2px}
   #taskTabBar .tab-btn{flex:0 0 auto}
   .form-row{grid-template-columns:1fr}
-  .modal{padding:22px;width:95%}
+  .modal{padding:22px;width:95%;max-height:85vh}
+  /* v1.42.20 手机端修复：登录/发布模态被虚拟键盘下半部分挡住。改为顶部对齐 + safe-area */
+  .modal-overlay{align-items:flex-start;padding-top:max(20px,env(safe-area-inset-top,0px))}
+  .modal-overlay.active{padding-top:max(20px,env(safe-area-inset-top,0px))}
 }
 @media(max-width:480px){
   .container{padding:0 16px}
@@ -845,9 +848,10 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .ai-lost-reason{display:inline-block;padding:3px 9px;background:#f0f7ff;color:#185fa5;border-radius:99px;font-size:11px;font-weight:600;border:1px solid #d8e9fa}
 .ai-lost-btn{padding:5px 14px;font-size:12px;background:linear-gradient(135deg,#185fa5,#3680c8);color:#fff;border:none;border-radius:99px;cursor:pointer;font-weight:600;transition:all .2s}
 .ai-lost-btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(24,95,165,.3)}
-.wheel-fab{position:fixed;right:88px;bottom:24px;z-index:200;width:52px;height:52px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--accent),#fb923c);color:#fff;font-size:1.5rem;line-height:1;cursor:pointer;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease)}
+.wheel-fab{position:fixed;right:88px;bottom:24px;z-index:200;width:52px;height:52px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--accent),#fb923c);color:#fff;font-size:1.5rem;line-height:1;cursor:pointer;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease);touch-action:none;-webkit-user-select:none;user-select:none;will-change:transform,right,bottom}
 .wheel-fab:hover{transform:translateY(-3px) scale(1.05) rotate(12deg);box-shadow:var(--shadow-xl)}
 .wheel-fab:active{transform:scale(.95)}
+.wheel-fab.dragging{transition:none;opacity:.9;cursor:grabbing;z-index:210}
 /* 🎡 幸运转盘弹窗 */
 .wheel-tabs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 10px}
 .wheel-tab{border:1px solid var(--border);background:var(--bg-card);color:var(--text);border-radius:99px;padding:4px 11px;font-size:.78rem;cursor:pointer;transition:all var(--t)}
@@ -2409,7 +2413,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.19';
+const APP_VERSION = '1.42.20';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -7040,10 +7044,16 @@ async function deleteAllComments(inum) {
 }
 
 // ============ AUTH ============
+// v1.42.20：手机端修复。发布表单输入时键盘弹起 -> 点发布触发 showAuthModal 打开登录模态 ->
+//   原 autofocus 会重新弹键盘，导致模态（align-items:center）被键盘下半屏挡住，用户只看到
+//   顶部小 toast、却摸不到登录框。修复：先 blur 当前活跃元素收起键盘、不再 autofocus，让模态
+//   干净显示；用户主动点 input 时才会再触发键盘。同时在 CSS 把手机端 .modal-overlay 改成
+//   顶部对齐 + safe-area inset，模态不会被任何残留元素遮挡。
 function showAuthModal() {
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+  // 不再自动 focus 输入框：避免键盘再次弹起遮住登录表单（用户想登录时主动点 input 即可）
   document.getElementById('authModal').classList.add('active');
   switchAuthTab('login');
-  setTimeout(() => { const f = document.querySelector('#authModal input:not([type=hidden]),#authModal textarea,#authModal select'); if (f) f.focus(); }, 60);
 }
 
 function closeAuthModal() {
@@ -9918,7 +9928,7 @@ if ('serviceWorker' in navigator) {
 
 <!-- AI 互助小助手 (ai+opc) -->
 <button class="ai-fab" id="aiFab" aria-label="AI 互助小助手" title="互助AI 小助手（可拖动）" data-page-node-id="QgWQyVu9dXFqT7O9Uq0DMF"><img src="icons/ai-avatar.png" alt="AI" style="width:32px;height:32px;border-radius:50%;object-fit:cover;pointer-events:none" data-page-node-id="tpnQKN8Ja0dWSCIkMHjFpm"></button>
-<button class="wheel-fab" id="wheelFab" onclick="openWheel()" aria-label="幸运转盘" title="🎡 幸运转盘：今天吃什么等随机决策" data-page-node-id="PbUCgmaYhC0PMxTVpLpmhQ">🎡</button>
+<button class="wheel-fab" id="wheelFab" aria-label="幸运转盘" title="🎡 幸运转盘（可拖动）：今天吃什么等随机决策" data-page-node-id="PbUCgmaYhC0PMxTVpLpmhQ">🎡</button>
 <div class="ai-panel" id="aiPanel" role="dialog" aria-label="AI 互助小助手" data-page-node-id="ZO6ztycbhSDCAH8VpZURwQ">
   <div class="ai-panel-header" data-page-node-id="KfkPkCIlYbL1iaXJTUaOGu">
     <div class="ai-avatar" data-page-node-id="pDE6NHpTHXYJJNf3XFwb1n"><img src="icons/ai-avatar.png" alt="AI" style="width:28px;height:28px;border-radius:50%;object-fit:cover" data-page-node-id="r3C8A9cF2AWCV1J2S786QC"></div>
@@ -10134,6 +10144,73 @@ if ('serviceWorker' in navigator) {
   }
   window.initAiFabDrag = initAiFabDrag;
   initAiFabDrag();
+
+  // v1.42.20：幸运转盘按钮支持拖动（参考 AI 助手 fab 的拖动方案）。位置记忆到 localStorage，
+  //   避免和右下角的"发布"按钮(.task-fab)重叠。移动>3px 视作拖动、不触发 openWheel()。
+  function initWheelFabDrag(){
+    const btn = document.getElementById('wheelFab');
+    if(!btn) return;
+    const saved = localStorage.getItem('wheelFabPos');
+    if(saved){
+      try{
+        const p = JSON.parse(saved);
+        if(typeof p.right === 'number' && typeof p.bottom === 'number'){
+          btn.style.right = p.right + 'px';
+          btn.style.bottom = p.bottom + 'px';
+          btn.style.left = 'auto';
+          btn.style.top = 'auto';
+        }
+      }catch(e){}
+    }
+    let dragging = false, moved = false, startX = 0, startY = 0, startR = 0, startB = 0;
+    btn.addEventListener('pointerdown', function(e){
+      if(e.pointerType === 'mouse' && e.button !== 0) return;
+      dragging = true; moved = false;
+      startX = e.clientX; startY = e.clientY;
+      const rect = btn.getBoundingClientRect();
+      startR = window.innerWidth - rect.right;
+      startB = window.innerHeight - rect.bottom;
+      btn.classList.add('dragging');
+      try{ btn.setPointerCapture(e.pointerId); }catch(_){}
+    });
+    btn.addEventListener('pointermove', function(e){
+      if(!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if(Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+      const size = btn.offsetWidth || 52;
+      let newR = startR - dx;
+      let newB = startB - dy;
+      newR = Math.max(8, Math.min(window.innerWidth - size - 8, newR));
+      newB = Math.max(8, Math.min(window.innerHeight - size - 8, newB));
+      btn.style.right = newR + 'px';
+      btn.style.bottom = newB + 'px';
+      btn.style.left = 'auto';
+      btn.style.top = 'auto';
+    });
+    const endDrag = function(e){
+      if(!dragging) return;
+      dragging = false;
+      btn.classList.remove('dragging');
+      try{ btn.releasePointerCapture(e.pointerId); }catch(_){}
+      if(moved){
+        const rect = btn.getBoundingClientRect();
+        localStorage.setItem('wheelFabPos', JSON.stringify({
+          right: Math.round(window.innerWidth - rect.right),
+          bottom: Math.round(window.innerHeight - rect.bottom)
+        }));
+      }
+    };
+    btn.addEventListener('pointerup', endDrag);
+    btn.addEventListener('pointercancel', endDrag);
+    // 区分点击与拖动：拖动时不打开转盘
+    btn.addEventListener('click', function(e){
+      if(moved){ e.preventDefault(); e.stopPropagation(); moved = false; return; }
+      if(typeof openWheel === 'function') openWheel();
+    });
+  }
+  window.initWheelFabDrag = initWheelFabDrag;
+  initWheelFabDrag();
 
   // v1.38：AI 入口卡片 & 对话动作闭环
   function openAiAndAsk(q){
