@@ -47,7 +47,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.41.4';
+const VERSION = '1.41.5';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -328,6 +328,123 @@ async function callHunyuan(messages) {
   throw new Error('AI_BUSY: 模型繁忙，重试多次仍失败，请稍后再试');
 }
 
+// ---- 多模态视觉模型（图生文 / 识图）：智谱 GLM-4V-Flash（免费不限量）----
+// 与 callHunyuan 共用 TOKENHUB_API_KEY / TOKENHUB_BASE_URL，模型名可由
+// SCF 环境变量 TOKENHUB_VISION_MODEL 覆盖（默认 glm-4v-flash）。
+// 让模型直接"看"图片，一步返回关键词与书籍结构化信息，不依赖腾讯云 OCR 额度。
+async function callVision(prompt, imageUrl) {
+  if (!TOKENHUB_API_KEY) throw new Error('TOKENHUB_NOT_CONFIGURED');
+  const model = process.env.TOKENHUB_VISION_MODEL || 'glm-4v-flash';
+  const buildBody = () => JSON.stringify({
+    model: model,
+    messages: [
+      { role: 'user', content: [
+        { type: 'text', text: String(prompt || '') },
+        { type: 'image_url', image_url: { url: imageUrl } }
+      ] }
+    ],
+    temperature: 0.3,
+    max_tokens: 700
+  });
+  const sleep = ms => new Promise(res => setTimeout(res, ms));
+  const MAX_ATTEMPTS = 2;
+  const REQ_TIMEOUT = 18000;
+  const BUSY_RE = /访问量过大|速率限制|请求频率|繁忙|稍后再试|too many|rate.?limit|busy|1305|\b429\b|503/i;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const startedAt = Date.now();
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), REQ_TIMEOUT);
+    try {
+      const r = await fetch(TOKENHUB_BASE_URL + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + TOKENHUB_API_KEY, 'Content-Type': 'application/json' },
+        body: buildBody(),
+        signal: ctl.signal
+      });
+      const json = await r.json().catch(() => ({}));
+      const errMsg = (json.error && (json.error.message || json.error.code)) || (r.ok ? '' : ('HTTP ' + r.status));
+      const isBusy = (r.status === 429 || r.status === 503) || BUSY_RE.test(JSON.stringify(json));
+      if (!r.ok || isBusy) {
+        const elapsed = Date.now() - startedAt;
+        if (isBusy && elapsed < 5000 && attempt < MAX_ATTEMPTS) { await sleep(1500); continue; }
+        throw new Error(isBusy ? ('AI_BUSY: ' + (errMsg || '视觉模型繁忙')) : (errMsg || 'VISION_ERROR'));
+      }
+      if (!json.choices || !json.choices[0] || !json.choices[0].message) throw new Error('VISION_EMPTY');
+      const content = json.choices[0].message.content;
+      if (content && String(content).trim()) return String(content);
+      throw new Error('VISION_EMPTY');
+    } catch (er) {
+      if (er && (er.name === 'AbortError' || /abort/i.test(String((er && er.message) || '')))) {
+        throw new Error('VISION_TIMEOUT: 视觉模型 ' + model + ' 无响应（高峰排队或网络慢），请稍后再试');
+      }
+      throw er;
+    } finally { clearTimeout(timer); }
+  }
+  throw new Error('VISION_BUSY: 视觉模型繁忙，重试多次仍失败');
+}
+
+// 关键词噪音过滤（与前端保持一致严格度）：过滤相机水印 / 文件名时间戳 / 纯数字短码
+function filterNoiseKeywords(arr) {
+  return (arr || []).filter(k => {
+    if (/^\d+$/.test(k)) return false;
+    if (/^IMG[\s_\-_]?\d/i.test(k)) return false;
+    if (/^DSC[\s_\-_]?\d/i.test(k)) return false;
+    if (/^Screenshot[\s_\-_]?\d/i.test(k)) return false;
+    if (/^image[\s_\-_]?\d/i.test(k)) return false;
+    if (/^\d{6,}$/.test(k)) return false;
+    if (!/[\u4e00-\u9fa5]/.test(k) && /^[A-Za-z]{1,3}$/.test(k)) return false;
+    return true;
+  });
+}
+
+// 从模型返回的 JSON 中规整出 keywords + book（两路共用）
+function normalizeExtract(parsed) {
+  let keywords = [];
+  let book = null;
+  if (parsed && Array.isArray(parsed.keywords)) {
+    keywords = parsed.keywords.map(k => String(k).trim().slice(0, 10)).filter(k => k.length >= 2).slice(0, 8);
+    keywords = filterNoiseKeywords(keywords);
+  }
+  if (parsed && parsed.book && typeof parsed.book === 'object') {
+    const b = parsed.book;
+    const bt = String(b.book_title || '').trim().slice(0, 40);
+    const bs = String(b.subject || '').trim().slice(0, 20);
+    const bg = String(b.grade || '').trim().slice(0, 8);
+    const bk = ['教材', '考研教辅', '课外书', '其他'].includes(b.book_kind) ? b.book_kind : '其他';
+    if (bt || bs) book = { book_title: bt, subject: bs, grade: bg, book_kind: bk };
+  }
+  return { keywords, book };
+}
+
+// 文本模型（glm-4-flash）从 OCR 文字提炼关键词/书籍 的系统提示（兜底路径复用）
+const OCR_SYS_PROMPT =
+  '你是二手交易/校园互助平台的图片关键词提取器。输入是照片 OCR 识别出的文字（可能杂乱）。' +
+  '请提取最有助于买家搜索的关键词：商品名、书名/课程名、品牌、型号、成色描述等。' +
+  '必须只返回一个 JSON 对象 {"keywords":["..."],"book":null 或 {"book_title":"","subject":"","grade":"","book_kind":""}}。' +
+  'keywords 最多 8 个，每个 2-10 个字，去掉价格/纯数字/微信号/QQ/手机号等联系方式和乱码。' +
+  'book 仅当图片明显是教材/教辅/书籍封面或内页时才填对象，否则必须为 null：' +
+  'book_title = OCR 文字里的书名（20 字内，认不出留空）；' +
+  'subject = 科目或课程名（如 高等数学/线性代数/大学物理/电路理论/数据结构/C语言程序设计/大学英语/概率论，' +
+  '只写课程本身，去掉「教材」「上册」「第X版」等后缀，认不出留空）；' +
+  'grade = 常见开课学期（大一上/大一下/大二上/大二下/大三上/大三下/考研/其他），不确定留空；' +
+  'book_kind 只能是 教材/考研教辅/课外书/其他 之一。' +
+  '严禁编造 OCR 文字中不存在的信息。';
+
+// 视觉模型（glm-4v-flash）直接看图理解的系统提示（主路径）
+const VISION_SYS_PROMPT =
+  '你是二手交易/校园互助平台的图片理解器。请直接观察这张图片（可能是教材封面、商品照片、小票、海报等），' +
+  '提取最有助于买家搜索的关键词和结构化信息。' +
+  '必须只返回一个 JSON 对象（不要 markdown 代码块、不要任何解释文字）：' +
+  '{"raw_text":"图片上肉眼可见的全部文字（保留换行，尽量原样，识别不出留空字符串"),' +
+  '"keywords":["..."],"book":null 或 {"book_title":"","subject":"","grade":"","book_kind":""}}。' +
+  'keywords 最多 8 个，每个 2-10 个字，去掉价格/纯数字/微信号/QQ/手机号等联系方式和乱码；' +
+  'book 仅当图片明显是教材/教辅/书籍封面或内页时才填对象，否则必须为 null：' +
+  'book_title = 书名（20 字内，认不出留空）；' +
+  'subject = 科目或课程名（如 高等数学/线性代数/大学物理/电路理论/数据结构/C语言程序设计/大学英语/概率论，只写课程本身，去掉「教材」「上册」「第X版」等后缀，认不出留空）；' +
+  'grade = 常见开课学期（大一上/大一下/大二上/大二下/大三上/大三下/考研/其他），不确定留空；' +
+  'book_kind 只能是 教材/考研教辅/课外书/其他 之一。' +
+  '严禁编造图片中不存在的信息。';
+
 // ---- 腾讯云 OCR 通用文字识别（GeneralBasicOCR，免费 1000 次/月）----
 async function callOcrBasic(imageBase64) {
   const json = await tc3Request({
@@ -602,7 +719,7 @@ const server = http.createServer(async (req, res) => {
   if (path === '/health') {
     return sendJSON(res, 200, {
       status: 'ok', version: VERSION, hasToken: !!GITHUB_TOKEN,
-      ai: { key: !!TOKENHUB_API_KEY, baseUrl: TOKENHUB_BASE_URL, model: TOKENHUB_MODEL },
+      ai: { key: !!TOKENHUB_API_KEY, baseUrl: TOKENHUB_BASE_URL, model: TOKENHUB_MODEL, vision: process.env.TOKENHUB_VISION_MODEL || 'glm-4v-flash' },
       ts: Date.now()
     }, headers);
   }
@@ -885,60 +1002,53 @@ const server = http.createServer(async (req, res) => {
         }
 
         // ---- AI 识图：OCR 识别 + 混元提取关键词（两段式，一次请求返回）----
+        // ---- AI 识图 v1.41.5：视觉模型直接看图（glm-4v-flash）优先，腾讯云 OCR+glm-4-flash 兜底 ----
         if (method === 'POST' && path === '/api/ai/ocr') {
           if (rateLimited(clientIp(req), OCR_RATE_LIMIT)) return sendJSON(res, 429, { error: 'RATE_LIMITED' }, headers);
           const image = ghBody && ghBody.image;
           if (!image || typeof image !== 'string' || image.length < 100) return sendJSON(res, 400, { error: 'INVALID_INPUT' }, headers);
           if (image.length > 7 * 1024 * 1024) return sendJSON(res, 400, { error: 'IMAGE_TOO_LARGE' }, headers);
+          // image 可能是纯 base64（前端）或完整 data URL；拆出裸 base64 给腾讯 OCR，拼好 dataUrl 给视觉模型
+          const rawImg = (image.indexOf(',') >= 0) ? image.split(',')[1] : image;
+          const imgUrl = (image.indexOf('data:') === 0) ? image : ('data:image/jpeg;base64,' + image);
           try {
-            const text = await callOcrBasic(image);          // 第一段：OCR
-            if (!text) return sendJSON(res, 200, { ok: true, text: '', keywords: [] }, headers); // 图中无文字属正常
-            const clip = text.slice(0, 1500);                // 防混元超长
+            let engine = 'vision';
+            let text = '';
             let keywords = [];
-            let book = null;                                  // v1.41.0 书籍分类（null = 非书 / 未识别）
-            try {                                             // 第二段：混元提取关键词（失败不阻断，仅 keywords 为空）
-              const sys = '你是二手交易/校园互助平台的图片关键词提取器。输入是照片 OCR 识别出的文字（可能杂乱）。' +
-                '请提取最有助于买家搜索的关键词：商品名、书名/课程名、品牌、型号、成色描述等。' +
-                '必须只返回一个 JSON 对象 {"keywords":["..."],"book":null 或 {"book_title":"","subject":"","grade":"","book_kind":""}}。' +
-                'keywords 最多 8 个，每个 2-10 个字，去掉价格/纯数字/微信号/QQ/手机号等联系方式和乱码。' +
-                'book 仅当图片明显是教材/教辅/书籍封面或内页时才填对象，否则必须为 null：' +
-                'book_title = OCR 文字里的书名（20 字内，认不出留空）；' +
-                'subject = 科目或课程名（如 高等数学/线性代数/大学物理/电路理论/数据结构/C语言程序设计/大学英语/概率论，' +
-                '只写课程本身，去掉「教材」「上册」「第X版」等后缀，认不出留空）；' +
-                'grade = 常见开课学期（大一上/大一下/大二上/大二下/大三上/大三下/考研/其他），不确定留空；' +
-                'book_kind 只能是 教材/考研教辅/课外书/其他 之一。' +
-                '严禁编造 OCR 文字中不存在的信息。';
-              const content = await callHunyuan([
-                { role: 'system', content: sys },
-                { role: 'user', content: 'OCR 文字：\n' + clip }
-              ]);
+            let book = null;
+            try {
+              // 主路径：视觉模型直接看图，一步出结果（不占腾讯云 OCR 额度）
+              const content = await callVision(VISION_SYS_PROMPT, imgUrl);
               const parsed = extractJson(content);
-              if (parsed && Array.isArray(parsed.keywords)) {
-                keywords = parsed.keywords.map(k => String(k).trim().slice(0, 10)).filter(k => k.length >= 2).slice(0, 8);
-                // v1.41.3 后处理：过滤图片元数据/相机水印/纯数字短码等噪音
-                // （GLM 有时会照搬 OCR 文字里的 "IMG_20260907_211109" 之类的相机烧入水印 / 文件名时间戳）
-                keywords = keywords.filter(k => {
-                  if (/^\d+$/.test(k)) return false;                              // 纯数字
-                  if (/^IMG[\s_\-_]?\d/i.test(k)) return false;                  // IMG_数字 / IMG-数字 / IMG 数字
-                  if (/^DSC[\s_\-_]?\d/i.test(k)) return false;                  // DSC_数字
-                  if (/^Screenshot[\s_\-_]?\d/i.test(k)) return false;           // Screenshot_数字
-                  if (/^image[\s_\-_]?\d/i.test(k)) return false;                // image_数字
-                  if (/^\d{6,}$/.test(k)) return false;                           // 6+ 位时间戳
-                  if (!/[\u4e00-\u9fa5]/.test(k) && /^[A-Za-z]{1,3}$/.test(k)) return false; // 1-3 字符纯字母噪音（如 IMG/DSC）
-                  return true;
-                });
+              if (parsed) {
+                text = String(parsed.raw_text || '').slice(0, 1500);
+                const ex = normalizeExtract(parsed);
+                keywords = ex.keywords; book = ex.book;
               }
-              // v1.41.0 书籍自动分类：书名 / 科目 / 年级 / 书类型，供二手教材按科目聚合与搜索
-              if (parsed && parsed.book && typeof parsed.book === 'object') {
-                const b = parsed.book;
-                const bt = String(b.book_title || '').trim().slice(0, 40);
-                const bs = String(b.subject || '').trim().slice(0, 20);
-                const bg = String(b.grade || '').trim().slice(0, 8);
-                const bk = ['教材', '考研教辅', '课外书', '其他'].includes(b.book_kind) ? b.book_kind : '其他';
-                if (bt || bs) book = { book_title: bt, subject: bs, grade: bg, book_kind: bk };
+              // 视觉模型完全没看懂 → 强制降级到 OCR 兜底
+              if (!text && !keywords.length && !book) throw new Error('VISION_EMPTY_RESULT');
+            } catch (ve) {
+              // 兜底路径：腾讯云 OCR 出文字 → glm-4-flash 提炼（失败不阻断，仅 keywords 为空）
+              engine = 'ocr';
+              try {
+                const ocrText = await callOcrBasic(rawImg);
+                if (ocrText) {
+                  text = ocrText.slice(0, 1500);
+                  try {
+                    const c2 = await callHunyuan([
+                      { role: 'system', content: OCR_SYS_PROMPT },
+                      { role: 'user', content: 'OCR 文字：\n' + text }
+                    ]);
+                    const p2 = extractJson(c2);
+                    if (p2) { const ex = normalizeExtract(p2); keywords = ex.keywords; book = ex.book; }
+                  } catch (e) { /* 提炼失败，降级返回纯文本 */ }
+                }
+              } catch (oe) {
+                // 连腾讯 OCR 也挂了（额度/网络）→ 返回空，前端会退化到本地识别
+                if (!text) return sendJSON(res, 200, { ok: true, text: '', keywords: [], book: null, engine: 'ocr' }, headers);
               }
-            } catch (e) { /* 关键词提取失败，降级返回纯文本 */ }
-            return sendJSON(res, 200, { ok: true, text: clip, keywords, book }, headers);
+            }
+            return sendJSON(res, 200, { ok: true, text: text, keywords: keywords, book: book, engine: engine }, headers);
           } catch (e) { return sendJSON(res, 502, { error: e.message }, headers); }
         }
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="version" content="1.42.15">
+<meta name="version" content="1.42.16">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2409,7 +2409,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.15';
+const APP_VERSION = '1.42.16';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2533,6 +2533,22 @@ function cacheGetStale(key) {
 // ---- 会话 Token 管理（与用户资料分离，绝不存储密码）----
 function getToken() { try { return localStorage.getItem('hust_token') || getCookieToken(); } catch (e) { return null; } }
 function setToken(t) { try { localStorage.setItem('hust_token', t); } catch (e) {} }
+
+function onAuthRequired(reason) {
+  try {
+    const msg = reason || '登录态已过期，请重新登录';
+    if (window.toast) toast(msg, 'error');
+    if (typeof showAuthModal === 'function') setTimeout(function () { showAuthModal(); }, 100);
+  } catch (e) {}
+}
+function requireAuth() {
+  if (!S.user || !getToken()) {
+    onAuthRequired('登录态已过期，请重新登录后操作');
+    return false;
+  }
+  return true;
+}
+
 function clearToken() { try { localStorage.removeItem('hust_token'); } catch (e) {} clearAuthCookies(); }
 function tokenPayload() {
   const t = getToken();
@@ -2597,6 +2613,7 @@ function ghApi(path, method, body, reqOpts) {
   // v1.26.0 R1：15s 超时 + 429 自动重试（最多 2 次，退避 1s/2s）；v1.39.6 起可经 reqOpts 覆盖超时/重试（AI 长请求用）
   return ghFetchWithRetry(PROXY_BASE + path, opts, retries, timeoutMs)
     .then(function (res) {
+      if (res.status === 401) { onAuthRequired('登录态已过期，请重新登录'); }
       if (res.status === 429) {
         try { if (window.toast) toast('请求过于频繁，请稍后再试', 'error'); } catch (e) {}
       }
@@ -7690,6 +7707,7 @@ function checkPublishPrice() {
 async function handlePublish(e) {
   e.preventDefault();
   const err = document.getElementById('publishError');
+  if (!requireAuth()) return;
   // 信用分检查：低于25禁止发单
   if (!isAdminUser()) {
     const cs = S.user.credit_score != null ? S.user.credit_score : 100;
@@ -7917,7 +7935,12 @@ async function handlePublish(e) {
     window._publishLock = false;
     const _pb = document.querySelector('#publishForm button[type=submit]');
     if (_pb) { _pb.disabled = false; _pb.textContent = '发布'; }
-    err.textContent = '发布失败：' + ex.message; err.style.display = 'block';
+    let _pubErr = ex.message || '未知错误';
+    if (/UNAUTHORIZED|401|登录态/.test(_pubErr)) {
+      _pubErr = '登录态已过期，请重新登录后发布';
+      onAuthRequired(_pubErr);
+    }
+    err.textContent = '发布失败：' + _pubErr; err.style.display = 'block';
   }
 }
 
