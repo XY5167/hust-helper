@@ -3,7 +3,7 @@
 <head data-page-node-id="eYdSsfZZhBRoaWwxYXhf8r">
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
-<meta name="version" content="1.42.21" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.42.22" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2413,7 +2413,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.21';
+const APP_VERSION = '1.42.22';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2538,20 +2538,21 @@ function cacheGetStale(key) {
 function getToken() { try { return localStorage.getItem('hust_token') || getCookieToken(); } catch (e) { return null; } }
 function setToken(t) { try { localStorage.setItem('hust_token', t); } catch (e) {} }
 
-// v1.42.18：onAuthRequired 加节流，避免 30s 轮询里 checkAwaitingConfirmOrders 等写操作
-//   反复 401 时把右侧 toast 堆成"血条"，并反复弹登录框。10s 内只弹一次模态+toast，
-//   GET 401 由 ghApi 内部静默处理（见 v1.42.18 区分读写）。
-// v1.42.19：onAuthRequired 收窄到「用户主动操作」语义。
+// v1.42.22：onAuthRequired 取消 10s 节流。
+//   历史：v1.42.18 加 10s 节流（防 30s 轮询后台写操作反复弹模态）→ v1.42.19 收窄到"用户主动操作"语义
+//   → 但 10s 节流还在，导致用户反复点"发布"时只有第一次弹模态，后续被 return，
+//     toast 一直飘、模态永远不弹——"一直显示重新登录发布不了"的死循环。
+//   v1.42.19 后 ghApi 401 已静默，onAuthRequired 只剩 requireAuth/handlePublish catch 两个用户主动调用点，
+//   不存在后台轮询触发的"血条"问题，所以节流可以取消。保留 500ms 防双击即可。
 //   - 调用方只有 requireAuth（发布等主动写操作）和 handlePublish catch——都是用户点出来的
 //   - ghApi 401 不再调它，背景写操作（runNotificationCheck / 自动确认订单）401 静默即可
-//   - 10s 节流保留
 //   - clearToken 同步清 S.user（见 v1.42.19 修改），避免"假登录态"
 let _authModalShownAt = 0;
 function onAuthRequired(reason) {
   try {
-    const now = Date.now();
-    if (now - _authModalShownAt < 10000) return; // 10s 节流：模态+toast 都跳过
-    _authModalShownAt = now;
+    // 仅防双击：500ms 内的重复触发跳过；超过则每次都弹模态（用户主动操作应当每次都响应）
+    if (Date.now() - _authModalShownAt < 500) return;
+    _authModalShownAt = Date.now();
     const msg = reason || '登录态已过期，请重新登录';
     if (window.toast) toast(msg, 'error');
     if (typeof showAuthModal === 'function') setTimeout(function () { showAuthModal(); }, 100);
@@ -7052,9 +7053,13 @@ async function deleteAllComments(inum) {
 //   顶部对齐 + safe-area inset，模态不会被任何残留元素遮挡。
 function showAuthModal() {
   try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+  // v1.42.22：弹模态时清理所有 toast（避免老 toast 一直飘在模态上面、特别是在右上角挡关闭按钮）
+  try { if (typeof _clearAllToasts === 'function') _clearAllToasts(); } catch (e) {}
   // 不再自动 focus 输入框：避免键盘再次弹起遮住登录表单（用户想登录时主动点 input 即可）
   document.getElementById('authModal').classList.add('active');
   switchAuthTab('login');
+  // v1.42.22：把模态滚到视口顶部，避免被发布表单的滚动位置影响
+  try { document.getElementById('authModal').scrollTop = 0; } catch (e) {}
 }
 
 function closeAuthModal() {
@@ -9402,7 +9407,14 @@ startSmartPolling();
 // WebSocket 实时通知已移除：SCF 云函数不支持长连接 WS，实时性由 startSmartPolling / startCommentPolling 轮询兜底
 
 // ============ TOAST ============
-function toast(msg, type, duration) {
+// v1.42.22：清空所有正在显示的 toast（弹模态时调用，避免老 toast 飘在模态上面）
+function _clearAllToasts() {
+  try {
+    const c = document.querySelector('.toast-container');
+    if (c) c.innerHTML = '';
+  } catch (e) {}
+}
+function toast(msg, type) {
   const c = document.getElementById('toastContainer');
   const el = document.createElement('div');
   el.className = 'toast toast-' + (type || 'info');
