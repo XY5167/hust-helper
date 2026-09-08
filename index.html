@@ -3,7 +3,7 @@
 <head data-page-node-id="eYdSsfZZhBRoaWwxYXhf8r">
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
-<meta name="version" content="1.42.20" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.42.21" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2413,7 +2413,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.20';
+const APP_VERSION = '1.42.21';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3830,7 +3830,8 @@ async function loadOrders(type, cat) {
       if (o.deadline && !o.taker_id) {
         const dl = new Date(o.deadline);
         if (!isNaN(dl.getTime())) {
-          const buffer = new Date(dl.getTime() + 2 * 60 * 60 * 1000); // 2小时缓冲
+          // v1.42.21：截止时间过了 5 分钟即视为过期（原 2h 缓冲太宽松，导致截止时间到了几小时还在显示）
+        const buffer = new Date(dl.getTime() + 5 * 60 * 1000);
           if (buffer < now) {
             o.status = 'expired';
             try {
@@ -8322,10 +8323,12 @@ async function loadMyOrders(myTab) {
       if (!o.deadline) continue;
       const dl = new Date(o.deadline);
       if (isNaN(dl.getTime())) continue;
-      const buffer = new Date(dl.getTime() + 2 * 60 * 60 * 1000); // 2小时缓冲
+      // v1.42.21：截止时间过了 5 分钟即视为过期（原 2h 缓冲太宽松）；状态名与广场页统一为 expired
+      //   之前 cancelled/expired 两个名字导致同一个订单在广场显示"已过期"、在我的页显示"已取消"。
+      const buffer = new Date(dl.getTime() + 5 * 60 * 1000);
       if (buffer < now && o.status === 'open' && !o.taker_id) {
-        o.status = 'cancelled';
-        o.cancel_reason = '超时无人接单，系统自动取消';
+        o.status = 'expired';
+        o.expire_reason = '超时无人接单，系统自动过期';
         expiredToUpdate.push(o);
       }
       // 已接单订单逾期不自动差评，防止骑手只是忘记点"完成"；由发布者手动处理
