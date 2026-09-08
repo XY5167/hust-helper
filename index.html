@@ -3,7 +3,7 @@
 <head data-page-node-id="eYdSsfZZhBRoaWwxYXhf8r">
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
-<meta name="version" content="1.42.18" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.42.19" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2409,7 +2409,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.42.18';
+const APP_VERSION = '1.42.19';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2537,6 +2537,11 @@ function setToken(t) { try { localStorage.setItem('hust_token', t); } catch (e) 
 // v1.42.18：onAuthRequired 加节流，避免 30s 轮询里 checkAwaitingConfirmOrders 等写操作
 //   反复 401 时把右侧 toast 堆成"血条"，并反复弹登录框。10s 内只弹一次模态+toast，
 //   GET 401 由 ghApi 内部静默处理（见 v1.42.18 区分读写）。
+// v1.42.19：onAuthRequired 收窄到「用户主动操作」语义。
+//   - 调用方只有 requireAuth（发布等主动写操作）和 handlePublish catch——都是用户点出来的
+//   - ghApi 401 不再调它，背景写操作（runNotificationCheck / 自动确认订单）401 静默即可
+//   - 10s 节流保留
+//   - clearToken 同步清 S.user（见 v1.42.19 修改），避免"假登录态"
 let _authModalShownAt = 0;
 function onAuthRequired(reason) {
   try {
@@ -2556,7 +2561,19 @@ function requireAuth() {
   return true;
 }
 
-function clearToken() { try { localStorage.removeItem('hust_token'); } catch (e) {} clearAuthCookies(); }
+// v1.42.19：clearToken 同步清 S.user 和 hust_current_user，避免"假登录态"。
+//   之前只清 token，导致 S.user 仍残留（从 hust_current_user 还原）、ghApi 仍认为有用户
+//   在操作，401 路径会反复触发弹模态。改为彻底退出登录状态，下一次用户主动操作时由
+//   requireAuth 干净地引导重新登录。
+function clearToken() {
+  try { localStorage.removeItem('hust_token'); } catch (e) {}
+  try { localStorage.removeItem('hust_current_user'); } catch (e) {}
+  clearAuthCookies();
+  try {
+    if (window.S) { S.user = null; }
+  } catch (e) {}
+  try { if (typeof updateUI === 'function') updateUI(); } catch (e) {}
+}
 function tokenPayload() {
   const t = getToken();
   if (!t) return null;
@@ -2629,20 +2646,21 @@ function ghApi(path, method, body, reqOpts) {
   // v1.26.0 R1：15s 超时 + 429 自动重试（最多 2 次，退避 1s/2s）；v1.39.6 起可经 reqOpts 覆盖超时/重试（AI 长请求用）
   return ghFetchWithRetry(PROXY_BASE + path, opts, retries, timeoutMs)
     .then(function (res) {
-      // v1.42.18：只对写操作（POST/PATCH/PUT/DELETE）401 才弹登录模态；GET 401 静默
-      //   提示。背景：v1.42.16 给所有 401 加 onAuthRequired，导致 30s 轮询的写操作（自动
-      //   确认超时订单）过期时反复把模态弹出来、右上 toast 堆成血条。
+      // v1.42.19：ghApi 401 静默处理——不弹登录模态、不弹 toast。
+      //   原因：onAuthRequired 应该只在"用户主动操作"语义下触发（requireAuth / 发布 catch），
+      //   背景调用（30s 轮询的 runNotificationCheck / 自动确认超时订单）401 是已知降级路径，
+      //   不应把模态反复弹出来打断用户。
+      //   真正的"登录态"恢复由 requireAuth 把关：用户点发布/评论/接单等时如果 S.user
+      //   为空或 token 失效，requireAuth 会正确弹模态。
       if (res.status === 401) {
-        const _isWrite = method && /^(POST|PATCH|PUT|DELETE)$/i.test(method);
-        if (_isWrite) {
-          onAuthRequired('登录态已过期，请重新登录后操作');
-        } else {
-          // GET 401：通常是 token 失效，但浏览/读数据不应强制打断用户；只 toast 一次（每 30s）
-          if (window.toast && (!window._readAuthWarnedAt || Date.now() - window._readAuthWarnedAt > 30000)) {
-            try { toast('会话已过期，正在用游客模式加载（部分功能需登录）', 'error'); } catch(e) {}
-            window._readAuthWarnedAt = Date.now();
+        // 仅做一次静默清理：如果 token 在 localStorage 但服务端拒了（说明已失效或被改），
+        // 主动清掉，避免后续每次都带一个无效 Authorization 头。
+        try {
+          if (getToken() && S && S.user) {
+            // 异步清理：失败也不影响本次返回
+            setTimeout(function () { try { clearToken(); } catch(e){} }, 0);
           }
-        }
+        } catch (e) {}
       }
       if (res.status === 429) {
         try { if (window.toast) toast('请求过于频繁，请稍后再试', 'error'); } catch (e) {}
