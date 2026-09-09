@@ -3,7 +3,7 @@
 <head data-page-node-id="eYdSsfZZhBRoaWwxYXhf8r">
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
-<meta name="version" content="1.45.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.45.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2481,7 +2481,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.45.0';
+const APP_VERSION = '1.45.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -4132,6 +4132,8 @@ function renderOrders(orders) {
 function renderBookSubjectFilters() {
   const bar = document.getElementById('bookSubjectFilters');
   if (!bar) return;
+  // v1.45.1：科目筛选条只在二手（教材）场景显示，避免在互助/跑腿/问答里残留
+  if (S.listingMode !== 'ershou') { bar.innerHTML = ''; bar.style.display = 'none'; S.bookSubject = ''; return; }
   const list = _cachedOrders || [];
   const counts = {};
   list.forEach(o => {
@@ -4342,6 +4344,7 @@ function switchTaskTab(tab) {
   document.getElementById('taskFilters').style.display = (tab === 'task') ? 'flex' : 'none';
   document.getElementById('goodsFilters').style.display = (tab === 'goods') ? 'flex' : 'none';
   document.getElementById('goodsCategoryFilters').style.display = (tab === 'goods') ? 'flex' : 'none';
+  document.getElementById('bookSubjectFilters').style.display = (tab === 'goods') ? 'flex' : 'none'; // v1.45.1
   document.getElementById('qaFilters').style.display = (tab === 'qa') ? 'flex' : 'none';
   document.getElementById('findFilters').style.display = (tab === 'find') ? 'flex' : 'none';
   // 问答/找人 隐藏区域/价格筛选
@@ -4392,6 +4395,7 @@ function applyListingMode(mode) {
   setDisp('taskTabBar', !isErsou);
   setDisp('goodsFilters', isErsou); // v1.42.4：恢复「全部/出售转让/短期租借」二级 tab
   setDisp('goodsCategoryFilters', isErsou); // 二手模式始终显示分类 chips
+  setDisp('bookSubjectFilters', isErsou); // v1.45.1：二手教材科目筛选只在二手模式显示
   // v1.42.3 统一风格：二手/互助均使用白底市场 header
   const hero = document.querySelector('#page-task .task-hero');
   if (hero) hero.classList.add('task-hero-market');
