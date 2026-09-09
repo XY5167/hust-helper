@@ -3,7 +3,7 @@
 <head data-page-node-id="eYdSsfZZhBRoaWwxYXhf8r">
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
-<meta name="version" content="1.44.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.44.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2432,7 +2432,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.44.0';
+const APP_VERSION = '1.44.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -7939,7 +7939,10 @@ async function handlePublish(e) {
       }
     }
   }
-  const imgFiles = document.getElementById('publishImage').files;
+  // v1.44.1 修复：选图后 input.value 被清空以支持重复选，真实文件在 window._publishOcr.files 里
+  const imgFiles = (window._publishOcr && window._publishOcr.files && window._publishOcr.files.length)
+    ? window._publishOcr.files
+    : (document.getElementById('publishImage').files || []);
 
   if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
   const sensitiveWord = checkSensitive(title + ' ' + desc);
