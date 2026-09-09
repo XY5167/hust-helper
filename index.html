@@ -3,7 +3,7 @@
 <head data-page-node-id="eYdSsfZZhBRoaWwxYXhf8r">
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
-<meta name="version" content="1.44.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.45.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -451,6 +451,29 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
   .live-data{grid-template-columns:1fr}
   .steps-grid{grid-template-columns:1fr}
 }
+
+/* P0-2 信任透明页：信任全链路 + 数据墙 */
+.trust-chain{display:flex;align-items:stretch;gap:0;margin-top:16px;flex-wrap:wrap}
+.trust-step{flex:1;min-width:118px;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 10px;position:relative;text-align:center}
+.trust-step .ts-ico{font-size:1.5rem;line-height:1}
+.trust-step .ts-title{font-size:.83rem;font-weight:600;margin-top:6px}
+.trust-step .ts-desc{font-size:.68rem;color:var(--text-muted);margin-top:4px;line-height:1.4}
+.trust-step:not(:last-child)::after{content:'→';position:absolute;right:-11px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:1.05rem;z-index:2}
+@media(max-width:768px){
+  .trust-chain{flex-direction:column}
+  .trust-step:not(:last-child)::after{content:'↓';right:50%;top:auto;bottom:-13px;transform:translateX(50%)}
+}
+.wall-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:14px}
+.wall-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 10px;text-align:center}
+.wall-num{font-size:1.7rem;font-weight:800;color:var(--primary);line-height:1.1}
+.wall-label{font-size:.76rem;color:var(--text-secondary);margin-top:6px}
+.wall-sub{font-size:.66rem;color:var(--text-muted);margin-top:2px}
+.dist-bar{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:.75rem}
+.dist-name{width:54px;color:var(--text-secondary);text-align:right;flex:0 0 auto}
+.dist-track{flex:1;background:var(--bg-soft,#f1f5f9);border-radius:99px;height:14px;overflow:hidden}
+.dist-fill{height:100%;border-radius:99px}
+.dist-val{width:40px;flex:0 0 auto;color:var(--text-muted);text-align:left}
+@media(max-width:768px){.wall-grid{grid-template-columns:repeat(2,1fr)}}
 
 /* Sections */
 .section{padding:56px 0}
@@ -1499,6 +1522,32 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <div class="safety-card" data-page-node-id="ASOXbh2lC6FqfqoNbNsPwS"><div class="safety-card-ico" data-page-node-id="5lswtZiOI9hbi9umVJYTpx">⚖️</div><div data-page-node-id="tImGcGong6rGB2fBbtCFnh"><div class="safety-card-title" data-page-node-id="7pftm3O7IOQT6NtYsphvgF">④ 投诉仲裁</div><div class="safety-card-desc" data-page-node-id="Y5mAuHppiBVtF3vYZEs9EW">纠纷可一键投诉，成立将自动扣除对方信用分，累计 5 次自动封停账号，平台介入裁定。</div></div></div>
       <div class="safety-card" data-page-node-id="bXqiGh3Gns6O5Q9ENeLznG"><div class="safety-card-ico" data-page-node-id="RvQevnMNSsysBEztnEIFBc">⭐</div><div data-page-node-id="EAlj7ERdXqJBWtpddxfQeh"><div class="safety-card-title" data-page-node-id="Ws5zwq0jPhKVFpzlSdsW2K">⑤ 信用分体系</div><div class="safety-card-desc" data-page-node-id="LrROCCu3dBfo1Fg9JLrd0H">初始 100 分，完成订单、被好评加分；爽约、被投诉扣分，过低将限制发布与接单，让守信者被看见。</div></div></div>
       <p class="form-hint" style="margin-top:8px" data-page-node-id="oxnNBsnHnjC46QEO8XpCg7">注：当前为「平台见证 + 信用约束 + 投诉自动惩罚」的轻量担保模式，资金由双方按确认节点线下支付。真·资金托管需接入微信 / 支付宝商户资质，列为本项目未来工作。</p>
+
+      <!-- P0-2 信任全链路 -->
+      <h2 style="font-size:1.08rem;font-weight:700;margin:28px 0 4px">🔗 信任全链路：陌生人也能放心交易</h2>
+      <p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:4px">从你注册到完成一笔互助，每一步都有机制兜底：</p>
+      <div class="trust-chain">
+        <div class="trust-step"><div class="ts-ico">🎓</div><div class="ts-title">学号/邮箱核验</div><div class="ts-desc">实名验证，确保对面是真实校友</div></div>
+        <div class="trust-step"><div class="ts-ico">⭐</div><div class="ts-title">信用分初始化</div><div class="ts-desc">初始 100 分，行为计分</div></div>
+        <div class="trust-step"><div class="ts-ico">🔒</div><div class="ts-title">担保交易</div><div class="ts-desc">先服务后付款，确认才放款</div></div>
+        <div class="trust-step"><div class="ts-ico">🔑</div><div class="ts-title">交接码确认</div><div class="ts-desc">双向验证，防赖账</div></div>
+        <div class="trust-step"><div class="ts-ico">💰</div><div class="ts-title">金额上限</div><div class="ts-desc">大额单硬拦截，控风险</div></div>
+        <div class="trust-step"><div class="ts-ico">🚫</div><div class="ts-title">拉黑/封停</div><div class="ts-desc">爽约/投诉累计自动封停</div></div>
+        <div class="trust-step"><div class="ts-ico">⚖️</div><div class="ts-title">投诉 AI 仲裁</div><div class="ts-desc">纠纷一键投诉，成立即惩罚</div></div>
+      </div>
+
+      <!-- P0-2 平台数据墙 -->
+      <h2 style="font-size:1.08rem;font-weight:700;margin:30px 0 4px">📊 平台信任数据墙</h2>
+      <p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:4px">数据由公开 Issue 实时聚合，<b>匿名展示，不泄露任何个人信息</b>：</p>
+      <div class="wall-grid" id="trustWall">
+        <div class="wall-card"><div class="wall-num" id="twUsers">…</div><div class="wall-label">实名注册校友</div></div>
+        <div class="wall-card"><div class="wall-num" id="twOrders">…</div><div class="wall-label">累计互助订单</div></div>
+        <div class="wall-card"><div class="wall-num" id="twRate">…</div><div class="wall-label">订单完成率</div></div>
+        <div class="wall-card"><div class="wall-num" id="twCredit">…</div><div class="wall-label">平均信用分</div></div>
+        <div class="wall-card"><div class="wall-num" id="twReports">…</div><div class="wall-label">投诉成立处理</div></div>
+      </div>
+      <h3 style="font-size:.95rem;font-weight:600;margin:24px 0 6px">信用分分布</h3>
+      <div id="trustCreditDist"><div class="form-hint">加载中…</div></div>
     </div>
   </div>
 </section>
@@ -2432,7 +2481,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.44.1';
+const APP_VERSION = '1.45.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2886,6 +2935,7 @@ function navigate(page) {
   else if (page === 'forum-detail') { loadForumDetail(S._forumDetailNum); }
   else if (page === 'my') loadMyOrders();
   else if (page === 'stats') loadStatsPage();
+  else if (page === 'safety') loadTrustWall();
 }
 
 // ===== v1.24.0 首页改版：统一入口跳转 =====
@@ -3435,6 +3485,61 @@ async function loadHomeLiveData() {
   } catch(e) {
     const act = document.getElementById('liveActivity'); if (act) act.innerHTML = '<div class="live-act-empty">动态加载失败</div>';
   }
+}
+
+// P0-2 信任透明页：数据墙（从 Issues 聚合，匿名只读，无后端改动）
+let _trustWallCache = null, _trustWallTs = 0;
+async function loadTrustWall(force) {
+  const grid = document.getElementById('trustWall');
+  if (!grid) return;
+  if (!force && _trustWallCache && (Date.now() - _trustWallTs < 60000)) { renderTrustWall(_trustWallCache); return; }
+  try {
+    const users = await ghIssues('user', 'all');
+    const orders = await ghIssues('order', 'all');
+    const reports = await ghIssues('report', 'all');
+    const uList = (users || []).map(function (i) { try { return JSON.parse(i.body); } catch (e) { return null; } }).filter(Boolean);
+    const oList = (orders || []).map(function (i) { try { return JSON.parse(i.body); } catch (e) { return null; } }).filter(Boolean);
+    const rList = (reports || []).map(function (i) { try { return JSON.parse(i.body); } catch (e) { return null; } }).filter(Boolean);
+    const totalUsers = uList.length;
+    const totalOrders = oList.length;
+    const completed = oList.filter(function (o) { return o.status === 'completed'; }).length;
+    const rate = totalOrders ? Math.round(completed / totalOrders * 100) : 0;
+    const credits = uList.map(function (u) { return (typeof u.credit_score === 'number' && !isNaN(u.credit_score)) ? u.credit_score : 100; });
+    const avgCredit = credits.length ? Math.round(credits.reduce(function (a, b) { return a + b; }, 0) / credits.length) : 0;
+    const reportsDone = rList.filter(function (r) { return r.status === 'resolved' || r.status === 'ai_resolved'; }).length;
+    const buckets = [
+      { name: '<60', min: -Infinity, max: 60, color: '#dc2626' },
+      { name: '60-79', min: 60, max: 80, color: '#f59e0b' },
+      { name: '80-99', min: 80, max: 100, color: '#3b82f6' },
+      { name: '100', min: 100, max: 101, color: '#16a34a' },
+      { name: '>100', min: 101, max: Infinity, color: '#7c3aed' }
+    ];
+    buckets.forEach(function (b) { b.count = credits.filter(function (c) { return c >= b.min && c < b.max; }).length; });
+    _trustWallCache = { totalUsers: totalUsers, totalOrders: totalOrders, rate: rate, avgCredit: avgCredit, reportsDone: reportsDone, buckets: buckets };
+    _trustWallTs = Date.now();
+    renderTrustWall(_trustWallCache);
+  } catch (e) {
+    ['twUsers', 'twOrders', 'twRate', 'twCredit', 'twReports'].forEach(function (id) { const el = document.getElementById(id); if (el) el.textContent = '—'; });
+    const dist = document.getElementById('trustCreditDist');
+    if (dist) dist.innerHTML = '<div class="form-hint">数据暂时无法加载，请稍后重试</div>';
+  }
+}
+function renderTrustWall(d) {
+  const set = function (id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('twUsers', d.totalUsers);
+  set('twOrders', d.totalOrders);
+  set('twRate', d.rate + '%');
+  set('twCredit', d.avgCredit);
+  set('twReports', d.reportsDone);
+  const dist = document.getElementById('trustCreditDist');
+  if (!dist) return;
+  const maxC = Math.max(1, d.buckets[0].count, d.buckets[1].count, d.buckets[2].count, d.buckets[3].count, d.buckets[4].count);
+  dist.innerHTML = d.buckets.map(function (b) {
+    const pct = Math.round(b.count / maxC * 100);
+    return '<div class="dist-bar"><span class="dist-name">' + b.name + '</span>'
+      + '<span class="dist-track"><span class="dist-fill" style="width:' + pct + '%;background:' + b.color + '"></span></span>'
+      + '<span class="dist-val">' + b.count + '</span></div>';
+  }).join('');
 }
 
 // v1.44.0 P0-3 首页新手引导卡：登录态/是否 dismissed 动态决定内容
