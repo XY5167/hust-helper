@@ -3,7 +3,7 @@
 <head data-page-node-id="eYdSsfZZhBRoaWwxYXhf8r">
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
-<meta name="version" content="1.46.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.47.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -276,6 +276,8 @@ html[data-theme="dark"] .forum-guest-bar{background:rgba(37,99,235,.16);border-c
 .forum-banner-dots{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
 .forum-banner-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.45);cursor:pointer}
 .forum-banner-dot.active{background:#fff}
+.forum-banner-brand{position:absolute;top:10px;left:12px;z-index:2;font-size:.72rem;font-weight:700;color:#fff;background:rgba(0,0,0,.30);padding:3px 10px;border-radius:99px;backdrop-filter:blur(2px);letter-spacing:.5px;pointer-events:none}
+.forum-cat-icon{box-shadow:0 2px 6px rgba(0,0,0,.14)}
 
 /* Stats */
 .forum-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
@@ -1277,18 +1279,19 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 
       <!-- Banner 轮播：真实校园互助场景，点击跳转对应分区 -->
       <div class="forum-banner" id="forumBanner" data-page-node-id="qfuN6xCEfIUJbq6LEwSPkj">
+        <div class="forum-banner-brand">🏫 华中科技大学 · 校园互助</div>
         <div class="forum-banner-track" id="forumBannerTrack" data-page-node-id="jExt9dz3RGyAe3em11pufR">
-          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#185FA5,#6366f1)" onclick="openForumCat('life')" data-page-node-id="SRbpFMSQf2E6XVjc5I7nO7">
+          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#D20B17,#004B84)" onclick="openForumCat('life')" data-page-node-id="SRbpFMSQf2E6XVjc5I7nO7">
             <div class="forum-banner-tag" data-page-node-id="RrHLh4JNIL51rJMlT9m012">失物招领</div>
             <div class="forum-banner-title" data-page-node-id="Hhw4eRkRNQhSnYzJMq4dFd">捡到校园卡 / 伞 / 书？</div>
             <div class="forum-banner-sub" data-page-node-id="Q9JwcUzHlHljO9cUO84IvU">发到「生活分享」找主人 ›</div>
           </div>
-          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#3B6D11,#84cc16)" onclick="openForumCat('study')" data-page-node-id="jk9f6ei5W7XxW9JzJ6AZgW">
+          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#004B84,#1e40af)" onclick="openForumCat('study')" data-page-node-id="jk9f6ei5W7XxW9JzJ6AZgW">
             <div class="forum-banner-tag" data-page-node-id="uFX1NqSCDCG0XW6tZ9MXHF">期末互助</div>
             <div class="forum-banner-title" data-page-node-id="X6UcDqhC6TojplMAiaJ8us">组队复习 · 资料共享</div>
             <div class="forum-banner-sub" data-page-node-id="HYhY4fkNVvAccWT6eqHlfA">在「学习求助」找搭子 ›</div>
           </div>
-          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#B91C1C,#F59E0B)" onclick="openForumCat('tucao')" data-page-node-id="LpEIR7X8sTxA1l7o21CkXo">
+          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#D20B17,#b45309)" onclick="openForumCat('tucao')" data-page-node-id="LpEIR7X8sTxA1l7o21CkXo">
             <div class="forum-banner-tag" data-page-node-id="BTebyebaqLu4jUU3XwIGaO">校园公约</div>
             <div class="forum-banner-title" data-page-node-id="Rto6ET6jB794O2RGXoynn6">友善交流 · 拒绝校外交易</div>
             <div class="forum-banner-sub" data-page-node-id="JPjqgu6WDvLijJvkqf4WZG">有槽点来「校园吐槽」 ›</div>
@@ -1337,38 +1340,38 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <div class="onboard-ctas" id="onboardCtAs"></div>
       </div>
 
-      <!-- 8 宫格分类 -->
+      <!-- 8 宫格分类（P1-8 实心色块底 + 白字，跨平台对比度更稳） -->
       <div class="forum-cat-grid" data-page-node-id="H2tWMnKzOsbBFl9rAQbWWx">
         <button class="forum-cat" onclick="openForumCat('tucao')" data-page-node-id="isX3SHRTQJJQGpoSALKRDE">
-          <span class="forum-cat-icon" style="background:rgba(234,88,12,.16);color:#ea580c" data-page-node-id="qyviTc05enedVduMAlqQhd">💬</span>
+          <span class="forum-cat-icon" style="background:#ea580c;color:#fff" data-page-node-id="qyviTc05enedVduMAlqQhd">💬</span>
           <span class="forum-cat-label" data-page-node-id="wEoJBGHsZvD7biLJECGUaM">校园吐槽</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('study')" data-page-node-id="gZAzCZ2pqHJCIlkSPR0tq7">
-          <span class="forum-cat-icon" style="background:rgba(37,99,235,.16);color:#2563eb" data-page-node-id="4CaTpDIUukTsDOHIFSctSw">📚</span>
+          <span class="forum-cat-icon" style="background:#2563eb;color:#fff" data-page-node-id="4CaTpDIUukTsDOHIFSctSw">📚</span>
           <span class="forum-cat-label" data-page-node-id="jIXHMkmvpYnyHxZlaj6ds0">学习求助</span>
         </button>
         <button class="forum-cat" onclick="navigate('ershou')" data-page-node-id="7onEjvf8KyQqnEWjUQfysj">
-          <span class="forum-cat-icon" style="background:rgba(22,163,74,.16);color:#16a34a" data-page-node-id="RHdMkUPHCa1BAAg9G5C5Ap">🔄</span>
+          <span class="forum-cat-icon" style="background:#16a34a;color:#fff" data-page-node-id="RHdMkUPHCa1BAAg9G5C5Ap">🔄</span>
           <span class="forum-cat-label" data-page-node-id="8GbSTSlzvJlS4DHYUOe7Gf">闲置交易</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('lost')" data-page-node-id="LwxHN9ur3SdZLZXB1AInZk">
-          <span class="forum-cat-icon" style="background:rgba(22,163,74,.16);color:#16a34a" data-page-node-id="JDsdzwvv3PMFS4ZdhBGJ2M">🎒</span>
+          <span class="forum-cat-icon" style="background:#0ea5e9;color:#fff" data-page-node-id="JDsdzwvv3PMFS4ZdhBGJ2M">🎒</span>
           <span class="forum-cat-label" data-page-node-id="9y7AROgFDx8TS4vMAEL1Xr">失物招领</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('activity')" data-page-node-id="QM4bgq7q0v5kjBPvGF4F9Y">
-          <span class="forum-cat-icon" style="background:rgba(202,138,4,.16);color:#ca8a04" data-page-node-id="IHoh7W2vvPzqj74ZESlvLX">🎉</span>
+          <span class="forum-cat-icon" style="background:#ca8a04;color:#fff" data-page-node-id="IHoh7W2vvPzqj74ZESlvLX">🎉</span>
           <span class="forum-cat-label" data-page-node-id="JH0CfjdM1QIMuetFycgNP1">校园活动</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('confession')" data-page-node-id="NUsz49pp0uFpBZkbp6RwvA">
-          <span class="forum-cat-icon" style="background:rgba(168,85,247,.16);color:#a855f7" data-page-node-id="9R4B8DnKFu2ZsXpL4UhcV8">💌</span>
+          <span class="forum-cat-icon" style="background:#a855f7;color:#fff" data-page-node-id="9R4B8DnKFu2ZsXpL4UhcV8">💌</span>
           <span class="forum-cat-label" data-page-node-id="GWh5aNb0hAcxw7U0YO7dy0">表白墙</span>
         </button>
         <button class="forum-cat" onclick="navigate('help')" data-page-node-id="nCSb2wucf60s3cQUrMwrva">
-          <span class="forum-cat-icon" style="background:rgba(8,145,178,.16);color:#0891b2" data-page-node-id="01bHzlS1zSOUi5HD1pVp7G">❓</span>
+          <span class="forum-cat-icon" style="background:#0891b2;color:#fff" data-page-node-id="01bHzlS1zSOUi5HD1pVp7G">❓</span>
           <span class="forum-cat-label" data-page-node-id="SJf4Uxy9kJu3muaEAGeLBN">问答求助</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('life')" data-page-node-id="IhIU8rVK6BPTEmt7Ju8xNh">
-          <span class="forum-cat-icon" style="background:rgba(124,58,237,.16);color:#7c3aed" data-page-node-id="b45LK1218XHWSTTuqUy4Us">☕</span>
+          <span class="forum-cat-icon" style="background:#7c3aed;color:#fff" data-page-node-id="b45LK1218XHWSTTuqUy4Us">☕</span>
           <span class="forum-cat-label" data-page-node-id="qeAcAWHxrP51Ks7vM4szRI">生活分享</span>
         </button>
       </div>
@@ -1418,13 +1421,13 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
   <!-- 原有信任/数据/达人榜/引导区块保留，默认折叠 -->
   <div class="container" style="margin-top:24px" data-page-node-id="A8aHs7r4D4ly3pqwNHU15q">
     <!-- B3. 信任与安全 -->
-    <div class="home-section trust-section collapsed" data-section="trust" data-page-node-id="PhvvEw1dI7VtmVM0iOCd0l">
+    <div class="home-section trust-section" data-section="trust" data-page-node-id="PhvvEw1dI7VtmVM0iOCd0l">
       <div class="home-section-head" onclick="toggleHomeSection('trust')" data-page-node-id="lsLGLxTeoNsEM1XYxfBCCg">
         <div class="home-section-title trust-title" onclick="event.stopPropagation(); navigate('safety')" data-page-node-id="ongcCInUuS6MZTTJiRcjHk">🛡️ 平台信任与安全 · 点此查看安全中心 ›</div>
         <div class="home-section-summary" data-page-node-id="epGWZq6vfUdpUNAex1nn4k">5 项安全机制已启用</div>
-        <button class="home-section-toggle" onclick="event.stopPropagation(); toggleHomeSection('trust')" data-page-node-id="DuBWesomYfweJs5CDRG9iD"><span class="toggle-text" data-page-node-id="nWWSzcsNCeIC7ahlZBO1Uq">展开</span><span class="toggle-icon" data-page-node-id="aWVegT4hKbfZNXTpTVpZ1Q">▼</span></button>
+        <button class="home-section-toggle" onclick="event.stopPropagation(); toggleHomeSection('trust')" data-page-node-id="DuBWesomYfweJs5CDRG9iD"><span class="toggle-text" data-page-node-id="nWWSzcsNCeIC7ahlZBO1Uq">收起</span><span class="toggle-icon" data-page-node-id="aWVegT4hKbfZNXTpTVpZ1Q">▼</span></button>
       </div>
-      <div class="home-section-body collapsed" id="homeSection-trust" data-page-node-id="iDDlArhxLdOsGm5L54PNKa">
+      <div class="home-section-body" id="homeSection-trust" data-page-node-id="iDDlArhxLdOsGm5L54PNKa">
         <div class="trust-grid" data-page-node-id="Cvl1HLZF63emPWe6kRYPXH">
           <div class="trust-item" data-page-node-id="vWl2gnsyJ0D1cKDnhHvY6a"><div class="trust-ico" data-page-node-id="imERl8J0Xli5C5XGn9qfRe">🎓</div><div class="trust-name" data-page-node-id="umd38QWInFBC8K5bkiSd5g">学号实名核验</div><div class="trust-desc" data-page-node-id="K5k133aK6hTiEeoJc6qihZ">校园邮箱 / 人工审核双轨，确保校内真实身份</div></div>
           <div class="trust-item" data-page-node-id="5TeCp06BkTXafJjthOIZU9"><div class="trust-ico" data-page-node-id="Qj56lnbfPcZSonCBXr586s">🔒</div><div class="trust-name" data-page-node-id="BUaNvq59ElBBZl1C3BNlLT">担保交易</div><div class="trust-desc" data-page-node-id="gLaPJlBFC3AO2qHBh0eEHu">先服务后付款，双方确认才完成</div></div>
@@ -1438,13 +1441,13 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 
   <div class="container" data-page-node-id="J8TRxnp46WfwgWBXIclN6n">
     <!-- D. 实时数据 + 最新互助动态 -->
-    <div class="home-section collapsed" data-section="live" data-page-node-id="4yOFs6Hp9ahgygq2oozjEh">
+    <div class="home-section" data-section="live" data-page-node-id="4yOFs6Hp9ahgygq2oozjEh">
       <div class="home-section-head" onclick="toggleHomeSection('live')" data-page-node-id="RCDZEtdetvDv0cenQw8wj8">
         <div class="home-section-title" data-page-node-id="SquMz2HvCIjrtGkpNUaANo">📊 平台实时数据</div>
         <div class="home-section-summary" id="liveSummary" data-page-node-id="GCx9GTP37HHUjdfPEyDOHk">注册 0 · 订单 0 · 完成 0</div>
-        <button class="home-section-toggle" onclick="event.stopPropagation(); toggleHomeSection('live')" data-page-node-id="lE5d8yhVoLqe0kHyDHirEk"><span class="toggle-text" data-page-node-id="Tda66j3wF3lXCqE7rNG2AP">展开</span><span class="toggle-icon" data-page-node-id="vSmJoPjjRzGI3bp3HYREGT">▼</span></button>
+        <button class="home-section-toggle" onclick="event.stopPropagation(); toggleHomeSection('live')" data-page-node-id="lE5d8yhVoLqe0kHyDHirEk"><span class="toggle-text" data-page-node-id="Tda66j3wF3lXCqE7rNG2AP">收起</span><span class="toggle-icon" data-page-node-id="vSmJoPjjRzGI3bp3HYREGT">▼</span></button>
       </div>
-      <div class="home-section-body collapsed" id="homeSection-live" data-page-node-id="1O6XeJsbmI6yKW69BHxvtE">
+      <div class="home-section-body" id="homeSection-live" data-page-node-id="1O6XeJsbmI6yKW69BHxvtE">
         <div class="live-data" data-page-node-id="6Lo4qJuxIf3j8Dg2rUslEl">
           <div class="live-stats" data-page-node-id="tu5GzGT1QZABi0ZtAyLfzv">
             <div class="live-stat-row" data-page-node-id="w30FJUI5njhE6Kg07SVFdt"><span class="live-stat-label" data-page-node-id="xaviIztMccVGgjKm4ZQI2x">注册同学</span><span class="live-stat-num" id="liveUsers" data-page-node-id="42aGQTwIi007ioG1mdSStg">0</span></div>
@@ -2512,7 +2515,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.46.0';
+const APP_VERSION = '1.47.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
