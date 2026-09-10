@@ -3,7 +3,7 @@
 <head data-page-node-id="eYdSsfZZhBRoaWwxYXhf8r">
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
-<meta name="version" content="1.45.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.46.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -69,6 +69,10 @@
   --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;
   --brand: #185FA5;
   --brand-ink: #ffffff;
+  /* v1.46.0 华科官方标准色（vi.hust.edu.cn）：蓝做主色，红做强调 */
+  --hust-red: #D20B17;
+  --hust-red-dark: #A50A13;
+  --hust-blue: #004B84;
   --cat-task: #185FA5;
   --cat-goods: #3B6D11;
   --cat-qa: #BA7517;
@@ -102,7 +106,7 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .header{background:rgba(255,255,255,.85);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);box-shadow:0 1px 0 var(--border),0 6px 24px rgba(15,23,42,.05);transition:box-shadow var(--t)}
 .nav-inner{display:flex;align-items:center;justify-content:space-between;height:60px;gap:20px}
 .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:1.15rem;background:linear-gradient(135deg,var(--primary),#6d28d9);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--primary)}
-.brand-logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--brand);color:#fff;font-weight:600;font-size:15px;box-shadow:0 4px 12px rgba(24,95,165,.25);flex:0 0 auto}
+.brand-logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--hust-red);color:#fff;font-weight:600;font-size:15px;box-shadow:0 4px 12px rgba(210,11,23,.28);flex:0 0 auto}
 .nav-links{display:flex;gap:2px}
 .nav-link{padding:8px 14px;border-radius:var(--radius-xs);font-size:.88rem;font-weight:500;color:var(--text-secondary);transition:all .15s;border:none;background:none;position:relative}
 .nav-link:hover{background:var(--bg-hover);color:var(--text)}
@@ -198,6 +202,27 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 .forum-header-actions{display:flex;gap:10px}
 .forum-header-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-sm)}
 .forum-header-btn:active{transform:scale(.95)}
+/* v1.46.0 首页全局搜索：对标竞品首屏第一元素（复用 homeSearchSubmit / #homeSearchInput） */
+.forum-search{display:flex;align-items:center;gap:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:99px;padding:11px 16px;margin-bottom:16px;cursor:text;transition:border-color .15s,box-shadow .15s}
+.forum-search:focus-within{border-color:var(--hust-red);box-shadow:0 0 0 3px rgba(210,11,23,.10)}
+.forum-search-ico{font-size:1rem;line-height:1;opacity:.75;flex:0 0 auto}
+.forum-search-input{flex:1;min-width:0;border:none;background:transparent;outline:none;font-size:.9rem;color:var(--text)}
+.forum-search-input::placeholder{color:var(--text-muted)}
+/* v1.46.0 首屏重排：搜索 + 功能宫格提到第一屏（纯 CSS order，不改 DOM 结构、易回滚） */
+.forum-home{display:flex;flex-direction:column}
+.forum-header{order:1}
+.forum-search{order:2}
+.forum-cat-grid{order:3}
+.forum-banner{order:4}
+.forum-stats{order:5}
+.ai-entry{order:6;margin:0 0 14px}
+.onboard-card{order:7;margin:0 0 14px}
+.forum-guest-bar{order:8}
+.forum-biz-cards{order:9}
+.forum-feed-section{order:10}
+/* v1.46.0 深色模式修复：原浅色硬编码在暗色下变成白块/浅底浅字，改为半透明叠加，两种模式通用 */
+html[data-theme="dark"] .onboard-card{background:linear-gradient(135deg,rgba(234,88,12,.16),rgba(22,163,74,.12));border-color:rgba(234,88,12,.4)}
+html[data-theme="dark"] .forum-guest-bar{background:rgba(37,99,235,.16);border-color:rgba(37,99,235,.4);color:var(--text)}
 /* v1.38 AI 互助入口卡片：校园圈首屏核心卖点 */
 .ai-entry{display:flex;align-items:center;gap:14px;margin:14px 0;padding:14px 16px;border-radius:var(--radius-md);background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(24,95,165,.10));border:1px solid rgba(99,102,241,.28);box-shadow:var(--shadow-sm);cursor:pointer;transition:box-shadow .2s ease,transform .12s ease}
 .ai-entry:hover{box-shadow:var(--shadow-md)}
@@ -255,7 +280,7 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 /* Stats */
 .forum-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
 .forum-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 8px;text-align:center}
-.forum-stat-num{font-size:1.35rem;font-weight:700;color:var(--brand);line-height:1}
+.forum-stat-num{font-size:1.35rem;font-weight:700;color:var(--hust-red);line-height:1}
 .forum-stat-label{font-size:.72rem;color:var(--text-muted);margin-top:4px}
 .forum-stats.stats-degraded .forum-stat-num{color:var(--text-muted);opacity:.65}
 
@@ -1244,6 +1269,12 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         </div>
       </div>
 
+      <!-- v1.46.0 首页全局搜索：首屏第一元素，复用 homeSearchSubmit() + #homeSearchInput -->
+      <div class="forum-search" id="forumSearchBox" onclick="document.getElementById('homeSearchInput').focus()">
+        <span class="forum-search-ico" aria-hidden="true">🔍</span>
+        <input type="text" id="homeSearchInput" class="forum-search-input" placeholder="搜索求助 / 二手 / 失物 / 跑腿…" aria-label="站内搜索" onkeydown="if(event.key==='Enter'){event.preventDefault();homeSearchSubmit();}">
+      </div>
+
       <!-- Banner 轮播：真实校园互助场景，点击跳转对应分区 -->
       <div class="forum-banner" id="forumBanner" data-page-node-id="qfuN6xCEfIUJbq6LEwSPkj">
         <div class="forum-banner-track" id="forumBannerTrack" data-page-node-id="jExt9dz3RGyAe3em11pufR">
@@ -1309,35 +1340,35 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <!-- 8 宫格分类 -->
       <div class="forum-cat-grid" data-page-node-id="H2tWMnKzOsbBFl9rAQbWWx">
         <button class="forum-cat" onclick="openForumCat('tucao')" data-page-node-id="isX3SHRTQJJQGpoSALKRDE">
-          <span class="forum-cat-icon" style="background:#fff7ed;color:#ea580c" data-page-node-id="qyviTc05enedVduMAlqQhd">💬</span>
+          <span class="forum-cat-icon" style="background:rgba(234,88,12,.16);color:#ea580c" data-page-node-id="qyviTc05enedVduMAlqQhd">💬</span>
           <span class="forum-cat-label" data-page-node-id="wEoJBGHsZvD7biLJECGUaM">校园吐槽</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('study')" data-page-node-id="gZAzCZ2pqHJCIlkSPR0tq7">
-          <span class="forum-cat-icon" style="background:#eff6ff;color:#2563eb" data-page-node-id="4CaTpDIUukTsDOHIFSctSw">📚</span>
+          <span class="forum-cat-icon" style="background:rgba(37,99,235,.16);color:#2563eb" data-page-node-id="4CaTpDIUukTsDOHIFSctSw">📚</span>
           <span class="forum-cat-label" data-page-node-id="jIXHMkmvpYnyHxZlaj6ds0">学习求助</span>
         </button>
         <button class="forum-cat" onclick="navigate('ershou')" data-page-node-id="7onEjvf8KyQqnEWjUQfysj">
-          <span class="forum-cat-icon" style="background:#f0fdf4;color:#16a34a" data-page-node-id="RHdMkUPHCa1BAAg9G5C5Ap">🔄</span>
+          <span class="forum-cat-icon" style="background:rgba(22,163,74,.16);color:#16a34a" data-page-node-id="RHdMkUPHCa1BAAg9G5C5Ap">🔄</span>
           <span class="forum-cat-label" data-page-node-id="8GbSTSlzvJlS4DHYUOe7Gf">闲置交易</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('lost')" data-page-node-id="LwxHN9ur3SdZLZXB1AInZk">
-          <span class="forum-cat-icon" style="background:#f0fdf4;color:#16a34a" data-page-node-id="JDsdzwvv3PMFS4ZdhBGJ2M">🎒</span>
+          <span class="forum-cat-icon" style="background:rgba(22,163,74,.16);color:#16a34a" data-page-node-id="JDsdzwvv3PMFS4ZdhBGJ2M">🎒</span>
           <span class="forum-cat-label" data-page-node-id="9y7AROgFDx8TS4vMAEL1Xr">失物招领</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('activity')" data-page-node-id="QM4bgq7q0v5kjBPvGF4F9Y">
-          <span class="forum-cat-icon" style="background:#fffbeb;color:#ca8a04" data-page-node-id="IHoh7W2vvPzqj74ZESlvLX">🎉</span>
+          <span class="forum-cat-icon" style="background:rgba(202,138,4,.16);color:#ca8a04" data-page-node-id="IHoh7W2vvPzqj74ZESlvLX">🎉</span>
           <span class="forum-cat-label" data-page-node-id="JH0CfjdM1QIMuetFycgNP1">校园活动</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('confession')" data-page-node-id="NUsz49pp0uFpBZkbp6RwvA">
-          <span class="forum-cat-icon" style="background:#fdf4ff;color:#a855f7" data-page-node-id="9R4B8DnKFu2ZsXpL4UhcV8">💌</span>
+          <span class="forum-cat-icon" style="background:rgba(168,85,247,.16);color:#a855f7" data-page-node-id="9R4B8DnKFu2ZsXpL4UhcV8">💌</span>
           <span class="forum-cat-label" data-page-node-id="GWh5aNb0hAcxw7U0YO7dy0">表白墙</span>
         </button>
         <button class="forum-cat" onclick="navigate('help')" data-page-node-id="nCSb2wucf60s3cQUrMwrva">
-          <span class="forum-cat-icon" style="background:#ecfeff;color:#0891b2" data-page-node-id="01bHzlS1zSOUi5HD1pVp7G">❓</span>
+          <span class="forum-cat-icon" style="background:rgba(8,145,178,.16);color:#0891b2" data-page-node-id="01bHzlS1zSOUi5HD1pVp7G">❓</span>
           <span class="forum-cat-label" data-page-node-id="SJf4Uxy9kJu3muaEAGeLBN">问答求助</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('life')" data-page-node-id="IhIU8rVK6BPTEmt7Ju8xNh">
-          <span class="forum-cat-icon" style="background:#f5f3ff;color:#7c3aed" data-page-node-id="b45LK1218XHWSTTuqUy4Us">☕</span>
+          <span class="forum-cat-icon" style="background:rgba(124,58,237,.16);color:#7c3aed" data-page-node-id="b45LK1218XHWSTTuqUy4Us">☕</span>
           <span class="forum-cat-label" data-page-node-id="qeAcAWHxrP51Ks7vM4szRI">生活分享</span>
         </button>
       </div>
@@ -2481,7 +2512,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.45.1';
+const APP_VERSION = '1.46.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
