@@ -3,7 +3,7 @@
 <head data-page-node-id="eYdSsfZZhBRoaWwxYXhf8r">
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
-<meta name="version" content="1.47.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.48.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -1633,6 +1633,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <button class="filter-btn" data-filter="print" onclick="filterOrders('task','print')" data-page-node-id="qxMwXxHdIYerk5gNdVcf3f">🖨️ 帮忙打印</button>
 
       <button class="filter-btn" data-filter="repair" onclick="filterOrders('task','repair')" data-page-node-id="BrtpnxkOkk9CLWsQDP1Dll">🔧 维修</button>
+      <button class="filter-btn" data-filter="queue" onclick="filterOrders('task','queue')" data-page-node-id="Qz9rVwXk7mNpLbR2cD4eF1">🚶 排队代办</button>
       <button class="filter-btn" data-filter="other" onclick="filterOrders('task','other')" data-page-node-id="0ABi1kEiHDghWdSz1vD8dl">📌 其他</button>
     </div>
     <!-- 物品流转子分类 -->
@@ -2515,7 +2516,7 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.47.0';
+const APP_VERSION = '1.48.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3977,6 +3978,13 @@ function refreshCurrentTab() {
   loadOrders(tab, cat);
 }
 
+// v1.48.0 P1-9：归一化旧版二级分类 key，兼容历史数据（textbook/device/tool→新 9 类）
+function normalizeCat(c) {
+  if (c === 'textbook') return 'book';
+  if (c === 'device') return 'electronic';
+  if (c === 'tool') return 'tools';
+  return c || 'other';
+}
 async function loadOrders(type, cat) {
   const grid = document.getElementById('taskOrders');
   if (!grid) return;
@@ -4011,6 +4019,7 @@ async function loadOrders(type, cat) {
         const o = JSON.parse(i.body);
         if (o.type === 'errand' || o.type === 'skill') o.type = 'task';
         o._issue_number = i.number;
+        o.category = normalizeCat(o.category);   // v1.48.0 P1-9：兼容旧分类 key
         return o;
       } catch(e) { return null; }
     }).filter(o => o && o.status === 'open');
@@ -4328,14 +4337,17 @@ function updateGoodsSubTabUI() {
 function updateGoodsCategoryFilters() {
   const bar = document.getElementById('goodsCategoryFilters');
   if (!bar) return;
-  // v1.42.2：二手分类统一为原型风格的固定 chips（不再依赖出售/租借子 tab）
+  // v1.48.0 P1-9：二手二级分类扩展为 9 类，与发布端 key 对齐（tool→tools）
   const cats = [
     { k: 'all', l: '全部' },
     { k: 'book', l: '📚 教材书籍' },
     { k: 'electronic', l: '💻 电子产品' },
+    { k: 'digital', l: '🎧 数码配件' },
     { k: 'daily', l: '🏠 生活用品' },
+    { k: 'tools', l: '🔧 生活工具' },
     { k: 'sports', l: '⚽ 运动器材' },
-    { k: 'tool', l: '🔧 生活工具' },
+    { k: 'clothes', l: '👕 服饰鞋包' },
+    { k: 'furniture', l: '🛏️ 宿舍家具' },
     { k: 'other', l: '📌 其他' }
   ];
   const cur = S.goodsCategory || 'all';
@@ -7828,7 +7840,7 @@ function restorePublishDraft() {
     const d = JSON.parse(raw);
     const set = (id, v) => { const e = document.getElementById(id); if (e && v != null) e.value = v; };
     if (d.type) { const t = document.getElementById('publishType'); if (t) t.value = d.type; updatePublishCategories(); }
-    set('publishCategory', d.category);
+    set('publishCategory', normalizeCat(d.category || ''));
     set('publishTitle', d.title); set('publishDesc', d.desc);
     set('publishLocation', d.location); set('publishUrgency', d.urgency);
     set('publishPayment', d.payment); set('publishDeadline', d.deadline);
@@ -7907,10 +7919,11 @@ function closePublishModal() {
 
 function updatePublishCategories() {
   const t = document.getElementById('publishType').value;
+  // v1.48.0 P1-9：二手（出售+租借）统一 9 类二级分类；跑腿补全 7 类
   const cats = {
-    task: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'buy',l:'帮买帮送'},{v:'print',l:'帮忙打印'},{v:'repair',l:'维修'},{v:'other',l:'其他任务'}],
-    borrow: [{v:'textbook',l:'教材参考书'},{v:'device',l:'数码设备'},{v:'sports',l:'体育器材'},{v:'tool',l:'生活工具'},{v:'other',l:'其他物品'}],
-    secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'daily',l:'生活用品'},{v:'other',l:'其他'}],
+    task: [{v:'express',l:'代拿快递'},{v:'food',l:'代取外卖'},{v:'buy',l:'帮买帮送'},{v:'print',l:'帮忙打印'},{v:'repair',l:'维修'},{v:'queue',l:'排队代办'},{v:'other',l:'其他任务'}],
+    borrow: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'digital',l:'数码配件'},{v:'daily',l:'生活用品'},{v:'tools',l:'生活工具'},{v:'sports',l:'运动器材'},{v:'clothes',l:'服饰鞋包'},{v:'furniture',l:'宿舍家具'},{v:'other',l:'其他物品'}],
+    secondhand: [{v:'book',l:'教材书籍'},{v:'electronic',l:'电子产品'},{v:'digital',l:'数码配件'},{v:'daily',l:'生活用品'},{v:'tools',l:'生活工具'},{v:'sports',l:'运动器材'},{v:'clothes',l:'服饰鞋包'},{v:'furniture',l:'宿舍家具'},{v:'other',l:'其他物品'}],
     qa: [{v:'course',l:'选课学习'},{v:'exam',l:'考研保研'},{v:'life',l:'校园生活'},{v:'job',l:'实习就业'},{v:'exercise',l:'习题解答'},{v:'other',l:'其他问题'}],
     find: [{v:'team',l:'竞赛组队'},{v:'carpool',l:'出行拼车'},{v:'survey',l:'问卷招募'}]
   };
@@ -7981,7 +7994,7 @@ function updateBookMetaVisibility() {
   const c = document.getElementById('publishCategory').value;
   const g = document.getElementById('bookMetaGroup');
   if (!g) return;
-  const show = (t === 'secondhand' && c === 'book') || (t === 'borrow' && c === 'textbook');
+  const show = (t === 'secondhand' && c === 'book') || (t === 'borrow' && c === 'book');
   g.style.display = show ? 'block' : 'none';
   if (!show) {                          // 切走时清空，避免脏数据带进下一次发布
     const bt = document.getElementById('publishBookTitle');
