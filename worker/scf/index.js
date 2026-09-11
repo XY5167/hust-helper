@@ -47,7 +47,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.41.6';
+const VERSION = '1.42.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -179,6 +179,18 @@ function desensitizeUser(u) {
 function issueHasUserLabel(data) {
   return data && data.labels && Array.isArray(data.labels) &&
     data.labels.some(l => (l && (l.name || l)) === 'user');
+}
+// v1.42.0：从 issue body 提取「有权修改此 issue 的学号集合」，用于写操作所有权断言。
+// 订单类：创建者(student_id) / 发布者(publisher_*) / 接单者(taker_*)；用户类：student_id 即本人。
+function issueOwnerSids(data) {
+  const sids = [];
+  if (!data || !data.body) return sids;
+  let b = null;
+  try { b = JSON.parse(data.body); } catch (e) { return sids; }
+  if (!b) return sids;
+  ['student_id', 'publisher_id', 'publisher_student_id', 'taker_id', 'taker_student_id']
+    .forEach(k => { if (b[k]) sids.push(String(b[k])); });
+  return sids;
 }
 function desensitizeIssue(data) {
   if (Array.isArray(data)) return data.map(desensitizeIssue);
@@ -1183,10 +1195,37 @@ const server = http.createServer(async (req, res) => {
             matches = matchLostItems(aiExtract, lost_type, norm);
           } catch (e) { matches = []; }
 
-          return sendJSON(res, 200, { ok: true, ai_extract: aiExtract, matches });
-        }
+        return sendJSON(res, 200, { ok: true, ai_extract: aiExtract, matches });
+      }
 
-        // ---- v1.41.4 写操作鉴权 ----
+      // ---- v1.42.0 信用分变更专属端点：替代「直改他人 user issue」，把跨用户写收敛到受控有界通道 ----
+      // 任何登录用户可发起，但 delta 被服务端强制钳制在 [-20, 20]，杜绝「刷负分搞垮他人」或「刷满分」。
+      if (method === 'POST' && /^\/api\/issue\/(\d+)\/credit$/.test(path)) {
+        const tk = bearerPayload(req);
+        if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED', hint: '需要登录态' }, headers);
+        const num = path.match(/^\/api\/issue\/(\d+)\/credit$/)[1];
+        const delta = Math.max(-20, Math.min(20, parseInt((ghBody && ghBody.delta) || 0, 10) || 0));
+        const reason = ((ghBody && ghBody.reason) || '').toString().slice(0, 120);
+        if (delta === 0) return sendJSON(res, 400, { error: 'INVALID_DELTA' }, headers);
+        const cur = await ghProxy(`/repos/${REPO}/issues/${num}`, 'GET', null);
+        if (cur.status !== 200 || !cur.data || !issueHasUserLabel(cur.data)) {
+          return sendJSON(res, 404, { error: 'USER_ISSUE_NOT_FOUND' }, headers);
+        }
+        let u;
+        try { u = JSON.parse(cur.data.body); } catch (e) { return sendJSON(res, 502, { error: 'PARSE_FAILED' }, headers); }
+        const oldScore = (u.credit_score != null) ? u.credit_score : 100;
+        const newScore = Math.max(0, Math.min(100, oldScore + delta));
+        u.credit_score = newScore;
+        if (!u.credit_history) u.credit_history = [];
+        u.credit_history.unshift({ score: delta, reason: reason, time: new Date().toISOString(), before: oldScore, after: newScore });
+        if (u.credit_history.length > 50) u.credit_history = u.credit_history.slice(0, 50);
+        const upd = await ghProxy(`/repos/${REPO}/issues/${num}`, 'PATCH', { body: protectPasswordField(JSON.stringify(u), cur.data.body) });
+        if (upd.status < 200 || upd.status >= 300) return sendJSON(res, 502, { error: 'UPDATE_FAILED' }, headers);
+        clearCache();
+        return sendJSON(res, 200, { ok: true, credit_score: newScore, student_id: u.student_id }, headers);
+      }
+
+      // ---- v1.41.4 写操作鉴权 ----
         // 此前 /api/* 的 POST/PATCH/DELETE 完全不校验身份：任何人拿到 SCF 地址即可
         // 创建假订单、篡改他人订单状态、删除评论（实测无 token PATCH 直达 GitHub 返回 404 而非 401）。
         // 注册/登录走 /api/register、/api/login 自建端点，不经过此处，因此可安全要求 Bearer。
@@ -1211,41 +1250,39 @@ const server = http.createServer(async (req, res) => {
         } else if (method === 'POST' && /^\/api\/comments\/\d+$/.test(path)) {
           const num = path.split('/api/comments/')[1];
           ghPath = `/repos/${REPO}/issues/${num}/comments`;
-        } else if (method === 'PATCH' && /^\/api\/issue\/(\d+)$/.test(path)) {
-          const num = path.split('/api/issue/')[1];
-          ghPath = `/repos/${REPO}/issues/${num}`;
-          // v1.41.4：单次 GET 同时服务两件事
-          //   (a) 乐观锁 CAS：客户端可传 _expect:{status:'open'} 等字段断言，后端在同一次请求内
-          //       读→比对→写入，避免前端「读-改-写」竞态（两人同时抢同一单都会成功）。
-          //   (b) 写保护：合并保留 password_hash
-          const needExpect = !!(ghBody && ghBody._expect && typeof ghBody._expect === 'object');
-          const needPwd = !!(ghBody && ghBody.body);
-          if (needExpect || needPwd) {
-            const cur = await ghProxy(ghPath, 'GET', null);
-            if (cur.status === 200 && cur.data) {
-              if (needPwd && issueHasUserLabel(cur.data)) {
-                ghBody = Object.assign({}, ghBody, { body: protectPasswordField(ghBody.body, cur.data.body) });
-              }
-              if (needExpect) {
-                let curObj = {};
-                try { curObj = JSON.parse(cur.data.body || '{}'); } catch (e) { curObj = {}; }
-                const conflicts = {};
-                for (const k of Object.keys(ghBody._expect)) {
-                  const want = JSON.stringify(ghBody._expect[k]);
-                  const got = JSON.stringify(curObj[k] === undefined ? null : curObj[k]);
-                  if (want !== got) conflicts[k] = { expect: ghBody._expect[k], actual: curObj[k] === undefined ? null : curObj[k] };
-                }
-                if (Object.keys(conflicts).length) {
-                  return sendJSON(res, 409, { error: 'CONFLICT', conflicts }, headers);
-                }
-              }
-            } else if (needExpect) {
-              return sendJSON(res, 502, { error: 'CAS_READ_FAILED' }, headers);
-            }
+      } else if (method === 'PATCH' && /^\/api\/issue\/(\d+)$/.test(path)) {
+        const num = path.split('/api/issue/')[1];
+        ghPath = `/repos/${REPO}/issues/${num}`;
+        const tk = bearerPayload(req);
+        const cur = await ghProxy(ghPath, 'GET', null);
+        if (cur.status !== 200 || !cur.data) {
+          return sendJSON(res, 404, { error: 'ISSUE_NOT_FOUND' }, headers);
+        }
+        // v1.42.0 所有权断言：仅创建者/发布者/接单者或管理员可改写，阻断「拿自己 token 改别人订单/信用」
+        const owner = issueOwnerSids(cur.data);
+        if (tk && tk.role !== 'admin' && owner.length && !owner.includes(String(tk.sid))) {
+          return sendJSON(res, 403, { error: 'FORBIDDEN', hint: '无权修改他人数据' }, headers);
+        }
+        // v1.41.4 写保护：合并保留 password_hash，杜绝整对象写回锁号
+        if (ghBody && ghBody.body && issueHasUserLabel(cur.data)) {
+          ghBody = Object.assign({}, ghBody, { body: protectPasswordField(ghBody.body, cur.data.body) });
+        }
+        // v1.41.4 乐观锁 CAS：_expect 字段断言，消除「读-改-写」竞态
+        if (ghBody && ghBody._expect && typeof ghBody._expect === 'object') {
+          let curObj = {};
+          try { curObj = JSON.parse(cur.data.body || '{}'); } catch (e) { curObj = {}; }
+          const conflicts = {};
+          for (const k of Object.keys(ghBody._expect)) {
+            const want = JSON.stringify(ghBody._expect[k]);
+            const got = JSON.stringify(curObj[k] === undefined ? null : curObj[k]);
+            if (want !== got) conflicts[k] = { expect: ghBody._expect[k], actual: curObj[k] === undefined ? null : curObj[k] };
           }
-          // 剔除内部字段，避免写入 GitHub
-          if (ghBody && ghBody._expect) { ghBody = Object.assign({}, ghBody); delete ghBody._expect; }
-        } else if (method === 'DELETE' && /^\/api\/issue\/\d+\/comments\/\d+$/.test(path)) {
+          if (Object.keys(conflicts).length) {
+            return sendJSON(res, 409, { error: 'CONFLICT', conflicts }, headers);
+          }
+          ghBody = Object.assign({}, ghBody); delete ghBody._expect;
+        }
+      } else if (method === 'DELETE' && /^\/api\/issue\/\d+\/comments\/\d+$/.test(path)) {
           const parts = path.split('/api/issue/')[1].split('/');
           ghPath = `/repos/${REPO}/issues/comments/${parts[1]}`;
         } else {
@@ -1268,6 +1305,11 @@ const server = http.createServer(async (req, res) => {
     const ghPath = req.url.replace(/^\/gh/, ''); // 保留 query string
     if (!GH_WHITELIST.test(ghPath) || ghPath.includes('..')) {
       return sendJSON(res, 403, { error: 'Forbidden path' }, headers);
+    }
+    // v1.42.0：所有非 GET 写操作必须携带有效登录态，杜绝匿名直写 GitHub（此前仅拦 announcement 标签）
+    if (method !== 'GET') {
+      const tk = bearerPayload(req);
+      if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED', hint: '写操作需要登录态' }, headers);
     }
 
     let body;
