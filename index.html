@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.49.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.49.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2521,8 +2521,67 @@ async function aiExtractAndMatchLost(issueNum, title, content, campus, lostType)
   } catch (e) { /* fail-silent: AI 抽取失败不打扰用户 */ }
 }
 
+// v1.49.1 二手/租借 AI 相似闲置匹配：建帖后异步调用，匹配后写回 issue body 并通知本人
+async function aiMatchSecondhand(issueNum, title, content, category, campus, price) {
+  try {
+    const tryJson = function (s) { try { return JSON.parse(s); } catch (e) { return null; } };
+    const stripH = function (s) { return String(s || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); };
+    const myCampus = (campus || 'main');
+
+    // 拉近同校区在售二手/租借帖（排除自己）
+    const recent = [];
+    try {
+      const issues = await ghIssues('order', 'open');
+      (issues || []).forEach(function (i) {
+        let o = null; try { o = JSON.parse(i.body); } catch (e) { return; }
+        if (!o) return;
+        if (o.type !== 'secondhand' && o.type !== 'borrow') return;
+        if (o.status && o.status !== 'open') return;
+        if (String(i.number) === String(issueNum)) return;
+        const c = (o.campus || 'main');
+        if (c !== myCampus) return;
+        let ae = null;
+        if (o.ai_extract) ae = (typeof o.ai_extract === 'string') ? tryJson(o.ai_extract) : o.ai_extract;
+        recent.push({
+          number: i.number, type: o.type, category: o.category,
+          ai_extract: ae, title: o.title || '', body_text: stripH(o.description || '').slice(0, 200),
+          campus: c, price: (typeof o.price === 'number' ? o.price : 0)
+        });
+      });
+    } catch (_) {}
+
+    const res = await ghApi('/api/ai/match-secondhand', 'POST', {
+      title: title, content: content, category: category, campus: campus, price: price, recent_issues: recent.slice(0, 120)
+    }, { timeout: 28000, retries: 1 });
+    if (!res || !res.ok) return;
+    const data = await res.json();
+    if (!data || !data.ok) return;
+
+    // 把抽取结果与匹配写回 issue body（保留其它字段）
+    let cur = null;
+    try {
+      const r2 = await ghApi('/api/issue/' + issueNum, 'GET');
+      if (r2 && r2.ok) cur = await r2.json();
+    } catch (_) {}
+    const curBody = (cur && cur.body) ? (tryJson(cur.body) || {}) : {};
+    curBody.ai_extract = data.ai_extract || null;
+    curBody.ai_matches = Array.isArray(data.matches) ? data.matches : [];
+    await ghUpdateIssue(issueNum, JSON.stringify(curBody));
+
+    // 仅通知本人（站内通知系统为本地存储，跨用户推送需服务端通知层，本版不做）
+    const me = S.user;
+    if (data.matches && data.matches.length > 0) {
+      const summary = '🤖 AI 为你找到 ' + data.matches.length + ' 件相似闲置' + (data.ai_extract && data.ai_extract.item ? ('（' + data.ai_extract.item + '）') : '');
+      if (me && (me._issue_number || me.student_id)) {
+        try { sendNotify('🤖 二手相似推荐', summary, { icon: '🛒', link: 'task' }); } catch (_) {}
+      }
+      try { if (typeof refreshCurrentTab === 'function') refreshCurrentTab(); } catch (_) {}
+    }
+  } catch (e) { /* fail-silent: AI 匹配失败不打扰用户 */ }
+}
+
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.49.0';
+const APP_VERSION = '1.49.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3122,6 +3181,35 @@ function renderAiLostMatches(p) {
       + '</div>';
   }
   html += '</div></div>';
+  return html;
+}
+
+// v1.49.1 二手/租借 AI 相似闲置匹配区渲染（详情页用，p.ai_matches 为空/null 时返回空串，绝不阻塞渲染）
+function renderAiSecondhandMatches(p) {
+  if (!p) return '';
+  if (p.type !== 'secondhand' && p.type !== 'borrow') return '';
+  const matches = Array.isArray(p.ai_matches) ? p.ai_matches : [];
+  if (matches.length === 0) return '';
+  const extract = p.ai_extract || {};
+  let html = '<div class="ai-lost-matches">';
+  html += '<div class="ai-lost-header"><span class="ai-lost-icon">🤖</span><span class="ai-lost-title">AI 为你找到 ' + matches.length + ' 件相似闲置</span></div>';
+  if (extract.item || extract.category) {
+    html += '<div class="ai-lost-extract">🏷️ 识别：' + esc(extract.item || extract.category || '物品') + (extract.price_band ? ' · 💰 ' + esc(extract.price_band) : '') + '</div>';
+  }
+  html += '<div class="ai-lost-list">';
+  for (const m of matches) {
+    const reasons = Array.isArray(m.reasons) ? m.reasons : [];
+    html += '<div class="ai-lost-item">'
+      + '<div class="ai-lost-item-head"><span class="ai-lost-score">' + (m.score || 0) + ' 分</span>'
+      + '<span class="ai-lost-item-title">#' + m.id + (m.title ? ' · ' + esc(m.title) : '') + '</span></div>'
+      + (reasons.length ? '<div class="ai-lost-reasons">' + reasons.map(function (r) { return '<span class="ai-lost-reason">' + esc(r) + '</span>'; }).join('') + '</div>' : '')
+      + '<button class="btn btn-sm ai-lost-btn" onclick="showDetail(' + m.id + ')">查看原帖 ↗</button>'
+      + '</div>';
+  }
+  html += '</div>';
+  // 重新匹配按钮：手动触发一次最新相似度计算
+  html += '<div style="margin-top:10px"><button class="btn btn-sm btn-outline" onclick="aiMatchSecondhand(' + p._issue_number + ',\'' + esc(p.title || '').replace(/'/g, '') + '\',\'' + esc(p.description || '').replace(/'/g, '') + '\',\'' + esc(p.category || '') + '\',\'' + esc(p.campus || 'main') + '\',' + (p.price || 0) + ')">🔄 AI 重新匹配</button></div>';
+  html += '</div>';
   return html;
 }
 
@@ -4123,6 +4211,9 @@ function renderOrders(orders) {
     const isMine = !!(S.user && o.publisher_student_id === S.user.student_id);
     const recTag = (!isMine && matchOrderToPrefs(o)) ? '<span class="rec-chip">🎯 为你推荐</span>' : '';
     const dormTag = (!isMine && S.user && S.user.dorm && dormTier(o, S.user) === 0) ? '<span class="rec-chip" style="background:#dcfce7;color:#15803d">🏠 同楼栋</span>' : '';
+    // v1.49.1 二手/租借：有 AI 相似匹配时加角标
+    const shTag = ((o.type === 'secondhand' || o.type === 'borrow') && Array.isArray(o.ai_matches) && o.ai_matches.length)
+      ? '<span class="rec-chip" style="background:#eef2ff;color:#4338ca">🤖 ' + o.ai_matches.length + ' 件相似</span>' : '';
     // v1.42.0 信息流卡片：仅取首图作封面（封面渲染在卡片顶部，见下方 order-card-cover）
     const imgList = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     return '<div class="order-card' + (imgList.length ? ' has-cover' : '') + '" onclick="showDetail(' + o._issue_number + ')">'
@@ -4130,7 +4221,7 @@ function renderOrders(orders) {
       + (imgList.length ? '<div class="order-card-cover-wrap"><img class="order-card-cover" src="' + safeImgSrc(imgList[0]) + '" loading="lazy" alt=""><span class="order-card-condition">' + esc(o.condition || '9成新') + '</span></div>' : '')
       + '<div class="order-card-body">'
       + '<div class="order-card-header">'
-      + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + recTag + dormTag
+      + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + recTag + dormTag + shTag
       + '<span class="order-card-status status-' + o.status + '">' + (o.type === 'qa' || o.type === 'find' || o.type === 'academic' ? (o.solved ? '✅ 已解决' : (o.type === 'find' ? '🔍 寻找中' : '💬 待解答')) : o.type === 'chat' ? '💬 对话中' : sl[o.status]) + '</span>'
       + '</div>'
       // v1.40.1 紧凑化：在 header 后插入头像+byline 行（仿 forum-card-head）
@@ -4774,6 +4865,7 @@ async function showDetail(issueNum) {
       + '<div class="detail-desc">' + esc(o.description || '无详细描述') + '</div>'
       + (o.type === 'qa' ? '<div style="margin-top:12px"><button type="button" class="btn btn-ai btn-sm" onclick="aiSolve()">🤖 AI 解题思路</button><div id="qaAiSolveBox" style="margin-top:10px;font-size:.88rem;color:var(--text-secondary);white-space:pre-wrap"></div></div>' : '')
       + (isQA ? '' : paymentHTML + takenPayHint + takerPayHTML) + qaBountyHTML
+      + ((o.type === 'secondhand' || o.type === 'borrow') ? renderAiSecondhandMatches(o) : '')
       + '<div class="detail-actions">' + actions + '</div>';
     // 加载评论区
     await loadComments(issueNum);
@@ -8259,7 +8351,7 @@ async function handlePublish(e) {
   try {
     const label = type === 'qa' ? 'qa' : 'order';
     const prefix = type === 'qa' ? '[问答] ' : (type === 'borrow' ? '[借物] ' : '[订单] ');
-    await ghCreateIssue(prefix + title, JSON.stringify(order), [label, type, cat]);
+    const created = await ghCreateIssue(prefix + title, JSON.stringify(order), [label, type, cat]);
     toast('发布成功！', 'success');
     try { localStorage.setItem('hust_last_publish', String(Date.now())); } catch(e) {}
     try { localStorage.setItem('hust_safety_tip_seen', '1'); } catch(e) {}
@@ -8272,6 +8364,10 @@ async function handlePublish(e) {
       loadOrders(S.page, S.filter[S.page] || 'all');
     }
     loadStats();
+    // v1.49.1 二手/租借 AI 相似闲置匹配：发布成功后异步跑，不阻塞 UI（失败静默）
+    if ((type === 'secondhand' || type === 'borrow') && created && created.number) {
+      aiMatchSecondhand(created.number, title, desc, cat, order.campus, order.price).catch(function (e) { try { console.warn('AI 二手匹配失败:', e); } catch (_) {} });
+    }
   } catch(ex) {
     window._publishLock = false;
     const _pb = document.querySelector('#publishForm button[type=submit]');

@@ -47,7 +47,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.42.0';
+const VERSION = '1.42.1';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -614,6 +614,66 @@ function matchLostItems(extract, lostType, recentIssues) {
         title: it.title || '', content: it.body_text || ''
       });
       if (r.score >= 50) scored.push({ id: it.number, score: r.score, reasons: r.reasons });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 3);
+  } catch (e) {
+    return [];
+  }
+}
+
+// ---- 二手/租借 AI 相似闲置匹配（v1.49.1，复用失物匹配的打分范式）----
+// 单维满分：campus 35 + category 30 + item/keyword 20 + price 15
+function scoreSecondhandMatch(self, other) {
+  const reasons = [];
+  let score = 0;
+
+  // 校区 35
+  const cSelf = normalizeCampus(self.campus);
+  const cOther = normalizeCampus(other.campus);
+  if (cSelf === cOther) { score += 35; reasons.push('📍 同校区'); }
+
+  // 类目 30（二手二级分类完全相等）
+  const catSelf = String(self.category || '').trim();
+  const catOther = String(other.category || '').trim();
+  if (catSelf && catSelf === catOther) { score += 30; reasons.push('🏷️ 同类目'); }
+
+  // 物品/关键词相似 20（Jaccard>0.3 或 最长公共子串≥4）
+  const a = String((self.item || '') + ' ' + (self.title || '') + ' ' + (self.content || '') + ' ' + (self.keywords || []).join(' '));
+  const b = String((other.item || '') + ' ' + (other.title || '') + ' ' + (other.body_text || '') + ' ' + ((other.ai_extract && Array.isArray(other.ai_extract.keywords)) ? other.ai_extract.keywords.join(' ') : ''));
+  const jc = jaccardStr(a, b);
+  const lcs = longestCommonSubstr(a, b, 4);
+  if (jc > 0.3 || lcs >= 4) { score += 20; reasons.push('📦 物品相似'); }
+
+  // 价格相近 15（±30% 内）
+  const pSelf = Number(self.price || 0);
+  const pOther = Number(other.price || 0);
+  if (pSelf > 0 && pOther > 0) {
+    const ratio = Math.max(pSelf, pOther) / Math.min(pSelf, pOther);
+    if (ratio <= 1.3) { score += 15; reasons.push('💰 价格相近'); }
+  }
+
+  return { score, reasons };
+}
+
+// 从已发布订单中找相似在售闲置（二手/租借），算 Top3
+function matchSecondhandItems(extract, recentIssues) {
+  try {
+    const cSelf = normalizeCampus(extract.campus);
+    const scored = [];
+    for (const it of (recentIssues || [])) {
+      if (!it) continue;
+      if (it.type !== 'secondhand' && it.type !== 'borrow') continue;
+      const cOther = normalizeCampus(it.campus);
+      if (cSelf !== cOther) continue; // 跨校区暂不算
+      const r = scoreSecondhandMatch({
+        item: extract.item, title: extract.item, content: '', keywords: extract.keywords || [],
+        category: extract.category, campus: cSelf, price: extract.price
+      }, {
+        item: (it.ai_extract && it.ai_extract.item) || '', title: it.title || '', body_text: it.body_text || '',
+        category: it.category, campus: cOther, price: it.price, ai_extract: it.ai_extract
+      });
+      if (r.score >= 50) scored.push({ id: it.number, score: r.score, reasons: r.reasons, title: String(it.title || '').slice(0, 20) });
     }
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, 3);
@@ -1197,6 +1257,56 @@ const server = http.createServer(async (req, res) => {
 
         return sendJSON(res, 200, { ok: true, ai_extract: aiExtract, matches });
       }
+
+        // v1.49.1: 二手/租借 AI 相似闲置匹配（GLM 抽结构化 + 多维打分）
+        if (method === 'POST' && path === '/api/ai/match-secondhand') {
+          if (rateLimited(clientIp(req), AI_RATE_LIMIT)) return sendJSON(res, 429, { error: 'RATE_LIMITED' }, headers);
+          const { title, content, category, campus, price, recent_issues } = ghBody || {};
+          const sysPrompt = '你是校园二手闲置信息抽取助手。从用户发布的中文二手/租借文本中抽取字段，返回严格 JSON：' +
+            '{"item":"物品归一化短词（如：教材/手机/自行车/显示器/吉他/宿舍桌/考研资料 等）","category":"与给定 category 一致或归一化短词","campus":"main/tongji/wangan/junshan/empty","price_band":"价格区间短描述（如：100-200元，缺失则空字符串）","keywords":["有助于匹配的关键词数组，最多5个"]}' +
+            '。要求：只输出 JSON，不要任何解释、不要 markdown 代码块、不要多余文字。';
+          let aiExtract = null;
+          try {
+            const text = '标题：' + (title || '（无）') + '\n内容：' + (content || '（无）') + '\n分类：' + (category || '（无）');
+            const c = await callHunyuan([
+              { role: 'system', content: sysPrompt },
+              { role: 'user', content: text }
+            ]);
+            const parsed = extractJson(c);
+            if (parsed && parsed.item) aiExtract = {
+              item: String(parsed.item || '').slice(0, 30),
+              category: String(parsed.category || category || '').slice(0, 20),
+              campus: normalizeCampus(parsed.campus || campus || ''),
+              price_band: String(parsed.price_band || '').slice(0, 30),
+              keywords: Array.isArray(parsed.keywords) ? parsed.keywords.slice(0, 5).map(k => String(k).slice(0, 12)) : [],
+              price: Number(price || 0)
+            };
+          } catch (e) { /* fail-open：LLM 失败时 aiExtract=null，降级到正则 */ }
+
+          // LLM 失败/无效时降级到结构化兜底
+          if (!aiExtract) {
+            aiExtract = {
+              item: String(category || '物品'),
+              category: String(category || ''),
+              campus: normalizeCampus(campus || ''),
+              price_band: '',
+              keywords: [],
+              price: Number(price || 0)
+            };
+          }
+
+          // 算匹配（传 recent_issues 数组）
+          let matches = [];
+          try {
+            const norm = (Array.isArray(recent_issues) ? recent_issues : []).map(it => ({
+              number: it.number, type: it.type, category: it.category,
+              ai_extract: it.ai_extract, title: it.title, body_text: it.body_text, campus: it.campus, price: it.price
+            }));
+            matches = matchSecondhandItems(aiExtract, norm);
+          } catch (e) { matches = []; }
+
+          return sendJSON(res, 200, { ok: true, ai_extract: aiExtract, matches });
+        }
 
       // ---- v1.42.0 信用分变更专属端点：替代「直改他人 user issue」，把跨用户写收敛到受控有界通道 ----
       // 任何登录用户可发起，但 delta 被服务端强制钳制在 [-20, 20]，杜绝「刷负分搞垮他人」或「刷满分」。
