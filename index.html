@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.50.4" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.51.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -1027,6 +1027,13 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 /* 发布图片 OCR 关键词（v1.16.0） */
 .ocr-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;font-size:.78rem;background:rgba(99,102,241,.12);border:1px solid var(--primary);color:var(--text,#1a202c)}
 .ocr-chip button{border:none;background:none;cursor:pointer;font-size:.8rem;color:var(--text-secondary);padding:0;line-height:1}
+/* v1.51.0 发布表单 AI 智能标签区 */
+.ai-tag-box{margin:10px 0;padding:12px;border:1px dashed var(--primary);border-radius:var(--radius);background:rgba(99,102,241,.06)}
+.ai-tag-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px;margin-bottom:6px;font-size:.84rem;font-weight:600;color:var(--primary)}
+.ai-tag-status{flex:1 1 100%;font-weight:400;font-size:.76rem;color:var(--text-secondary)}
+.tag-group-label{font-size:.72rem;color:var(--text-secondary);margin:8px 0 4px}
+.tag-group-label:first-child{margin-top:0}
+.ai-tag-chips{display:flex;gap:6px;flex-wrap:wrap}
 .ocr-thumb{width:64px;height:64px;border-radius:var(--radius-sm,8px);object-fit:cover;border:1px solid var(--border);display:block}
 .ocr-badge{position:absolute;right:-6px;top:-6px;font-size:.6rem;background:var(--primary);color:#fff;border-radius:999px;padding:1px 5px;white-space:nowrap;line-height:1.4}
 .est-opt{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);cursor:pointer;font-size:.9rem;color:var(--text);transition:border-color .15s,background .15s}
@@ -1858,7 +1865,8 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       🔒 <strong data-page-node-id="b7LYrNLQvTORI9q9CA8xlw">安全须知</strong>：请在公共地点当面交接物品；<strong data-page-node-id="SVt04hVkSiGETA3fdayCsF">不要预付押金/定金</strong>；优先使用站内私信沟通，避免直接泄露手机号/微信号。<br data-page-node-id="bRaLGFGLEmUlZ7xCmiTXFS">本平台采用<strong data-page-node-id="LlzIdLt7AZTgqcTEtaERQj">担保交易</strong>：接单人完成服务并请你确认后，才会展示其收款信息——请<strong data-page-node-id="PQ6W7GCQGMjJzXmwE6ih52">确认付款后再点「确认收到」</strong>。若遇纠纷可投诉，成立将扣对方信用分并封停。
       <button type="button" class="btn btn-sm" style="margin-left:8px;padding:2px 10px;font-size:.75rem;background:var(--bg-card);border:1px solid var(--border);border-radius:6px" onclick="dismissSafetyTip()" data-page-node-id="V8w2SbwXhw9LHaccCig91J">知道了</button>
     </div>
-    <div style="display:flex;justify-content:flex-end;margin-bottom:8px" data-page-node-id="tvbyPFy3E3SrKOU89FDfKq">
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px" data-page-node-id="tvbyPFy3E3SrKOU89FDfKq">
+      <button type="button" class="btn btn-ai btn-sm" id="aiTagBtn" onclick="aiExtractTags()">🏷️ AI 智能标签</button>
       <button type="button" class="btn btn-ai btn-sm" onclick="toggleAiAssist()" data-page-node-id="klsjwIgN6AURWwz31LwPrj">✨ AI 帮我写</button>
     </div>
     <div class="ai-assist-panel" id="aiAssistPanel" data-page-node-id="cfpxnvr5bnRCpYQrz7mkIe">
@@ -1871,6 +1879,14 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <button type="button" class="btn btn-outline btn-sm" onclick="toggleAiAssist(false)" data-page-node-id="q9kZcGBRNOXltKfZp8DQYz">取消</button>
         <span id="aiAssistStatus" style="font-size:.78rem;color:var(--text-secondary)" data-page-node-id="ervgubwyUhWErxa8dVCIex"></span>
       </div>
+    </div>
+    <div class="ai-tag-box" id="aiTagBox" style="display:none">
+      <div class="ai-tag-head">
+        <span>🏷️ AI 智能标签</span>
+        <span class="ai-tag-status" id="aiTagStatus"></span>
+      </div>
+      <div id="aiTagGroups"></div>
+      <p class="form-hint" style="margin:8px 0 0">标签会进入搜索与智能匹配；点标签上的 ✕ 可删除</p>
     </div>
     <form id="publishForm" onsubmit="handlePublish(event)" data-page-node-id="O5sCooNX0Tkq2hhj1wvuQj">
       <div class="form-group" data-page-node-id="FucaLAEAnZMCQ3pGehrOnv">
@@ -2626,7 +2642,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.50.4';
+const APP_VERSION = '1.51.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -8122,6 +8138,7 @@ function updatePublishCategories() {
   // v1.22.0：二手类型默认展开"更多选项"（描述/图片对二手重要）
   const pm = document.getElementById('publishMore');
   if (pm) pm.open = (t === 'secondhand');
+  if (window.clearAiTags) window.clearAiTags();   // v1.51.0：切换类型后旧标签失效，清空防误导
   updateFoodPublishTip();   // v1.19.0：外卖发布提示显隐
 }
 
@@ -8378,8 +8395,22 @@ async function handlePublish(e) {
     handoff_code: handoffCode || null,   // v1.18.0 交接码
     images: images,
     attachments: attachments,   // v1.25.0 附件列表（后端 /api/upload 部署后可用）
-    search_keywords: (window._publishOcr && window._publishOcr.chips && window._publishOcr.chips.length)
-      ? window._publishOcr.chips.slice(0, 10) : [],
+    search_keywords: (function () {
+      // v1.51.0：合并「照片 OCR 关键词」与「AI 智能标签」，去重后上限 12，供搜索与 AI 匹配消费
+      const ocrWords = (window._publishOcr && Array.isArray(window._publishOcr.chips)) ? window._publishOcr.chips : [];
+      const aiWords = (window._publishTags && Array.isArray(window._publishTags.groups))
+        ? window._publishTags.groups.reduce(function (acc, g) { return acc.concat((g && g.tags) || []); }, []) : [];
+      const seen = {}; const out = [];
+      ocrWords.concat(aiWords).forEach(function (w) {
+        const s = String(w || '').trim();
+        if (!s) return;
+        const k = s.toLowerCase();
+        if (seen[k]) return;
+        seen[k] = 1;
+        if (out.length < 12) out.push(s);
+      });
+      return out;
+    })(),
     status: 'open',
     ai_moderation: _aiMod.verdict !== 'safe' ? _aiMod : null,
     campus: S._forumCampus || 'main',   // v1.39.3 订单带校区，供首页按校区筛选
@@ -9297,6 +9328,7 @@ window._publishOcr = { chips: [], text: '', busy: false, files: [], ocrDone: [],
 
 function resetOcrState() {
   window._publishOcr = { chips: [], text: '', busy: false, files: [], ocrDone: [], book: null };
+  if (window.clearAiTags) window.clearAiTags();   // v1.51.0：同时清空 AI 智能标签，防脏数据带到下一单
   const box = document.getElementById('publishOcrBox'); if (box) box.style.display = 'none';
   const chips = document.getElementById('publishOcrChips'); if (chips) chips.innerHTML = '';
   const st = document.getElementById('publishOcrStatus'); if (st) st.textContent = '';
@@ -10918,6 +10950,145 @@ if ('serviceWorker' in navigator) {
     if(window.toast) toast('✨ AI 已润色，检查后发布');
   }
   window.aiPolishForum = aiPolishForum;
+
+  // ===== v1.51.0 发布表单「AI 智能标签」：从标题/描述抽取结构化检索标签 =====
+  // 与后端 worker/scf/index.js 的 TAG_GROUPS/TYPE_TAG_GROUPS 保持一致的镜像词表（本地兜底用）
+  const TAG_VOCAB_FE = {
+    service: { name: '服务类型', words: ['代拿快递','代取外卖','帮买帮送','帮忙打印','维修安装','排队代办','搬运行李','代取文件','接送站','代缴代办','宿舍搬运','校外代购'] },
+    goods:   { name: '物品品类', words: ['教材书籍','考试资料','电子产品','手机平板','电脑配件','生活用品','生活工具','运动器材','服饰鞋包','宿舍家具','乐器','自行车','零食饮品'] },
+    cond:    { name: '物品属性', words: ['全新未拆','九成新','八成新','有使用痕迹','可议价','急出','可邮寄','自提','含配件','支持验货','有发票保修'] },
+    subject: { name: '学业领域', words: ['高数线代','大学物理','概率统计','英语四六级','专业课','C语言编程','电工电子','化学实验','机械制图','马原思政','实验报告','论文写作','考研数学'] },
+    ask:     { name: '求助类型', words: ['习题解答','概念讲解','考前突击','资料共享','选课建议','保研经验','实习内推','简历修改','面试经验','软件报错','真题资料'] },
+    team:    { name: '组队出行', words: ['竞赛组队','项目开发','科研助理','拼车回家','周末出游','问卷调研','被试招募','拍摄约拍','社团招新','学习搭子','运动搭子','志愿者招募'] },
+    place:   { name: '地点场景', words: ['韵苑','紫菘','沁苑','东九楼','东十二','西十二','图书馆','西一食堂','东园食堂','百景园','体育馆','光谷','关山口','校内','校外'] }
+  };
+  const TAG_TYPE_GROUPS_FE = { task:['service','place'], secondhand:['goods','cond','place'], borrow:['goods','cond','place'], qa:['subject','ask','place'], find:['team','place'] };
+  // 口语别名 -> 标准标签，提高本地兜底命中率
+  const TAG_ALIAS_FE = [
+    { t:'代拿快递', kw:['快递','取件','菜鸟','驿站','包裹'] },
+    { t:'代取外卖', kw:['外卖','取餐','带饭'] },
+    { t:'帮忙打印', kw:['打印','复印'] },
+    { t:'搬运行李', kw:['搬行李','搬东西','箱子'] },
+    { t:'教材书籍', kw:['教材','课本','参考书'] },
+    { t:'电子产品', kw:['手机','平板','电脑','耳机','相机','显示器'] },
+    { t:'自行车', kw:['自行车','单车','电动车','山地车'] },
+    { t:'高数线代', kw:['高数','微积分','线代','线性代数'] },
+    { t:'大学物理', kw:['大物','大学物理'] },
+    { t:'C语言编程', kw:['c语言','编程','代码','程序','python','java'] },
+    { t:'英语四六级', kw:['四级','六级','雅思','托福'] },
+    { t:'竞赛组队', kw:['组队','竞赛','比赛','大创','挑战杯'] },
+    { t:'拼车回家', kw:['拼车','回家','火车站','机场','高铁'] },
+    { t:'学习搭子', kw:['搭子','自习','一起学'] }
+  ];
+
+  function ensureTagStore() {
+    if (!window._publishTags || !Array.isArray(window._publishTags.groups)) window._publishTags = { groups: [] };
+    return window._publishTags;
+  }
+  function countAiTags() {
+    return ensureTagStore().groups.reduce(function (n, g) { return n + ((g && g.tags) ? g.tags.length : 0); }, 0);
+  }
+  function renderAiTags() {
+    const box = document.getElementById('aiTagBox');
+    const wrap = document.getElementById('aiTagGroups');
+    if (!box || !wrap) return;
+    const groups = ensureTagStore().groups;
+    if (!groups.length) { box.style.display = 'none'; wrap.innerHTML = ''; return; }
+    box.style.display = 'block';
+    wrap.innerHTML = groups.map(function (g, gi) {
+      const chips = (g.tags || []).map(function (t, ti) {
+        return '<span class="ocr-chip">' + esc(t) + ' <button type="button" title="删除" onclick="removeAiTag(' + gi + ',' + ti + ')">✕</button></span>';
+      }).join('');
+      return '<div class="tag-group-label">' + esc(g.name) + '</div><div class="ai-tag-chips">' + chips + '</div>';
+    }).join('');
+  }
+  function removeAiTag(gi, ti) {
+    const groups = ensureTagStore().groups;
+    if (!groups[gi] || !groups[gi].tags) return;
+    groups[gi].tags.splice(ti, 1);
+    if (!groups[gi].tags.length) groups.splice(gi, 1);
+    renderAiTags();
+    const st = document.getElementById('aiTagStatus');
+    if (st) st.textContent = groups.length ? ('已生成 ' + countAiTags() + ' 个标签，可删除或手动补充') : '';
+  }
+  function clearAiTags() {
+    window._publishTags = { groups: [] };
+    const box = document.getElementById('aiTagBox'); if (box) box.style.display = 'none';
+    const wrap = document.getElementById('aiTagGroups'); if (wrap) wrap.innerHTML = '';
+    const st = document.getElementById('aiTagStatus'); if (st) st.textContent = '';
+  }
+  window.removeAiTag = removeAiTag;
+  window.clearAiTags = clearAiTags;
+
+  // 本地兜底：后端未部署/限流/额度用完时，用镜像词表 + 口语别名扫文本
+  function mockAiTags(publishType, text) {
+    const keys = TAG_TYPE_GROUPS_FE[publishType] || TAG_TYPE_GROUPS_FE.task;
+    const src = String(text || '');
+    const seen = {};
+    const groups = [];
+    function push(groupName, word) {
+      if (!word || word.length < 2 || seen[word]) return;
+      seen[word] = 1;
+      let g = null;
+      for (let i = 0; i < groups.length; i++) { if (groups[i].name === groupName) { g = groups[i]; break; } }
+      if (!g) { g = { name: groupName, tags: [] }; groups.push(g); }
+      g.tags.push(word);
+    }
+    keys.forEach(function (k) {
+      const g = TAG_VOCAB_FE[k];
+      g.words.forEach(function (w) { if (src.indexOf(w) >= 0) push(g.name, w); });
+    });
+    TAG_ALIAS_FE.forEach(function (a) {
+      if (!a.kw.some(function (k) { return src.indexOf(k) >= 0; })) return;
+      keys.forEach(function (k) {
+        if (TAG_VOCAB_FE[k].words.indexOf(a.t) >= 0) push(TAG_VOCAB_FE[k].name, a.t);
+      });
+    });
+    const flat = []; const out = [];
+    groups.forEach(function (g) {
+      const t = [];
+      g.tags.forEach(function (w) {
+        if (t.length >= 5 || flat.length >= 12) return;
+        t.push(w); flat.push(w);
+      });
+      if (t.length) out.push({ name: g.name, tags: t });
+    });
+    return { groups: out, tags: flat, source: 'fallback' };
+  }
+
+  async function aiExtractTags() {
+    const tEl = document.getElementById('publishTitle');
+    const dEl = document.getElementById('publishDesc');
+    const title = (tEl && tEl.value.trim()) || '';
+    const desc = (dEl && dEl.value.trim()) || '';
+    if (!title && !desc) { if (window.toast) toast('先写下标题或描述，AI 才能帮你打标签'); return; }
+    const pType = (document.getElementById('publishType') || {}).value || 'task';
+    const cat = (document.getElementById('publishCategory') || {}).value || '';
+    const btn = document.getElementById('aiTagBtn');
+    const st = document.getElementById('aiTagStatus');
+    const box = document.getElementById('aiTagBox');
+    if (box) box.style.display = 'block';
+    if (btn) { btn.disabled = true; btn.textContent = '识别中…'; }
+    if (st) st.textContent = 'AI 正在读你的标题和描述…';
+    let result = null; let degraded = false;
+    if (aiQuotaLeft() <= 0) { degraded = true; }
+    else {
+      try {
+        const res = await ghApi('/api/ai/tags', 'POST', { publishType: pType, category: cat, title: title, desc: desc }, { timeout: 20000, retries: 1 });
+        if (res.ok) { const d = await res.json(); if (d && Array.isArray(d.groups) && d.groups.length) { result = d; } }
+      } catch (e) {}
+    }
+    if (!result) { result = mockAiTags(pType, title + ' ' + desc); degraded = true; }
+    window._publishTags = { groups: (result.groups || []).filter(function (g) { return g && Array.isArray(g.tags) && g.tags.length; }) };
+    renderAiTags();
+    const n = countAiTags();
+    if (st) st.textContent = n
+      ? ((!degraded && result.source === 'ai') ? ('已生成 ' + n + ' 个标签，可删除或手动补充') : ('AI 暂不可用，已用本地规则生成 ' + n + ' 个'))
+      : '没识别出标签，可手动补充关键词';
+    if (n && !degraded) aiQuotaUse();
+    if (btn) { btn.disabled = false; btn.textContent = '🏷️ AI 智能标签'; }
+  }
+  window.aiExtractTags = aiExtractTags;
 
   // ===== 语音智能输入（Web Speech API，类 YOYO 语音发单）=====
   let _recognition = null, _voiceOn = false, _voiceBuffer = '';

@@ -24,6 +24,11 @@
 //   - /api/ai/ocr：腾讯云 GeneralBasicOCR 识别图片文字 + 混元提取搜索关键词（两段式）
 // v1.41.0 新增：
 //   - /api/ai/ocr 第二段 GLM 额外返回 book 分类（书名/科目/年级/书类型），供二手教材按科目聚合筛选
+//
+// v1.51.0 新增（发布表单 AI 智能标签）：
+//   - /api/ai/tags：从订单标题/描述抽取结构化检索标签，按发布类型（task/secondhand/borrow/qa/find）
+//     动态裁剪标签词表进 prompt（<300 token），GLM 失败时用字典兜底 fail-open
+//   - 标签落进订单已有的 search_keywords 字段，供前端搜索与 AI 匹配消费
 // ============================================================
 
 const http = require('http');
@@ -47,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.42.1';
+const VERSION = '1.43.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -276,8 +281,10 @@ async function tc3Request(opts) {
 // ---- 通用大模型（OpenAI 兼容接口：腾讯 TokenHub / 智谱 GLM / 其他）----
 // 支持多供应商切换：仅需在 SCF 环境变量配 TOKENHUB_API_KEY / TOKENHUB_MODEL / TOKENHUB_BASE_URL。
 // 例：智谱 GLM-4.7-Flash（免费）= https://open.bigmodel.cn/api/paas/v4 + glm-4.7-flash
-async function callHunyuan(messages) {
+async function callHunyuan(messages, opts) {
   if (!TOKENHUB_API_KEY) throw new Error('TOKENHUB_NOT_CONFIGURED');
+  // v1.51.0：temperature 可覆盖（标签抽取等确定性任务用低值），默认仍 0.7，旧的单参调用零影响
+  const temperature = (opts && typeof opts.temperature === 'number') ? opts.temperature : 0.7;
   const buildBody = () => JSON.stringify({
     model: TOKENHUB_MODEL,
     messages: messages.map(m => ({
@@ -286,7 +293,7 @@ async function callHunyuan(messages) {
         : 'user',
       content: String(m.content || '')
     })),
-    temperature: 0.7
+    temperature: temperature
   });
   const sleep = ms => new Promise(res => setTimeout(res, ms));
   // v1.41.2：智谱 GLM-4.7-Flash 免费模型高峰会返回两类限流——
@@ -484,6 +491,97 @@ function extractJson(text) {
   const m = text.match(/\{[\s\S]*\}/);
   if (m) { try { return JSON.parse(m[0]); } catch (e) {} }
   return null;
+}
+
+// ============================================================
+// v1.51.0 发布表单「AI 智能标签」词表与工具
+// ============================================================
+// 七个标签组按「订单能被谁搜到」的维度分组，而不是按技能领域。
+// 单次只把当前类型需要的 2-3 组塞进 prompt（<300 token），成本可控。
+const TAG_GROUPS = {
+  service: { name: '服务类型', words: ['代拿快递','代取外卖','帮买帮送','帮忙打印','维修安装','排队代办','搬运行李','代取文件','接送站','代缴代办','宿舍搬运','校外代购'] },
+  goods:   { name: '物品品类', words: ['教材书籍','考试资料','电子产品','手机平板','电脑配件','生活用品','生活工具','运动器材','服饰鞋包','宿舍家具','乐器','自行车','零食饮品'] },
+  cond:    { name: '物品属性', words: ['全新未拆','九成新','八成新','有使用痕迹','可议价','急出','可邮寄','自提','含配件','支持验货','有发票保修'] },
+  subject: { name: '学业领域', words: ['高数线代','大学物理','概率统计','英语四六级','专业课','C语言编程','电工电子','化学实验','机械制图','马原思政','实验报告','论文写作','考研数学'] },
+  ask:     { name: '求助类型', words: ['习题解答','概念讲解','考前突击','资料共享','选课建议','保研经验','实习内推','简历修改','面试经验','软件报错','真题资料'] },
+  team:    { name: '组队出行', words: ['竞赛组队','项目开发','科研助理','拼车回家','周末出游','问卷调研','被试招募','拍摄约拍','社团招新','学习搭子','运动搭子','志愿者招募'] },
+  place:   { name: '地点场景', words: ['韵苑','紫菘','沁苑','东九楼','东十二','西十二','图书馆','西一食堂','东园食堂','百景园','体育馆','光谷','关山口','校内','校外'] }
+};
+
+// 发布类型 -> 生效标签组（数组顺序即 prompt 中出现顺序）
+const TYPE_TAG_GROUPS = {
+  task:       ['service', 'place'],
+  secondhand: ['goods', 'cond', 'place'],
+  borrow:     ['goods', 'cond', 'place'],
+  qa:         ['subject', 'ask', 'place'],
+  find:       ['team', 'place']
+};
+
+const TYPE_LABELS = { task: '跑腿代办', secondhand: '出售转让', borrow: '短期租借', qa: '有问必答', find: '找人组队' };
+
+// 构造系统提示：只塞当前类型需要的 2-3 组词表
+function buildTagPrompt(publishType) {
+  const keys = TYPE_TAG_GROUPS[publishType] || TYPE_TAG_GROUPS.task;
+  const allowed = keys.map(k => '【' + TAG_GROUPS[k].name + '】' + TAG_GROUPS[k].words.join('/')).join('\n');
+  return '你是校园互助平台的标签抽取助手。用户给你一条发布信息，请抽取能帮其他同学检索到它的标签，返回严格 JSON：\n' +
+    '{"groups":[{"name":"组名","tags":["标签1","标签2"]}]}\n' +
+    '规则：\n' +
+    '1. 只能从下面「允许的组」及其「预设标签」中选；预设词不够时，才可自由生成不超过 6 个字的校园相关短标签。\n' +
+    '2. 每组最多 5 个，合计不超过 12 个；标签为名词或动宾短语（2-6 字），不要句子/标点/价格/日期/联系方式。\n' +
+    '3. 完全依据用户文本，禁止编造文本中不存在的信息（没提地点就不要输出地点）。\n' +
+    '4. 不确定就少选或不选，宁可少不可编。\n' +
+    '只输出 JSON，不要解释、不要 markdown 代码块、不要多余文字。\n' +
+    '允许的组：\n' + allowed + '\n' +
+    '当前类型：' + (TYPE_LABELS[publishType] || '跑腿代办');
+}
+
+// 噪声/联系方式过滤（与 OCR 关键词同一套严格度）
+function isNoiseTag(t) {
+  if (!t) return true;
+  if (t.length < 2 || t.length > 8) return true;
+  if (/^\d+$/.test(t)) return true;
+  if (/^(?:1[3-9]\d{9}|[1-9]\d{4,10})$/.test(t)) return true;
+  if (/[¥￥]\s*\d|\d+\s*元/.test(t)) return true;
+  if (/^[A-Za-z]{1,3}$/.test(t)) return true;
+  if (/微信号|微信|wx号|qq号|QQ号|手机号|电话号码|联系方式/i.test(t)) return true;
+  return false;
+}
+
+// 规整模型返回：去重、限长、每组<=5、总计<=12
+function normalizeTags(parsed) {
+  const out = { groups: [], tags: [] };
+  const seen = new Set();
+  const rawGroups = (parsed && Array.isArray(parsed.groups)) ? parsed.groups : [];
+  for (const g of rawGroups) {
+    if (out.tags.length >= 12) break;
+    const name = String((g && g.name) || '').trim().slice(0, 12);
+    const arr = (g && Array.isArray(g.tags)) ? g.tags : [];
+    const tags = [];
+    for (const t of arr) {
+      if (tags.length >= 5 || out.tags.length >= 12) break;
+      const w = String(t || '').trim().replace(/[，,。.、！!?？\s]/g, '').slice(0, 8);
+      if (isNoiseTag(w)) continue;
+      const key = w.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key); tags.push(w); out.tags.push(w);
+    }
+    if (name && tags.length) out.groups.push({ name: name, tags: tags });
+  }
+  return out;
+}
+
+// LLM 不可用时的字典兜底：用当前类型的词表扫标题 + 描述
+function tagFallbackDict(publishType, text) {
+  const keys = TYPE_TAG_GROUPS[publishType] || TYPE_TAG_GROUPS.task;
+  const out = { groups: [], tags: [] };
+  const src = String(text || '');
+  for (const k of keys) {
+    const g = TAG_GROUPS[k];
+    const hit = g.words.filter(w => src.includes(w)).slice(0, 5);
+    if (hit.length) out.groups.push({ name: g.name, tags: hit });
+  }
+  out.tags = out.groups.reduce((a, g) => a.concat(g.tags), []).slice(0, 12);
+  return out;
 }
 
 // ---- 失物招领 AI 智能匹配 ----
@@ -1257,6 +1355,31 @@ const server = http.createServer(async (req, res) => {
 
         return sendJSON(res, 200, { ok: true, ai_extract: aiExtract, matches });
       }
+
+        // v1.51.0: 发布表单 AI 智能标签（按类型裁剪词表 + GLM 抽取 + 字典兜底）
+        if (method === 'POST' && path === '/api/ai/tags') {
+          if (rateLimited(clientIp(req), AI_RATE_LIMIT)) return sendJSON(res, 429, { error: 'RATE_LIMITED' }, headers);
+          const { publishType, category, title, desc } = ghBody || {};
+          const pType = TYPE_TAG_GROUPS[publishType] ? publishType : 'task';
+          const srcText = String(title || '') + ' ' + String(desc || '');
+          let result = null;
+          try {
+            const c = await callHunyuan([
+              { role: 'system', content: buildTagPrompt(pType) },
+              { role: 'user', content: '标题：' + (title || '（无）') + '\n描述：' + (desc || '（无）') + (category ? ('\n子分类：' + category) : '') }
+            ], { temperature: 0.3 });
+            const norm = normalizeTags(extractJson(c));
+            if (norm.tags.length) result = { groups: norm.groups, tags: norm.tags, source: 'ai' };
+          } catch (e) { /* fail-open：LLM 失败/超时时降级到字典兜底 */ }
+          if (!result) {
+            const fb = tagFallbackDict(pType, srcText);
+            result = { groups: fb.groups, tags: fb.tags, source: 'fallback' };
+          }
+          return sendJSON(res, 200, {
+            ok: true, publishType: pType,
+            groups: result.groups, tags: result.tags, source: result.source
+          });
+        }
 
         // v1.49.1: 二手/租借 AI 相似闲置匹配（GLM 抽结构化 + 多维打分）
         if (method === 'POST' && path === '/api/ai/match-secondhand') {
