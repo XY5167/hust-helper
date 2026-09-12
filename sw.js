@@ -2,7 +2,7 @@
 // 策略：静态外壳预缓存；页面导航 network-first（保证每次部署拿到最新）；
 // 跨域 API（腾讯云 SCF）不缓存，直接走网络，保证订单/问答/消息实时。
 const APP_PREFIX = 'husthelper_';
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const CACHE_NAME = APP_PREFIX + CACHE_VERSION;
 
 const PRECACHE_ASSETS = [
