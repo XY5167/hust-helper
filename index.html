@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.50.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.50.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -1210,7 +1210,9 @@ html:not([data-theme="dark"]) .home-cat-icon { box-shadow: var(--shadow-sm); }
 html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-card-ico { box-shadow: var(--shadow-sm); }
 
 /* ===== v1.37.0 论坛卡片 / 详情 / 评论 补充样式 ===== */
-.forum-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-sm);cursor:pointer;transition:box-shadow .2s ease,transform .2s ease,border-color .2s ease}
+.forum-card{position:relative;overflow:hidden;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-sm);cursor:pointer;transition:box-shadow .2s ease,transform .2s ease,border-color .2s ease}
+/* v1.50.1 分类色条：原先无图帖会铺满一块渐变大色块+大字，太抢眼；改为左侧 3px 细色带 */
+.forum-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cat-c,transparent);pointer-events:none}
 .forum-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);border-color:#CFE0F5}
 .forum-card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .forum-card-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#2A7DE0,#0F4F9E);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex:0 0 auto}
@@ -1222,12 +1224,6 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 .forum-card-content{font-size:.86rem;color:var(--text-secondary);line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .forum-card-imgs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .forum-card-img{width:96px;height:96px;border-radius:10px;object-fit:cover;border:1px solid var(--border)}
-/* v1.50.0 无图帖子的彩色渐变色块占位（对标竞品 .category-art），让列表不再"空" */
-.forum-card-art{position:relative;overflow:hidden;height:104px;margin-top:10px;border-radius:10px;display:flex;align-items:center;justify-content:center}
-.forum-card-art::before,.forum-card-art::after{content:"";position:absolute;border-radius:50%;pointer-events:none}
-.forum-card-art::before{width:92px;height:92px;left:-26px;bottom:-34px;background:rgba(255,255,255,.22)}
-.forum-card-art::after{width:58px;height:58px;right:12%;top:-18px;background:rgba(255,255,255,.14)}
-.forum-card-art span{position:relative;z-index:1;font-size:1.75rem;font-weight:800;letter-spacing:.18em;color:rgba(255,255,255,.55);text-shadow:0 2px 12px rgba(0,0,0,.20);user-select:none}
 .forum-card-foot{display:flex;gap:18px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light);font-size:.8rem;color:var(--text-muted)}
 .forum-like-btn{cursor:pointer}
 .forum-report-btn{margin-left:auto;color:var(--text-muted);cursor:pointer}
@@ -2630,7 +2626,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.50.0';
+const APP_VERSION = '1.50.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3131,14 +3127,10 @@ const FORUM_CATS = {
 const FORUM_CAT_ICON = {
   tucao: '💬', study: '📚', lost: '🎒', activity: '🎉', confession: '💌', life: '☕'
 };
-// v1.50.0 无图帖色块占位：分类渐变 + 大字（对标竞品 .category-art）
-const FORUM_CAT_ART = {
-  tucao:      { g: 'linear-gradient(135deg,#fb923c,#ea580c)', t: '吐槽' },
-  study:      { g: 'linear-gradient(135deg,#60a5fa,#2563eb)', t: '学习' },
-  lost:       { g: 'linear-gradient(135deg,#38bdf8,#0284c7)', t: '失物' },
-  activity:   { g: 'linear-gradient(135deg,#fbbf24,#ca8a04)', t: '活动' },
-  confession: { g: 'linear-gradient(135deg,#c084fc,#a855f7)', t: '表白' },
-  life:       { g: 'linear-gradient(135deg,#a78bfa,#7c3aed)', t: '生活' }
+// v1.50.1 帖子分类色（仅用于卡片左侧 3px 细色带）
+const FORUM_CAT_COLOR = {
+  tucao: '#ea580c', study: '#2563eb', lost: '#0284c7',
+  activity: '#ca8a04', confession: '#a855f7', life: '#7c3aed'
 };
 // v1.37.1 华科官方校区（唯一数据源，避免多处硬编码重复）
 const CAMPUSES = [
@@ -3198,14 +3190,14 @@ function forumPostCardHTML(p) {
   const name = esc(forumDisplayName(p));
   const avatar = esc((forumDisplayName(p) || '匿').charAt(0));
   const cat = FORUM_CATS[p.cat] || '帖子';
-  const art = FORUM_CAT_ART[p.cat] || FORUM_CAT_ART.life;
+  const catColor = FORUM_CAT_COLOR[p.cat] || FORUM_CAT_COLOR.life;
   const imgs = (p.images && p.images.length)
     ? '<div class="forum-card-imgs">' + p.images.slice(0, 3).map(function (u) {
         return '<img src="' + safeImgSrc(u) + '" class="forum-card-img" onclick="event.stopPropagation();previewForumImg(\'' + encodeURIComponent(u) + '\')">';
       }).join('') + '</div>'
-    : '<div class="forum-card-art" style="background:' + art.g + '"><span>' + esc(art.t) + '</span></div>';
+    : '';
   const foot = '<div class="forum-card-foot"><span>❤️ ' + (p.upvotes || 0) + '</span><span>💬 ' + (p.comment_count || p._comments || 0) + '</span></div>';
-  return '<div class="forum-card" onclick="openForumDetail(' + p._issue_number + ')">'
+  return '<div class="forum-card" style="--cat-c:' + catColor + '" onclick="openForumDetail(' + p._issue_number + ')">'
     + '<div class="forum-card-head">'
     + '<div class="forum-card-avatar">' + avatar + '</div>'
     + '<div class="forum-card-meta"><div class="forum-card-name">' + name + '</div>'
