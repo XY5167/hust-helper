@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.49.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.50.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -49,6 +49,7 @@
   --bg: #f8fafc;
   --bg-card: #ffffff;
   --bg-hover: #f1f5f9;
+  --surface-2: var(--bg-hover); /* v1.50.0 修复：原 --surface-2 被引用但从未定义（601/674 行） */
   --text: #1e293b;
   --text-secondary: #64748b;
   --text-muted: #94a3b8;
@@ -58,6 +59,7 @@
   --shadow-md: 0 4px 6px rgba(0,0,0,.07);
   --shadow-lg: 0 10px 25px rgba(0,0,0,.1);
   --radius: 16px;
+  --radius-md: 14px; /* v1.50.0 修复：原 --radius-md 被引用 3 处（228/241/672 行）但从未定义，圆角实际失效 */
   --radius-sm: 10px;
   --radius-xs: 7px;
   --radius-lg: 24px;
@@ -213,9 +215,9 @@ html[data-theme="dark"] .home-announce{background:var(--bg-hover)}
 .forum-home{display:flex;flex-direction:column}
 .forum-header{order:1}
 .forum-search{order:2}
-.forum-cat-grid{order:3}
-.forum-banner{order:4}
-.forum-stats{order:5}
+.forum-cat-grid{order:5}
+.forum-banner{order:3}
+.forum-stats{order:4}
 .ai-entry{order:6;margin:0 0 14px}
 .onboard-card{order:7;margin:0 0 14px}
 .forum-guest-bar{order:8}
@@ -287,6 +289,36 @@ html[data-theme="dark"] .forum-guest-bar{background:rgba(37,99,235,.16);border-c
 .forum-stat-label{font-size:.72rem;color:var(--text-muted);margin-top:4px}
 .forum-stats.stats-degraded .forum-stat-num{color:var(--text-muted);opacity:.65}
 
+/* ===== v1.50.0 首页 Hero 大图区（对标竞品：暗色蒙层压校园图 + 超大汉字水印） ===== */
+.forum-hero{position:relative;border-radius:var(--radius-lg);overflow:hidden;min-height:286px;margin-bottom:0;background:var(--hust-blue);box-shadow:var(--shadow-lg)}
+.forum-hero-bg{position:absolute;inset:0;z-index:0;background-image:url("assets/hero-campus.v1.webp"),linear-gradient(135deg,var(--hust-blue),var(--hust-red));background-size:cover;background-position:52% 42%;background-repeat:no-repeat;background-color:var(--hust-blue);transform:scale(1.06);animation:heroPan 18s ease-in-out infinite alternate;will-change:transform}
+.forum-hero-scrim{position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(5,13,39,.97) 0%,rgba(6,16,47,.86) 43%,rgba(11,21,57,.28) 100%)}
+.forum-hero-mark{position:absolute;right:14px;bottom:-30px;z-index:1;font-size:9.5rem;font-weight:800;line-height:1;letter-spacing:-.04em;color:rgba(255,255,255,.055);pointer-events:none;user-select:none}
+.forum-hero-eyebrow{position:absolute;top:16px;left:20px;z-index:3;font-size:.72rem;font-weight:800;letter-spacing:.15em;color:#62e5ff;text-shadow:0 0 18px rgba(56,217,255,.55)}
+.forum-hero .forum-banner-track{position:relative;z-index:2}
+.forum-hero .forum-banner-slide{min-height:286px;padding:52px 24px 34px}
+.forum-hero .forum-banner-title{font-size:clamp(1.55rem,3.6vw,2.5rem);line-height:1.22;letter-spacing:-.01em;text-wrap:balance}
+.forum-hero .forum-banner-sub{font-size:.86rem;opacity:.92}
+.forum-hero .forum-banner-tag{background:rgba(255,255,255,.20);border:1px solid rgba(255,255,255,.32);backdrop-filter:blur(6px)}
+.forum-hero .forum-banner-dots{z-index:3;bottom:12px}
+@keyframes heroPan{from{transform:scale(1.06)}to{transform:scale(1.13) translateY(-8px)}}
+/* 统计卡上移叠在 hero 下沿，磨砂悬浮感（浅/深两种主题通用） */
+.forum-stats{margin-top:-34px;margin-bottom:20px;position:relative;z-index:2}
+.forum-stat{background:rgba(255,255,255,.90);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.65);border-radius:var(--radius-md);box-shadow:var(--shadow-md)}
+html[data-theme="dark"] .forum-stat{background:rgba(30,41,59,.86);border-color:rgba(255,255,255,.16)}
+html[data-theme="dark"] .forum-stat-num{color:#ff7a83;text-shadow:0 1px 8px rgba(0,0,0,.35)}
+html[data-theme="dark"] .forum-hero-scrim{background:linear-gradient(90deg,rgba(2,6,23,.97) 0%,rgba(2,6,23,.80) 55%,rgba(15,23,42,.35) 100%)}
+html:not([data-theme="dark"]) .forum-home-bg{background:radial-gradient(circle at 8% 3%,rgba(255,191,60,.16),transparent 23rem),var(--bg)}
+@media(max-width:768px){
+  .forum-hero{min-height:206px;border-radius:var(--radius)}
+  .forum-hero .forum-banner-slide{min-height:206px;padding:44px 18px 30px}
+  .forum-hero .forum-banner-title{font-size:clamp(1.35rem,6vw,1.8rem)}
+  .forum-hero-mark{font-size:5.5rem;bottom:-18px;right:8px}
+  .forum-hero-eyebrow{top:12px;left:14px}
+  .forum-hero-bg{animation:none}
+  .forum-stats{margin-top:-26px}
+}
+
 /* 8 grid */
 .forum-cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
 .forum-cat{display:flex;flex-direction:column;align-items:center;gap:8px;background:none;border:none;cursor:pointer;padding:4px 0}
@@ -307,6 +339,14 @@ html[data-theme="dark"] .forum-guest-bar{background:rgba(37,99,235,.16);border-c
 .forum-biz-arrow{font-size:1.2rem;color:var(--text-muted)}
 .forum-biz-task{border-left:3px solid var(--cat-task)}
 .forum-biz-secondhand{border-left:3px solid var(--cat-goods)}
+/* v1.50.0 悬浮微动效 + 区块标题统一竖条 + 空状态插画 */
+.forum-biz-card{transition:box-shadow .2s ease,transform .18s ease,border-color .2s ease}
+.forum-biz-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
+.forum-biz-card:active{transform:translateY(-1px)}
+.forum-feed-title{position:relative;padding-left:12px}
+.forum-feed-title::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:15px;border-radius:99px;background:linear-gradient(180deg,var(--hust-red),var(--hust-blue))}
+.forum-empty{padding:34px 16px}
+.forum-empty::before{content:"📭";display:block;font-size:2.2rem;line-height:1;margin-bottom:10px;opacity:.85}
 
 /* Feed */
 .forum-feed-section{margin-bottom:18px}
@@ -1182,6 +1222,12 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 .forum-card-content{font-size:.86rem;color:var(--text-secondary);line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .forum-card-imgs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .forum-card-img{width:96px;height:96px;border-radius:10px;object-fit:cover;border:1px solid var(--border)}
+/* v1.50.0 无图帖子的彩色渐变色块占位（对标竞品 .category-art），让列表不再"空" */
+.forum-card-art{position:relative;overflow:hidden;height:104px;margin-top:10px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.forum-card-art::before,.forum-card-art::after{content:"";position:absolute;border-radius:50%;pointer-events:none}
+.forum-card-art::before{width:92px;height:92px;left:-26px;bottom:-34px;background:rgba(255,255,255,.22)}
+.forum-card-art::after{width:58px;height:58px;right:12%;top:-18px;background:rgba(255,255,255,.14)}
+.forum-card-art span{position:relative;z-index:1;font-size:1.75rem;font-weight:800;letter-spacing:.18em;color:rgba(255,255,255,.55);text-shadow:0 2px 12px rgba(0,0,0,.20);user-select:none}
 .forum-card-foot{display:flex;gap:18px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light);font-size:.8rem;color:var(--text-muted)}
 .forum-like-btn{cursor:pointer}
 .forum-report-btn{margin-left:auto;color:var(--text-muted);cursor:pointer}
@@ -1278,21 +1324,24 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <input type="text" id="homeSearchInput" class="forum-search-input" placeholder="搜索求助 / 二手 / 失物 / 跑腿…" aria-label="站内搜索" onkeydown="if(event.key==='Enter'){event.preventDefault();homeSearchSubmit();}">
       </div>
 
-      <!-- Banner 轮播：真实校园互助场景，点击跳转对应分区 -->
-      <div class="forum-banner" id="forumBanner" data-page-node-id="qfuN6xCEfIUJbq6LEwSPkj">
-        <div class="forum-banner-brand">🏫 华中科技大学 · 校园互助</div>
+      <!-- v1.50.0 Hero 大图区：暗色蒙层压校园图 + 超大汉字水印，点击跳转对应分区 -->
+      <div class="forum-banner forum-hero" id="forumBanner" data-page-node-id="qfuN6xCEfIUJbq6LEwSPkj">
+        <div class="forum-hero-bg" aria-hidden="true"></div>
+        <div class="forum-hero-scrim" aria-hidden="true"></div>
+        <div class="forum-hero-mark" aria-hidden="true">互助</div>
+        <div class="forum-hero-eyebrow">华中科技大学 · 校园互助</div>
         <div class="forum-banner-track" id="forumBannerTrack" data-page-node-id="jExt9dz3RGyAe3em11pufR">
-          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#D20B17,#004B84)" onclick="openForumCat('life')" data-page-node-id="SRbpFMSQf2E6XVjc5I7nO7">
+          <div class="forum-banner-slide" onclick="openForumCat('life')" data-page-node-id="SRbpFMSQf2E6XVjc5I7nO7">
             <div class="forum-banner-tag" data-page-node-id="RrHLh4JNIL51rJMlT9m012">失物招领</div>
             <div class="forum-banner-title" data-page-node-id="Hhw4eRkRNQhSnYzJMq4dFd">捡到校园卡 / 伞 / 书？</div>
             <div class="forum-banner-sub" data-page-node-id="Q9JwcUzHlHljO9cUO84IvU">发到「生活分享」找主人 ›</div>
           </div>
-          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#004B84,#1e40af)" onclick="openForumCat('study')" data-page-node-id="jk9f6ei5W7XxW9JzJ6AZgW">
+          <div class="forum-banner-slide" onclick="openForumCat('study')" data-page-node-id="jk9f6ei5W7XxW9JzJ6AZgW">
             <div class="forum-banner-tag" data-page-node-id="uFX1NqSCDCG0XW6tZ9MXHF">期末互助</div>
             <div class="forum-banner-title" data-page-node-id="X6UcDqhC6TojplMAiaJ8us">组队复习 · 资料共享</div>
             <div class="forum-banner-sub" data-page-node-id="HYhY4fkNVvAccWT6eqHlfA">在「学习求助」找搭子 ›</div>
           </div>
-          <div class="forum-banner-slide" style="background:linear-gradient(135deg,#D20B17,#b45309)" onclick="openForumCat('tucao')" data-page-node-id="LpEIR7X8sTxA1l7o21CkXo">
+          <div class="forum-banner-slide" onclick="openForumCat('tucao')" data-page-node-id="LpEIR7X8sTxA1l7o21CkXo">
             <div class="forum-banner-tag" data-page-node-id="BTebyebaqLu4jUU3XwIGaO">校园公约</div>
             <div class="forum-banner-title" data-page-node-id="Rto6ET6jB794O2RGXoynn6">友善交流 · 拒绝校外交易</div>
             <div class="forum-banner-sub" data-page-node-id="JPjqgu6WDvLijJvkqf4WZG">有槽点来「校园吐槽」 ›</div>
@@ -2581,7 +2630,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.49.1';
+const APP_VERSION = '1.50.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3082,6 +3131,15 @@ const FORUM_CATS = {
 const FORUM_CAT_ICON = {
   tucao: '💬', study: '📚', lost: '🎒', activity: '🎉', confession: '💌', life: '☕'
 };
+// v1.50.0 无图帖色块占位：分类渐变 + 大字（对标竞品 .category-art）
+const FORUM_CAT_ART = {
+  tucao:      { g: 'linear-gradient(135deg,#fb923c,#ea580c)', t: '吐槽' },
+  study:      { g: 'linear-gradient(135deg,#60a5fa,#2563eb)', t: '学习' },
+  lost:       { g: 'linear-gradient(135deg,#38bdf8,#0284c7)', t: '失物' },
+  activity:   { g: 'linear-gradient(135deg,#fbbf24,#ca8a04)', t: '活动' },
+  confession: { g: 'linear-gradient(135deg,#c084fc,#a855f7)', t: '表白' },
+  life:       { g: 'linear-gradient(135deg,#a78bfa,#7c3aed)', t: '生活' }
+};
 // v1.37.1 华科官方校区（唯一数据源，避免多处硬编码重复）
 const CAMPUSES = [
   { code: 'main',    name: '主校区' },
@@ -3140,11 +3198,12 @@ function forumPostCardHTML(p) {
   const name = esc(forumDisplayName(p));
   const avatar = esc((forumDisplayName(p) || '匿').charAt(0));
   const cat = FORUM_CATS[p.cat] || '帖子';
+  const art = FORUM_CAT_ART[p.cat] || FORUM_CAT_ART.life;
   const imgs = (p.images && p.images.length)
     ? '<div class="forum-card-imgs">' + p.images.slice(0, 3).map(function (u) {
         return '<img src="' + safeImgSrc(u) + '" class="forum-card-img" onclick="event.stopPropagation();previewForumImg(\'' + encodeURIComponent(u) + '\')">';
       }).join('') + '</div>'
-    : '';
+    : '<div class="forum-card-art" style="background:' + art.g + '"><span>' + esc(art.t) + '</span></div>';
   const foot = '<div class="forum-card-foot"><span>❤️ ' + (p.upvotes || 0) + '</span><span>💬 ' + (p.comment_count || p._comments || 0) + '</span></div>';
   return '<div class="forum-card" onclick="openForumDetail(' + p._issue_number + ')">'
     + '<div class="forum-card-head">'
