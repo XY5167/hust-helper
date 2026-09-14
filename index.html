@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.52.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.53.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -1006,6 +1006,19 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .ai-quick{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 6px}
 .ai-quick button{font-size:.78rem;padding:5px 10px;border:1px solid var(--border);background:var(--bg-card);border-radius:99px;cursor:pointer;color:var(--text-secondary)}
 .ai-quick button:hover{border-color:var(--primary);color:var(--primary)}
+/* v1.53.0 AI 中枢：快捷指令与结果卡片 */
+.ai-quick button.ai-quick-hub{border-color:rgba(24,95,165,.45);color:var(--brand);font-weight:600}
+.ai-hub-card{margin:8px 8px 4px;padding:12px 13px;border:1px solid var(--border);border-radius:12px;background:var(--bg-card);box-shadow:var(--shadow-sm)}
+.ai-hub-card-h{font-size:.82rem;font-weight:700;color:var(--brand);margin-bottom:8px}
+.ai-hub-card-t{font-size:.92rem;font-weight:600;color:var(--text);margin-bottom:4px}
+.ai-hub-card-d{font-size:.82rem;color:var(--text-secondary);line-height:1.6;margin-bottom:8px;white-space:pre-wrap}
+.ai-hub-card-m{font-size:.75rem;color:var(--text-muted);margin-bottom:10px}
+.ai-hub-card-actions{display:flex;flex-wrap:wrap;gap:8px}
+.ai-hub-list{display:flex;flex-direction:column;gap:6px}
+.ai-hub-item{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 11px;border:1px solid var(--border);background:var(--bg);border-radius:9px;cursor:pointer;font-size:.84rem;color:var(--text)}
+.ai-hub-item:hover{border-color:var(--primary);background:var(--bg-hover)}
+.ai-hub-item-t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ai-hub-item-s{flex:0 0 auto;font-size:.72rem;color:var(--text-muted)}
 /* v1.25.0 智能客服菜单（菜单式 FAQ，横向滚动） */
 .ai-menu{display:flex;gap:6px;overflow-x:auto;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg-card);scrollbar-width:thin}
 .ai-menu::-webkit-scrollbar{height:4px}
@@ -2678,7 +2691,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.52.1';
+const APP_VERSION = '1.53.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -10725,6 +10738,10 @@ if ('serviceWorker' in navigator) {
     <button onclick="aiQuickAsk(this)" data-page-node-id="94N6XDWD78rTDKyWJdJtJI">信用分怎么算？</button>
     <button onclick="aiQuickAsk(this)" data-page-node-id="clAuvzAyWNoHiId5WA1H51">会员有什么用？</button>
     <button onclick="aiQuickAsk(this)" data-page-node-id="H3zaZfmC0wVebFiFZAKl3W">怎么接单赚钱？</button>
+    <button class="ai-quick-hub" onclick="aiHubPrompt('publish')">✍️ 帮我写发布</button>
+    <button class="ai-quick-hub" onclick="aiHubPrompt('lost')">🎒 找失物</button>
+    <button class="ai-quick-hub" onclick="aiHubPrompt('secondhand')">🛒 搜二手</button>
+    <button class="ai-quick-hub" onclick="aiHubPrompt('qa')">🤖 解难题</button>
   </div>
   <div class="ai-panel-body" id="aiBody" data-page-node-id="LOJjNFvcU1EAoLlbTdhWl1"></div>
   <div class="ai-quota" id="aiQuota" data-page-node-id="JnvABGVXKbyeGTYF2yMYSb"></div>
@@ -10829,9 +10846,14 @@ if ('serviceWorker' in navigator) {
       return;
     }
     inp.value = '';
+    inp.placeholder = '问问互助AI…';
     addAiMsg('me', text);
     _aiHistory.push({ role:'user', content:text });
+    // v1.53.0 AI 中枢：先做意图路由（本地快筛 → 后端意图识别），未命中再走普通聊天
     const typing = addAiMsg('bot','',true);
+    let _hubHandled = false;
+    try{ _hubHandled = await aiHubHandle(text, typing); }catch(e){ _hubHandled = false; }
+    if(_hubHandled){ saveAiHistory(); aiQuotaUse(); return; }
     const res = await callAiChat(_aiHistory);
     if(!res.ok){
       // v1.39.6：API 失败不再静默走 mock 冒充 AI，明确提示
@@ -11091,6 +11113,224 @@ if ('serviceWorker' in navigator) {
     saveAiHistory();
   }
   window.aiFaq = aiFaq;
+
+  // ===== v1.53.0 AI 中枢：统一调用层 + 意图路由 =====
+  // 所有 AI 能力共用的调用封装（统一超时/限流提示/失败降级返回结构）
+  const AIClient = {
+    async call(path, body, opts){
+      opts = opts || {};
+      try{
+        const res = await ghApi(path, 'POST', body, { timeout: opts.timeout || 25000, retries: opts.retries === undefined ? 1 : opts.retries });
+        if(res && res.ok){
+          const data = await res.json().catch(function(){ return null; });
+          return { ok:true, data:data };
+        }
+        const st = res ? res.status : 0;
+        if(st === 429 || st === 433 || st === 504){ if(window.toast) toast('AI 调用太频繁，请稍后再试～','error'); }
+        return { ok:false, reason:'http' + st, status:st };
+      }catch(e){ return { ok:false, reason:'net', error:e }; }
+    },
+    async intents(text){
+      const r = await this.call('/api/ai/intents', { text:String(text).slice(0,500) }, { timeout:15000 });
+      if(r.ok && r.data && r.data.intent) return { intent:r.data.intent, params:r.data.params || {} };
+      return { intent:'chat', params:{} };
+    }
+  };
+  window.AIClient = AIClient;
+
+  // 本地意图快筛（命中即路由，不耗 AI 额度）
+  function aiHubQuickIntent(text){
+    const t = String(text || '');
+    if(/我?(丢了|捡到|捡了|遗失|掉的|不见了)|失物|招领|找不到了|谁的.{0,8}(卡|伞|钥匙|耳机|书|包)/.test(t)) return 'lost';
+    if(/(想|要|求)?(收|求购|买)(个|一|台|本|件|辆)|出售|出个|出一|卖个|闲置|(想|要)?(租|出租|求租)/.test(t)) return 'secondhand';
+    if(/这题|这道题|怎么做|不会做|求思路|解题|帮我算|证明题|第\s*\d+\s*题|作业题|高数|线代|微积分|概率论/.test(t)) return 'qa';
+    if(/帮我(发|写|发个|发一)|发个(单|需求)|发布|代取|代拿|帮带|带个饭|帮买|帮送|打印|维修|跑腿/.test(t)) return 'publish';
+    return null;
+  }
+  // 只有"像行动请求"的句子才值得花一次 AI 调用去识别意图（省额度）
+  function aiHubLooksAction(text){
+    return /帮我|我(丢|想|要|有|需要)|谁(能|可以|有|会)|找(个|人|一下)|能不能|可以帮|求(个|购|助|带)|出(个|一)?|收(个|一)?|出售|闲置|求解|题/.test(String(text||''));
+  }
+  function aiHubRemoveTyping(el){ if(el && el.parentNode) el.parentNode.removeChild(el); }
+  function aiHubPushHistory(role, content){ try{ _aiHistory.push({ role:role, content:content }); }catch(e){} }
+
+  // 中枢总入口：命中意图则分发并返回 true；否则返回 false 交回普通聊天
+  async function aiHubHandle(text, typingEl){
+    let intent = window._aiPendingIntent || aiHubQuickIntent(text);
+    let params = {};
+    window._aiPendingIntent = null;
+    if(!intent && aiHubLooksAction(text)){
+      const r = await AIClient.intents(text);
+      if(r && r.intent && r.intent !== 'chat'){ intent = r.intent; params = r.params || {}; }
+    }
+    if(!intent || intent === 'chat') return false;
+    try{
+      if(intent === 'publish') return await aiHubPublish(text, typingEl, params);
+      if(intent === 'lost') return await aiHubLost(text, typingEl);
+      if(intent === 'secondhand') return await aiHubSecondhand(text, typingEl);
+      if(intent === 'qa') return await aiHubQa(text, typingEl);
+    }catch(e){ return false; }
+    return false;
+  }
+
+  // A. 发布：AI 帮我写 → 一键填入发布表单
+  async function aiHubPublish(text, typingEl, params){
+    let d = (params && params.title) ? { title:params.title, desc:params.desc || '', type:params.type || 'task', price:params.price || 0 } : null;
+    if(!d){
+      const r = await AIClient.call('/api/ai/polish', { text:text }, { timeout:25000 });
+      if(r.ok && r.data && r.data.title) d = r.data; else d = mockAiPolish(text);
+    }
+    if(!d || !d.title) return false;
+    aiHubRemoveTyping(typingEl);
+    window._aiHubDraft = d;
+    const tmap = { task:'跑腿代办', secondhand:'二手/租借', qa:'有问必答', find:'找人组队' };
+    const card = document.createElement('div');
+    card.className = 'ai-hub-card';
+    card.innerHTML = '<div class="ai-hub-card-h">✨ 我帮你写好了，确认无误后一键发布</div>'
+      + '<div class="ai-hub-card-t">' + esc(d.title) + '</div>'
+      + '<div class="ai-hub-card-d">' + esc(d.desc || '') + '</div>'
+      + '<div class="ai-hub-card-m">类型：' + esc(tmap[d.type] || d.type || '跑腿代办') + (d.price ? (' · 报酬 ¥' + esc(String(d.price))) : '') + '</div>'
+      + '<div class="ai-hub-card-actions"><button type="button" class="ai-action-btn" onclick="aiHubFillPublish()">✅ 填入发布表单</button></div>';
+    const body = document.getElementById('aiBody');
+    if(body){ body.appendChild(card); body.scrollTop = body.scrollHeight; }
+    aiHubPushHistory('assistant', '已为你起草发布内容：' + d.title);
+    return true;
+  }
+  function aiHubFillPublish(){
+    const d = window._aiHubDraft; if(!d) return;
+    try{ showPublishModal(d.type || 'task'); }catch(e){}
+    setTimeout(function(){
+      const t = document.getElementById('publishTitle'); if(t){ t.value = d.title || ''; t.dispatchEvent(new Event('input')); }
+      const de = document.getElementById('publishDesc'); if(de){ de.value = d.desc || ''; de.dispatchEvent(new Event('input')); }
+      const pr = document.getElementById('publishPrice'); if(pr && d.price){ pr.value = d.price; pr.dispatchEvent(new Event('input')); }
+      const pm = document.getElementById('publishModal'); if(pm) pm.classList.add('active');
+    }, 100);
+    try{ toggleAiChat(false); }catch(e){}
+    if(window.toast) toast('已填入发布表单，请确认后提交','success');
+  }
+  window.aiHubFillPublish = aiHubFillPublish;
+
+  // B. 失物：AI 抽取 + 候选匹配卡片（先看结果，不直接发布）
+  async function aiHubLost(text, typingEl){
+    const campus = (S.user && S.user.campus) || 'main';
+    let recentList = [];
+    try{
+      const recent = await forumLoadPosts({ cat:'lost', campus:campusCode(campus) });
+      recentList = (recent || []).filter(function(p){ return p && p.number; }).slice(0,80).map(function(p){
+        let ai = null; try{ ai = p.ai_extract ? (typeof p.ai_extract === 'string' ? JSON.parse(p.ai_extract) : p.ai_extract) : null; }catch(_){}
+        return { number:p.number, cat:'lost', lost_type:p.lost_type || 'lost', ai_extract:ai, title:p.title || '', body_text:String(p.content || '').replace(/<[^>]+>/g,' ').slice(0,200), campus:p.campus || 'main' };
+      });
+    }catch(_){}
+    const r = await AIClient.call('/api/ai/extract-lost', { title:'', content:text, campus:campus, lost_type:'lost', recent_issues:recentList }, { timeout:28000 });
+    if(!r.ok || !r.data) return false;
+    const data = r.data;
+    const matches = Array.isArray(data.matches) ? data.matches : [];
+    const item = (data.ai_extract && data.ai_extract.item) || '';
+    aiHubRemoveTyping(typingEl);
+    const body = document.getElementById('aiBody');
+    const wrap = document.createElement('div'); wrap.className = 'ai-hub-card';
+    let html = '<div class="ai-hub-card-h">🎒 ' + (item ? ('按「' + esc(item) + '」') : '') + '为你找到 ' + matches.length + ' 条可能相关的失物帖</div>';
+    if(!matches.length){
+      html += '<div class="ai-hub-card-d">暂时没匹配到相关帖子。要不要直接发一条失物招领？</div>'
+        + '<div class="ai-hub-card-actions"><button type="button" class="ai-action-btn" onclick="aiGotoLost()">🎒 发布失物招领</button></div>';
+    } else {
+      html += '<div class="ai-hub-list">';
+      matches.slice(0,5).forEach(function(m){
+        const tt = esc(m.title || ('帖子 #' + (m.id || m.number || '')));
+        const tag = (m.lost_type === 'found' || m.lost_type === 'found_item') ? '捡到' : '丢失';
+        html += '<button type="button" class="ai-hub-item" onclick="aiHubOpenForum(' + (m.id || m.number || 0) + ')"><span class="ai-hub-item-t">' + tt + '</span><span class="ai-hub-item-s">' + esc(tag) + (m.score ? (' · 匹配 ' + m.score) : '') + '</span></button>';
+      });
+      html += '</div>';
+    }
+    wrap.innerHTML = html;
+    if(body){ body.appendChild(wrap); body.scrollTop = body.scrollHeight; }
+    aiHubPushHistory('assistant', '失物匹配：找到 ' + matches.length + ' 条候选');
+    return true;
+  }
+  function aiHubOpenForum(num){
+    try{ toggleAiChat(false); }catch(e){}
+    try{ if(typeof openForumDetail === 'function'){ openForumDetail(num); return; } }catch(e){}
+    try{ navigate('forum'); }catch(e){}
+  }
+  window.aiHubOpenForum = aiHubOpenForum;
+
+  // C. 二手：AI 相似闲置匹配卡片
+  async function aiHubSecondhand(text, typingEl){
+    const campus = (S.user && S.user.campus) || 'main';
+    let recent = [];
+    try{
+      const issues = await ghIssues('order', 'open');
+      (issues || []).forEach(function(i){
+        let o = null; try{ o = JSON.parse(i.body); }catch(e){ return; }
+        if(!o) return;
+        if(o.type !== 'secondhand' && o.type !== 'borrow') return;
+        if(o.status && o.status !== 'open') return;
+        if((o.campus || 'main') !== campus) return;
+        let ae = null; try{ ae = o.ai_extract ? (typeof o.ai_extract === 'string' ? JSON.parse(o.ai_extract) : o.ai_extract) : null; }catch(_){}
+        recent.push({ number:i.number, type:o.type, category:o.category, ai_extract:ae, title:o.title || '', body_text:String(o.description || '').replace(/<[^>]+>/g,' ').slice(0,200), campus:(o.campus||'main'), price:(typeof o.price === 'number' ? o.price : 0) });
+      });
+    }catch(_){}
+    const r = await AIClient.call('/api/ai/match-secondhand', { title:'', content:text, category:'', campus:campus, price:0, recent_issues:recent.slice(0,120) }, { timeout:28000 });
+    if(!r.ok || !r.data) return false;
+    const data = r.data;
+    const matches = Array.isArray(data.matches) ? data.matches : [];
+    const item = (data.ai_extract && data.ai_extract.item) || '';
+    aiHubRemoveTyping(typingEl);
+    const body = document.getElementById('aiBody');
+    const wrap = document.createElement('div'); wrap.className = 'ai-hub-card';
+    let html = '<div class="ai-hub-card-h">🛒 ' + (item ? ('按「' + esc(item) + '」') : '') + '为你找到 ' + matches.length + ' 件相似闲置</div>';
+    if(!matches.length){
+      html += '<div class="ai-hub-card-d">暂时没有相似的闲置。要不要发一条求购/出售？</div>'
+        + '<div class="ai-hub-card-actions"><button type="button" class="ai-action-btn" onclick="showPublishModal(\'secondhand\')">🛒 发布二手</button></div>';
+    } else {
+      html += '<div class="ai-hub-list">';
+      matches.slice(0,5).forEach(function(m){
+        const tt = esc(m.title || ('闲置 #' + (m.id || m.number || '')));
+        const price = (typeof m.price === 'number' && m.price) ? ('¥' + m.price) : '';
+        html += '<button type="button" class="ai-hub-item" onclick="aiHubOpenOrder(' + (m.id || m.number || 0) + ')"><span class="ai-hub-item-t">' + tt + '</span><span class="ai-hub-item-s">' + esc(price) + (m.score ? ((price?' · ':'') + '匹配 ' + m.score) : '') + '</span></button>';
+      });
+      html += '</div>';
+    }
+    wrap.innerHTML = html;
+    if(body){ body.appendChild(wrap); body.scrollTop = body.scrollHeight; }
+    aiHubPushHistory('assistant', '二手匹配：找到 ' + matches.length + ' 件');
+    return true;
+  }
+  function aiHubOpenOrder(num){
+    try{ toggleAiChat(false); }catch(e){}
+    try{ if(typeof openDetail === 'function'){ openDetail(num); return; } }catch(e){}
+    try{ if(typeof showDetail === 'function'){ showDetail(num); return; } }catch(e){}
+    try{ navigate('help'); }catch(e){}
+  }
+  window.aiHubOpenOrder = aiHubOpenOrder;
+
+  // D. 学业：解题思路引导
+  async function aiHubQa(text, typingEl){
+    const msgs = [
+      { role:'system', content:'你是华中科技大学的学业辅导 AI。用户会给你一道题或一个问题，请只提供解题思路、步骤引导和方法提示，不要直接给出最终答案（帮助学生独立思考）。用中文分点说明，简明友好，不超过250字。' },
+      { role:'user', content: String(text).slice(0,800) }
+    ];
+    const r = await AIClient.call('/api/ai/chat', { messages:msgs }, { timeout:28000 });
+    const reply = (r.ok && r.data && r.data.reply) ? r.data.reply : mockAiSolve({ title:text, desc:'' });
+    await typeOutAi(typingEl, reply);
+    aiHubPushHistory('assistant', reply);
+    return true;
+  }
+
+  // 中枢快捷指令：点一下进入对应流程（设定待处理意图 + 输入提示）
+  const AI_HUB_PROMPTS = {
+    publish: '说说你想发布什么需求（例如"帮我在菜鸟驿站拿个快递到韵苑"），我帮你写好～',
+    lost: '描述一下丢了什么、在哪丢的（例如"昨天在图书馆丢了一张校园卡"），我帮你找找～',
+    secondhand: '说说想买或想卖什么（例如"想收一个二手台灯"），我帮你找相似闲置～',
+    qa: '把题目发给我，我给你解题思路～'
+  };
+  function aiHubPrompt(kind){
+    window._aiPendingIntent = kind;
+    const inp = document.getElementById('aiInput');
+    if(inp){ inp.value = ''; inp.placeholder = AI_HUB_PROMPTS[kind] || '说说你的需求…'; inp.focus(); }
+    addAiMsg('bot', '👌 ' + (AI_HUB_PROMPTS[kind] || ''));
+  }
+  window.aiHubPrompt = aiHubPrompt;
 
   // v1.39.6：返回 {ok,text,reason}，失败不再静默伪装成 AI 回答
   async function callAiChat(messages){

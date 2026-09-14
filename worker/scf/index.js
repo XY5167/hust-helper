@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.43.2';
+const VERSION = '1.44.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -1148,6 +1148,40 @@ const server = http.createServer(async (req, res) => {
           try {
             const reply = await callHunyuan(msgs);
             return sendJSON(res, 200, { ok: true, reply }, headers);
+          } catch (e) { return sendJSON(res, 502, { error: e.message }, headers); }
+        }
+
+        // ---- v1.44.0：AI 中枢意图识别（统一入口，把一句话分发到对应能力）----
+        // 输入 { text }，输出 { ok, intent, params }，intent ∈ publish|lost|secondhand|qa|chat
+        if (method === 'POST' && path === '/api/ai/intents') {
+          if (rateLimited(clientIp(req), AI_RATE_LIMIT)) return sendJSON(res, 429, { error: 'RATE_LIMITED' }, headers);
+          const text = ghBody && ghBody.text;
+          if (!text || typeof text !== 'string') return sendJSON(res, 400, { error: 'INVALID_INPUT' }, headers);
+          const sysPrompt = '你是华中科技大学校园互助平台的意图识别器。用户输入一句话，请判断意图并抽取参数。只返回一个 JSON 对象（不要 markdown 代码块、不要解释），格式：{"intent":"publish|lost|secondhand|qa|chat","params":{...}}。\n'
+            + '意图规则：\n'
+            + '- publish：想发布跑腿/代办（代取快递外卖、帮买帮送、打印、维修等）需求；\n'
+            + '- lost：丢东西/捡到东西/失物招领；\n'
+            + '- secondhand：买卖、出售、求购、租借二手物品；\n'
+            + '- qa：问学业题目、求解答/解题思路；\n'
+            + '- chat：其它（平台规则咨询、闲聊、校园生活攻略）。\n'
+            + 'params 按意图填（不确定就省略）：\n'
+            + '- publish：{"title":"20字内中文标题","desc":"规范友好的需求描述80-150字，含地点/时间/报酬与线下支付提示","type":"task|secondhand|qa|find","price":整数元}\n'
+            + '- lost：{"item":"物品名","place":"地点","lost_type":"lost|found"}\n'
+            + '- secondhand：{"item":"物品名","category":"品类","price":整数元}\n'
+            + '- qa：{"subject":"学科或题目概述"}\n'
+            + '- chat：{}\n'
+            + '注意：内容中不要出现微信号/QQ号/手机号，统一引导用平台私信。';
+          try {
+            const content = await callHunyuan([
+              { role: 'system', content: sysPrompt },
+              { role: 'user', content: String(text).slice(0, 500) }
+            ], { temperature: 0.2 });
+            const parsed = extractJson(content) || {};
+            let intent = String(parsed.intent || 'chat').toLowerCase().trim();
+            if (!['publish', 'lost', 'secondhand', 'qa', 'chat'].includes(intent)) intent = 'chat';
+            const params = (parsed.params && typeof parsed.params === 'object' && !Array.isArray(parsed.params)) ? parsed.params : {};
+            if (intent === 'publish' && params.price !== undefined) params.price = parseInt(params.price, 10) || 0;
+            return sendJSON(res, 200, { ok: true, intent, params }, headers);
           } catch (e) { return sendJSON(res, 502, { error: e.message }, headers); }
         }
 
