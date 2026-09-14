@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.43.1';
+const VERSION = '1.43.2';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -1517,7 +1517,31 @@ const server = http.createServer(async (req, res) => {
         }
       } else if (method === 'DELETE' && /^\/api\/issue\/\d+\/comments\/\d+$/.test(path)) {
           const parts = path.split('/api/issue/')[1].split('/');
-          ghPath = `/repos/${REPO}/issues/comments/${parts[1]}`;
+          const commentId = parts[1];
+          // v1.43.2 越权修复：删除评论前校验归属——仅「管理员 / 评论作者本人 / 所属 issue 当事人」可删。
+          // 此前该路由只校验登录态，任意登录用户可删任意评论（含他人订单/私信下的消息）。
+          const tk = bearerPayload(req);
+          const cm = await ghProxy(`/repos/${REPO}/issues/comments/${commentId}`, 'GET', null);
+          if (cm.status !== 200 || !cm.data) {
+            return sendJSON(res, 404, { error: 'COMMENT_NOT_FOUND' }, headers);
+          }
+          let commentSid = '';
+          try { commentSid = String((JSON.parse(cm.data.body) || {}).student_id || ''); } catch (e) { commentSid = ''; }
+          let ownerOk = false;
+          const im = (cm.data.issue_url || '').match(/\/issues\/(\d+)$/);
+          if (im) {
+            const iss = await ghProxy(`/repos/${REPO}/issues/${im[1]}`, 'GET', null);
+            if (iss.status === 200 && iss.data) {
+              const owners = issueOwnerSids(iss.data);
+              ownerOk = owners.length > 0 && owners.includes(String(tk && tk.sid));
+            }
+          }
+          const isAuthor = !!commentSid && !!tk && String(tk.sid) === commentSid;
+          const isAdmin = !!tk && tk.role === 'admin';
+          if (!isAdmin && !isAuthor && !ownerOk) {
+            return sendJSON(res, 403, { error: 'FORBIDDEN', hint: '无权删除该评论' }, headers);
+          }
+          ghPath = `/repos/${REPO}/issues/comments/${commentId}`;
         } else {
           return sendJSON(res, 404, { error: 'Unknown API endpoint' }, headers);
         }

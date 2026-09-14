@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.52.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.52.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -121,7 +121,6 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .user-name{font-weight:600;font-size:.88rem}
 .user-verified{font-size:.7rem;background:var(--success);color:#fff;padding:2px 7px;border-radius:99px}
 .user-runner-badge{font-size:.68rem;background:#f97316;color:#fff;padding:2px 8px;border-radius:99px;margin-left:4px;font-weight:600}
-.user-balance{display:none}
 
 /* Buttons */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border-radius:var(--radius-xs);font-size:.88rem;font-weight:500;border:none;transition:all var(--t)}
@@ -2679,7 +2678,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.52.0';
+const APP_VERSION = '1.52.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -7524,16 +7523,31 @@ async function persistDefaultAddress(addr) {
   const hasIssue = await ensureUserIssueNumber();
   if (!hasIssue) throw new Error('用户信息不完整，请退出后重新登录');
   const localRole = S.user && S.user.role;
+  let prevDefault = null;
+  let pulledRemote = false;
   try {
     const res = await ghApi('/api/issue/' + S.user._issue_number, 'GET');
     if (res.ok) {
       const issue = await res.json();
       let remote = null; try { remote = JSON.parse(issue.body); } catch (e) {}
-      if (remote) S.user = Object.assign({}, remote, { _issue_number: S.user._issue_number });
+      if (remote) {
+        prevDefault = remote.default_address || null;
+        pulledRemote = true;
+        S.user = Object.assign({}, remote, { _issue_number: S.user._issue_number });
+      }
     }
   } catch (e) { /* 拉不到就按本地现状写回 */ }
   S.user.default_address = addr;
-  await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user));
+  try {
+    // v1.52.1 乐观锁：断言 default_address 旧值，防双窗口互相覆盖
+    await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user), pulledRemote ? { default_address: prevDefault } : null);
+  } catch (e) {
+    if (e && e.code === 'CONFLICT') {
+      try { await pullRemoteUser(); } catch(_) {}
+      throw new Error('默认地址刚在其他窗口更新，已刷新，请重新保存');
+    }
+    throw e;
+  }
   if (localRole) S.user.role = localRole;   // 内存里恢复 role（不落库，与 saveMyPayment 行为一致）
   try { localStorage.setItem('hust_current_user', JSON.stringify(S.user)); } catch (e) {}
 }
@@ -8108,7 +8122,7 @@ async function handleAuth(e) {
       let initialStatus = (sid === ADMIN_STUDENT_ID) ? 'approved' : 'pending';
       if (verifyMethod === 'email') initialStatus = 'approved'; // 邮箱验证通过即放行
       // 注意：密码不在前端存储，单独传给 /api/register，由服务端哈希后写入 Issue
-      const userData = { student_id: sid, name, nickname: nicknameInput || name, name_nonstandard: nameValid.nonstandard, phone, dorm, balance: 0, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
+      const userData = { student_id: sid, name, nickname: nicknameInput || name, name_nonstandard: nameValid.nonstandard, phone, dorm, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
       // v1.52.0：注册时勾了「设为默认收货地址」→ 随注册一次性写入用户资料
       const _daChk = document.getElementById('authSetDefaultAddr');
       if (_daChk && _daChk.checked && phone && dorm) userData.default_address = { name: name, phone: phone, dorm: dorm };
@@ -9197,7 +9211,9 @@ async function saveMyPayment() {
     }
   }
 
-  // 4. 先从云端拉取最新用户数据（防止覆盖别人的修改）
+  // 4. 先从云端拉取最新用户数据（防止覆盖别人的修改），并记录收款码旧值作乐观锁锚点
+  let expectPayment = null;
+  let pulledRemote = false;
   try {
     const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + S.user._issue_number, {
       headers: {}
@@ -9205,6 +9221,8 @@ async function saveMyPayment() {
     if (res.ok) {
       const issue = await res.json();
       const remoteUser = JSON.parse(issue.body);
+      expectPayment = remoteUser.payment_info || null;
+      pulledRemote = true;
       // 用云端最新数据覆盖本地，再写入新的收款信息
       S.user = Object.assign({}, remoteUser, { _issue_number: S.user._issue_number });
       S.user.payment_info = info;
@@ -9222,15 +9240,22 @@ async function saveMyPayment() {
   // 5. 先存本地
   localStorage.setItem('hust_current_user', JSON.stringify(S.user));
 
-  // 6. 推送到 GitHub
+  // 6. 推送到 GitHub（v1.52.1 乐观锁：断言收款码旧值，防双窗口互相覆盖）
   try {
-    await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user));
+    await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user), pulledRemote ? { payment_info: expectPayment } : null);
     toast('收款信息已保存', 'success');
     const preview = document.getElementById('myPaymentPreview');
     if (preview && imageData) {
       preview.innerHTML = '<img src="' + safeImgSrc(imageData) + '" style="max-width:200px;border-radius:8px;border:1px solid var(--border)">';
     }
   } catch(e) {
+    if (e && e.code === 'CONFLICT') {
+      errEl.textContent = '收款信息刚在其他窗口被更新，已为你刷新，请重新保存。';
+      errEl.style.display = 'block';
+      try { await pullRemoteUser(); } catch(_) {}
+      try { if (typeof fillMyUserCard === 'function') fillMyUserCard(); } catch(_) {}
+      return;
+    }
     errEl.textContent = '保存到云端失败：' + e.message + '。请检查网络后重试。';
     errEl.style.display = 'block';
   }
