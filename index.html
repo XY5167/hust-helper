@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.53.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.54.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -683,13 +683,13 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 /* v1.42.2 原型风格：白底 market header / 搜索栏 / 分类 chips / 双列瀑布 / 空状态 */
 #page-task .task-hero{position:relative;overflow:hidden}
 #page-task .task-hero-blue{display:block}
-#page-task .task-hero.task-hero-market{background:transparent;box-shadow:none;border-radius:0;padding:0}
+#page-task .task-hero.task-hero-market{background:transparent;box-shadow:none;border-radius:0;padding:0;overflow:visible}
 #page-task .task-hero.task-hero-market .task-hero-blue{display:none}
 #page-task .task-hero-market-inner{display:none;background:#fff;border-bottom:1px solid var(--border);padding:14px 0}
 #page-task .task-hero.task-hero-market .task-hero-market-inner{display:block}
 #page-task .task-market-head{display:flex;align-items:center;gap:12px}
 #page-task .task-market-logo{font-size:1.35rem;font-weight:800;color:var(--primary);letter-spacing:-0.02em;flex:0 0 auto}
-#page-task .task-market-search{flex:1;display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f3f4f6;border-radius:99px;border:1px solid #e5e7eb}
+#page-task .task-market-search{position:relative;flex:1;display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f3f4f6;border-radius:99px;border:1px solid #e5e7eb}
 #page-task .task-market-search-ico{font-size:.95rem;opacity:.45}
 #page-task .task-market-search-input{flex:1;border:none;outline:none;background:transparent;font-size:.9rem;color:var(--text)}
 #page-task .task-market-search-input::placeholder{color:#9ca3af}
@@ -698,6 +698,18 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 /* 排序 chips */
 #page-task .task-sort-chips{margin-bottom:10px}
 #page-task .task-sort-chips .filter-btn{font-size:.8rem;padding:5px 14px}
+/* ===== v1.54.0 轻量语义搜索：联想下拉 + 校园圈搜索 ===== */
+#page-task .task-searchbar{position:relative}
+.task-suggest{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:70;background:var(--bg-card,#fff);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 28px rgba(15,23,42,.14);overflow:hidden;padding:4px 0}
+.task-suggest-item{display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:.85rem;color:var(--text);cursor:pointer;transition:background .12s}
+.task-suggest-item:hover{background:var(--bg-hover,#f1f5fb)}
+.task-suggest-ico{flex:0 0 auto;opacity:.5;font-size:.8rem}
+.task-suggest-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-suggest-clear{text-align:center;padding:8px;font-size:.78rem;color:var(--text-muted);cursor:pointer;border-top:1px solid var(--border)}
+.task-suggest-clear:hover{color:var(--primary)}
+.forum-search-bar{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:6px 14px;background:var(--bg-card,#fff);border:1px solid var(--border);border-radius:99px}
+.forum-search-bar .forum-search-ico{opacity:.45;font-size:.9rem}
+.forum-search-bar input{flex:1;border:none;outline:none;background:transparent;font-size:.88rem;padding:7px 0;color:var(--text)}
 /* 分类 chips 强化（圆角胶囊） */
 #page-task .filter-bar{gap:8px;margin-bottom:4px}
 #page-task #goodsFilters{margin-bottom:8px}
@@ -1576,6 +1588,10 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     </div>
   </div>
   <div class="container" data-page-node-id="ymoHC0cobb2gnw2O23pV2S">
+    <div class="forum-search-bar" data-page-node-id="fsearch-bar-v154">
+      <span class="forum-search-ico" data-page-node-id="fsearch-ico-v154">🔍</span>
+      <input type="text" id="forumSearchInput" placeholder="搜索帖子 / 失物 / 二手（支持同义词、拼音首字母）" oninput="forumSearchInput(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();S._forumKw=this.value;loadForumList();}" data-page-node-id="fsearch-input-v154">
+    </div>
     <div class="forum-sort-bar" data-page-node-id="Ug5T6Z5jpYM7bppwwxWpHe">
       <button class="forum-sort active" data-sort="recommend" onclick="setForumSort('recommend')" data-page-node-id="NMV79oS0uGUwUG6gkHfSNj">推荐</button>
       <button class="forum-sort" data-sort="latest" onclick="setForumSort('latest')" data-page-node-id="DRYxEkjJtTO5G0nTGTxyJS">最新</button>
@@ -1670,13 +1686,15 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       </div>
     </div>
     <!-- 二手模式：白底 market header（原型风格：logo + 居中搜索） -->
-    <div class="task-hero-market-inner" style="display:none" data-page-node-id="jejOzuFb1uW275RvQyC8Lt">
+    <!-- v1.54.0 fix：移除 inline display:none（它优先级高于 CSS，导致 header 从未显示、页内搜索框全部不可见） -->
+    <div class="task-hero-market-inner" data-page-node-id="jejOzuFb1uW275RvQyC8Lt">
       <div class="container" data-page-node-id="x2DfJ8QNzGwkKfyUDKw4fG">
         <div class="task-market-head" data-page-node-id="YI0Ls6qAcQwTn4hPkvEgjx">
           <div class="task-market-logo" data-page-node-id="1aD9JtGqF6t5FT7cAYsxEQ">hust-helper</div>
           <div class="task-market-search" data-page-node-id="YkB2Ua2fjhr2OdsGiF0lO0">
             <span class="task-market-search-ico" data-page-node-id="AVMdR6vjs0qBxdVc7OB8iW">🔍</span>
-            <input type="text" id="marketSearchInput" class="task-market-search-input" placeholder="搜书名、物品、科目、跑腿任务..." oninput="syncMarketSearch(this.value);resetTaskPageAndApply()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchEnterFeedback(document.getElementById('taskSearchInput'));" data-page-node-id="fj8lPzPiWNUxQihX7QoyJO">
+            <input type="text" id="marketSearchInput" class="task-market-search-input" placeholder="搜书名、物品、科目、跑腿任务..." oninput="syncMarketSearch(this.value);resetTaskPageAndApply();onSearchInput(this.value,'market')" onfocus="onSearchFocus(this,'market')" onblur="onSearchBlur()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchEnterFeedback(this);}" data-page-node-id="fj8lPzPiWNUxQihX7QoyJO">
+            <div class="task-suggest" id="marketSuggest" style="display:none"></div>
           </div>
         </div>
       </div>
@@ -1730,7 +1748,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     <!-- v1.42.2 原型风格：搜索 + 排序 chips（保留原 select 作数据绑定） -->
     <div class="task-searchbar" id="taskSearchBar" data-page-node-id="AkN8e2cBj2p2ZEoApSSiJZ">
       <span class="task-search-ico" data-page-node-id="WsoKBc6S4eNy3CZu3KTP43">🔍</span>
-      <input type="text" id="taskSearchInput" class="task-search-input" placeholder="搜索标题 / 描述 / 地点..." oninput="resetTaskPageAndApply()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchEnterFeedback(this);}" data-page-node-id="gF3LEeN5jaOV2UYP3aN7JO">
+      <input type="text" id="taskSearchInput" class="task-search-input" placeholder="搜索标题 / 描述 / 地点（支持同义词、拼音首字母）" oninput="resetTaskPageAndApply();onSearchInput(this.value,'task')" onfocus="onSearchFocus(this,'task')" onblur="onSearchBlur()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchEnterFeedback(this);}" data-page-node-id="gF3LEeN5jaOV2UYP3aN7JO">
       <select id="taskDormFilter" class="task-select" onchange="resetTaskPageAndApply()" data-page-node-id="O9Czucj2E396lBEl1Ugk0J">
         <option value="" data-page-node-id="uzZDr6BfDOOaBtwN0oxDYl">📍 全部区域</option>
         <option value="紫菘" data-page-node-id="6UxMYihewWGMkC8y3gKxdz">紫菘</option>
@@ -1747,6 +1765,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <option value="price_low" data-page-node-id="gE6ZELEtpY5qiqWKau7x7H">💰 价低</option>
       </select>
       <button class="btn btn-outline btn-sm" id="btnRecOnly" onclick="toggleRecOnly()" style="display:none" data-page-node-id="ivY0uwBuos4JZX2QLDXDoA">🎯 推荐</button>
+      <div class="task-suggest" id="searchSuggest" style="display:none"></div>
     </div>
     <div class="filter-bar task-sort-chips" id="taskSortChips" data-page-node-id="6WcYOtwpeBTMomNln3hT9G">
       <button class="filter-btn active" data-sort="newest" onclick="switchTaskSort('newest')" data-page-node-id="cIUCc1OsgCANEF1LmazDER">综合</button>
@@ -2691,7 +2710,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.53.0';
+const APP_VERSION = '1.54.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3345,15 +3364,21 @@ async function loadForumList() {
   const titleEl = document.getElementById('forumPageTitle');
   const cat = S._forumCat || null;
   if (titleEl) titleEl.textContent = cat ? (FORUM_CATS[cat] || '帖子') : '全部帖子';
+  // v1.54.0：搜索框值回填（从分类/详情页返回时保持）
+  const sInp = document.getElementById('forumSearchInput');
+  if (sInp && sInp.value !== (S._forumKw || '')) sInp.value = S._forumKw || '';
   el.innerHTML = skeletonCards(5);
   try {
     let posts = await forumLoadPosts();
     if (cat) posts = posts.filter(function (p) { return p.cat === cat; });
+    // v1.54.0：关键词过滤（同义词扩展 + 拼音首字母 + 多字段加权）
+    const kw = (S._forumKw || '').trim();
+    if (kw) posts = posts.filter(function (p) { return scorePost(p, kw) > 0; });
     const sort = S._forumSort || 'recommend';
     if (sort === 'latest') posts.sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
     else if (sort === 'hot') posts.sort(function (a, b) { return (b.upvotes || 0) - (a.upvotes || 0); });
     else posts.sort(function (a, b) { return (b.upvotes || 0) * 2 + (b.comment_count || 0) - ((a.upvotes || 0) * 2 + (a.comment_count || 0)); });
-    if (posts.length === 0) el.innerHTML = '<div class="forum-empty">该分区还没有帖子，去发布第一条吧～</div>';
+    if (posts.length === 0) el.innerHTML = '<div class="forum-empty">' + (kw ? '没有找到与「' + esc(kw) + '」相关的帖子，换个词试试～' : '该分区还没有帖子，去发布第一条吧～') + '</div>';
     else el.innerHTML = posts.map(function (p) { return forumPostCardHTML(p); }).join('');
   } catch (e) { el.innerHTML = '<div class="forum-empty">帖子加载失败，请稍后重试</div>'; }
 }
@@ -4436,43 +4461,329 @@ function renderTaskPager(pager, totalPages, totalCount) {
 function gotoTaskPage(n) { _taskCurrentPage = n; applySearchAndSort(); }
 function resetTaskPageAndApply() { _taskCurrentPage = 1; applySearchAndSort(); }
 
+// ============ v1.54.0 轻量语义搜索内核（纯前端 / 零依赖 / 无需后端）============
+// 把原来的「纯子串匹配」升级为四件事：
+//   ① 同义词·别名扩展：搜「吃饭」能命中「带饭 / 外卖」
+//   ② 拼音首字母匹配：搜「cdb」能命中「充电宝」
+//   ③ 字段加权打分：标题 > 智能关键词 > 描述 > 地点/昵称
+//   ④ 相关度排序 + 搜索历史联想
+
+// 校园场景同义词组（组内任意词互相召回）
+const SEARCH_SYNONYMS = [
+  ['吃饭', '带饭', '外卖', '打包', '送饭', '干饭', '买饭'],
+  ['快递', '取件', '菜鸟', '包裹', '驿站', '代取', '寄快递', '代寄'],
+  ['打印', '复印', '装订', '彩印', '论文打印', '打印店'],
+  ['充电宝', '充电', '移动电源', '充电器', '借充电宝'],
+  ['教材', '课本', '教科书', '二手书', '书籍', '专业书'],
+  ['维修', '修理', '修一下', '报修', '坏了', '坏了修'],
+  ['电脑', '笔记本', '平板', '装机', '系统重装', '清灰'],
+  ['手机', '贴膜', '换屏', '数据线', '耳机'],
+  ['搬家', '搬宿舍', '搬运', '拉货', '搬东西'],
+  ['拼车', '拼单', '顺路', '搭车', '一起走'],
+  ['问卷', '调查', '填问卷', '调研', '数据收集'],
+  ['组队', '队友', '招人', '求队友', '竞赛', '找队友'],
+  ['失物', '丢失', '遗失', '捡到', '寻物', '招领', '认领'],
+  ['兼职', '实习', '家教', '招聘', '找工作', '临时工'],
+  ['考研', '保研', '复习', '真题', '资料', '笔记'],
+  ['四级', '六级', '四六级', '英语', '雅思', '托福'],
+  ['电动车', '电瓶车', '自行车', '单车', '修车', '打气'],
+  ['饮料', '奶茶', '水', '买水', '喝点'],
+  ['早餐', '夜宵', '宵夜', '食堂', '午饭', '晚饭'],
+  ['门禁', '刷卡', '校园卡', '一卡通', '身份证'],
+  ['课程', '选课', '退课', '补考', '重修', '考试'],
+  ['火车票', '机票', '抢票', '订票', '高铁'],
+  ['医院', '看病', '买药', '药店', '发烧', '感冒'],
+  ['证件照', '照片', '拍照', '修图', '洗照片'],
+  ['理发', '剪头发', '烫头', '理发店'],
+  ['跑腿', '代购', '代办', '帮忙', '跑个腿', '捎带'],
+  ['租房', '合租', '找房', '室友', '出租'],
+  ['校园网', '网费', '宽带', '流量', 'wifi'],
+  ['运动', '打球', '羽毛球', '篮球', '健身', '约球'],
+  ['演出', '门票', '演唱会', '话剧', '活动票'],
+  ['高数', '高等数学', '数学分析', '线代', '线性代数', '概率论', '数理统计'],
+  ['健身', '跑步', '夜跑', '锻炼', '约跑'],
+  ['代拿', '帮拿', '捎带', '顺路带', '帮带']
+];
+
+// 构建 词 → 同组其他词 索引
+const _searchSynIdx = (function () {
+  const idx = {};
+  for (let i = 0; i < SEARCH_SYNONYMS.length; i++) {
+    const g = SEARCH_SYNONYMS[i];
+    for (let j = 0; j < g.length; j++) {
+      const k = g[j].toLowerCase();
+      if (!idx[k]) idx[k] = [];
+      for (let m = 0; m < g.length; m++) { if (m !== j) idx[k].push(g[m]); }
+    }
+  }
+  return idx;
+})();
+
+// 校园高频汉字 → 拼音首字母（按字母分组，用于「打首字母就能搜」）
+const PY_INIT_CHARS = {
+  a: '啊爱安按',
+  b: '八巴吧把白百摆拜班搬板版办半伴帮包宝保报抱北备背被本比笔必毕边变便遍标表别宾冰病拨波博补不步部布',
+  c: '才材财采彩菜参餐仓操草册测层茶查差产长常场厂唱超朝车成城程吃池迟持充冲虫抽出初除厨处传船窗床创吹春词此刺次从粗促存错',
+  d: '搭达答打大代带待单担蛋当党刀导岛到道得的灯等低底地弟第点电店调掉定丢东冬动都读独度短断对队顿多',
+  e: '额饿儿而二',
+  f: '发法翻凡反返饭防房访放飞非分份风封否夫服福府复付负妇附',
+  g: '该改干感刚钢高告哥歌格个各给根跟更工公功攻共狗够估股鼓固故顾瓜挂关观官馆惯光广规贵国果过',
+  h: '哈还孩海含好号喝合何和河黑很红厚后呼忽湖户花划华画话怀坏欢环换回会活火或货',
+  j: '击机积基及急级极即几己记技际计济加夹家价架假坚间检简见件建健将江讲交角脚叫教接街节结解姐介界借今金进近尽京经惊精井景竟净究九久酒旧就居局举句具剧据卷决绝军',
+  k: '卡开看康考科壳可克课肯空口扣哭苦块快宽矿况亏困扩',
+  l: '拉啦来赖蓝览烂劳老乐雷类冷离李理力历立连联脸练凉两亮量聊了料列烈林临领令留流六龙楼漏露路乱论落',
+  m: '妈麻马码吗买麦卖满慢忙猫毛么没眉梅每美妹门们迷米密面民明命摸模磨末某母目木',
+  n: '拿哪那纳乃奶男南难脑闹呢内能你尼年念娘您牛农弄努女暖',
+  o: '哦',
+  p: '怕拍排牌派盘判旁跑批朋碰皮票拼品平评瓶破普',
+  q: '期其奇启起气汽器千前钱强抢切亲轻清情请庆穷秋球区取去全权劝缺却群',
+  r: '然染让热人认任日容肉如入软若弱',
+  s: '撒赛三色森沙山商上少绍蛇设社深什身神审甚升生声省圣师失十石时识实食史使始士市示事受书熟属术树数刷双水说思四送搜速算虽随岁孙所',
+  t: '他她它台太态谈弹汤堂躺套特疼提题体天田条调跳贴铁听停通同统头投透突图土团推腿退',
+  w: '挖外完玩晚万王网往忘望危为围维委位味卫未文闻问我握无五午武务物',
+  x: '西吸希息习洗喜系细下夏先鲜闲显现线限乡想向项象像小校笑效些写谢心新信星行形醒兴姓性幸兄休修需许序续选学雪',
+  y: '压呀牙亚眼演样要药爷也业夜一衣医依已以艺议易益意因音阴引印应英营影硬用优由邮油游有又右于鱼愉与雨语育预元员原园远愿月越阅运晕',
+  z: '杂灾再在早造则择怎增扎展站张章招找照者这真整正证政之支知直值职只纸指至志制质中终种众周州洲主住助注祝专转装状准桌着资子字自总走租足族组祖最左作坐座做'
+};
+const _pyCharIdx = (function () {
+  const m = {};
+  const keys = Object.keys(PY_INIT_CHARS);
+  for (let i = 0; i < keys.length; i++) {
+    const L = keys[i], s = PY_INIT_CHARS[L];
+    for (let j = 0; j < s.length; j++) { if (!m[s[j]]) m[s[j]] = L; }
+  }
+  return m;
+})();
+
+// 汉字串 → 拼音首字母串（非汉字原样保留小写）
+function toPyInitials(s) {
+  const str = String(s || '');
+  let out = '';
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    const L = _pyCharIdx[ch];
+    if (L) out += L;
+    else if (ch !== ' ' && ch !== '\n') out += ch.toLowerCase();
+  }
+  return out;
+}
+
+// 查询归一化：小写 / 全角转半角 / 去标点 / 折叠空格
+function normQuery(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[\uFF01-\uFF5E]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+    .replace(/[\u3000\u3001-\u303F]/g, ' ')
+    .replace(/[，,。.、；;：:！!？?（）()\[\]{}【】"'“”‘’<>《》~`^|\\/+=*&#@$%_-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// 查询扩展：原词(1.0) + 同义词(0.75) + 拼音首字母(0.6)
+function expandQuery(q) {
+  const out = [], seen = {};
+  function push(term, w) {
+    const t = String(term || '').trim().toLowerCase();
+    if (!t) return;
+    const key = t + '|' + w;
+    if (seen[key]) return;
+    seen[key] = 1;
+    out.push({ term: t, w: w });
+  }
+  const toks = q.split(/\s+/);
+  for (let i = 0; i < toks.length; i++) {
+    const tok = toks[i];
+    if (!tok) continue;
+    push(tok, 1);
+    const syn = _searchSynIdx[tok];
+    if (syn) for (let j = 0; j < syn.length; j++) push(syn[j], 0.75);
+  }
+  const py = toPyInitials(q.replace(/\s+/g, ''));
+  if (/^[a-z0-9]{2,12}$/.test(py)) push('~py:' + py, 0.6);
+  return out;
+}
+
+// 字段权重
+const SEARCH_FIELD_W = { title: 10, keyword: 6, tag: 5, book: 5, desc: 3, loc: 2, name: 2 };
+
+// 给单条数据（订单 或 论坛帖）打分，0 表示不匹配
+function scorePost(o, rawQ) {
+  if (!o) return 0;
+  const q = normQuery(rawQ);
+  if (!q) return 0;
+  const groups = expandQuery(q);
+  if (!groups.length) return 0;
+
+  const title = String(o.title || '').toLowerCase();
+  const desc = (String(o.description || '') + ' ' + String(o.content || '')).toLowerCase();
+  const loc = String(o.location || '').toLowerCase();
+  const name = (String(o.publisher_name || '') + ' ' + String(o.publisher_dorm || '') + ' '
+    + String(o.author_name || '') + ' ' + String(o.nickname || '') + ' ' + String(o.name || '')).toLowerCase();
+  let kwArr = [];
+  if (Array.isArray(o.search_keywords)) kwArr = o.search_keywords.map(function (x) { return String(x || '').toLowerCase(); });
+  else if (typeof o.search_keywords === 'string') kwArr = [o.search_keywords.toLowerCase()];
+  else if (o.search_keywords && typeof o.search_keywords === 'object') kwArr = Object.keys(o.search_keywords).map(function (k) { return String(k).toLowerCase(); });
+  let book = '';
+  if (o.ai_book_meta) book = ((o.ai_book_meta.subject || '') + ' ' + (o.ai_book_meta.book_title || '') + ' ' + (o.ai_book_meta.grade || '')).toLowerCase();
+  const tagArr = Array.isArray(o.tags) ? o.tags.map(function (x) { return String(x || '').toLowerCase(); }) : [];
+
+  let total = 0;
+  for (let i = 0; i < groups.length; i++) {
+    const g = groups[i];
+    let s = 0;
+    if (g.term.indexOf('~py:') === 0) {
+      // 拼音首字母：只查标题与关键词，避免长文本转换开销
+      const py = g.term.slice(4);
+      const cands = [toPyInitials(title)];
+      for (let j = 0; j < kwArr.length; j++) cands.push(toPyInitials(kwArr[j]));
+      for (let j = 0; j < cands.length; j++) {
+        if (cands[j].indexOf(py) >= 0) s += (j === 0 ? SEARCH_FIELD_W.title : SEARCH_FIELD_W.keyword) * 0.6;
+      }
+    } else {
+      const t = g.term;
+      if (title.indexOf(t) >= 0) { s += SEARCH_FIELD_W.title; if (title === t) s += 8; }
+      for (let j = 0; j < kwArr.length; j++) { if (kwArr[j].indexOf(t) >= 0) { s += SEARCH_FIELD_W.keyword; break; } }
+      for (let j = 0; j < tagArr.length; j++) { if (tagArr[j].indexOf(t) >= 0) { s += SEARCH_FIELD_W.tag; break; } }
+      if (book && book.indexOf(t) >= 0) s += SEARCH_FIELD_W.book;
+      if (desc && desc.indexOf(t) >= 0) s += SEARCH_FIELD_W.desc;
+      if (loc && loc.indexOf(t) >= 0) s += SEARCH_FIELD_W.loc;
+      if (name && name.indexOf(t) >= 0) s += SEARCH_FIELD_W.name;
+    }
+    total += s * g.w;
+  }
+  return total;
+}
+
+// ---- 搜索历史（本地，最多 8 条）----
+const SEARCH_HIST_KEY = 'hust_search_hist';
+function getSearchHistory() {
+  try { const a = JSON.parse(localStorage.getItem(SEARCH_HIST_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function pushSearchHistory(kw) {
+  kw = String(kw || '').trim();
+  if (!kw || kw.length > 30) return;
+  try {
+    const a = getSearchHistory().filter(function (x) { return x !== kw; });
+    a.unshift(kw);
+    localStorage.setItem(SEARCH_HIST_KEY, JSON.stringify(a.slice(0, 8)));
+  } catch (e) {}
+}
+function clearSearchHistory() {
+  try { localStorage.removeItem(SEARCH_HIST_KEY); } catch (e) {}
+  hideSearchSuggest();
+}
+
+// ---- 联想下拉 ----
+let _searchSugCache = [];
+function searchSuggestions(kw) {
+  const q = normQuery(kw);
+  const out = [], seen = {};
+  function add(term, kind) {
+    const t = String(term || '').trim();
+    if (!t || seen[t.toLowerCase()]) return;
+    seen[t.toLowerCase()] = 1;
+    out.push({ term: t, kind: kind });
+  }
+  const hist = getSearchHistory();
+  if (q) {
+    hist.forEach(function (h) { if (out.length < 3 && normQuery(h).indexOf(q) >= 0) add(h, 'hist'); });
+    const keys = Object.keys(_searchSynIdx);
+    for (let i = 0; i < keys.length && out.length < 7; i++) {
+      const w = keys[i];
+      if (w.indexOf(q) < 0 && q.indexOf(w) < 0) continue;
+      add(w, 'syn');
+      const syn = _searchSynIdx[w];
+      for (let j = 0; j < syn.length && out.length < 8; j++) add(syn[j], 'syn');
+    }
+  } else {
+    hist.slice(0, 6).forEach(function (h) { add(h, 'hist'); });
+  }
+  return out;
+}
+function _sugBox(which) { return document.getElementById(which === 'market' ? 'marketSuggest' : 'searchSuggest'); }
+function renderSearchSuggest(kw, which) {
+  which = which === 'market' ? 'market' : 'task';
+  const other = _sugBox(which === 'market' ? 'task' : 'market');
+  if (other) other.style.display = 'none';
+  const box = _sugBox(which);
+  if (!box) return;
+  const items = searchSuggestions(kw);
+  _searchSugCache = items;
+  if (!items.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+  let html = '';
+  for (let i = 0; i < items.length; i++) {
+    html += '<div class="task-suggest-item" onclick="pickSearchSug(' + i + ')">'
+      + '<span class="task-suggest-ico">' + (items[i].kind === 'hist' ? '🕐' : '🔗') + '</span>'
+      + '<span class="task-suggest-txt">' + esc(items[i].term) + '</span></div>';
+  }
+  if (!normQuery(kw) && getSearchHistory().length) {
+    html += '<div class="task-suggest-clear" onclick="clearSearchHistory()">清空搜索历史</div>';
+  }
+  box.innerHTML = html;
+  box.style.display = 'block';
+}
+function onSearchInput(kw, which) { renderSearchSuggest(kw, which); }
+function onSearchFocus(el, which) { renderSearchSuggest((el && el.value) || '', which); }
+function onSearchBlur() { setTimeout(hideSearchSuggest, 180); }
+function hideSearchSuggest() {
+  ['searchSuggest', 'marketSuggest'].forEach(function (id) {
+    const box = document.getElementById(id);
+    if (box) box.style.display = 'none';
+  });
+}
+function pickSearchSug(i) {
+  const it = _searchSugCache[i];
+  if (!it) return;
+  applySearchSuggestion(it.term);
+}
+function applySearchSuggestion(kw) {
+  const inp = document.getElementById('taskSearchInput');
+  if (inp) inp.value = kw;
+  const mkt = document.getElementById('marketSearchInput');
+  if (mkt) mkt.value = kw;
+  pushSearchHistory(kw);
+  hideSearchSuggest();
+  resetTaskPageAndApply();
+}
+// 校园圈（含失物招领）搜索：带 220ms 防抖，避免逐字重渲染
+let _forumSearchTimer = null;
+function forumSearchInput(v) {
+  S._forumKw = v;
+  if (_forumSearchTimer) clearTimeout(_forumSearchTimer);
+  _forumSearchTimer = setTimeout(function () { loadForumList(); }, 220);
+}
+
 // 搜索框回车反馈：避免用户感觉"没反应"，给出匹配条数提示
 function searchEnterFeedback(input) {
   const kw = (input.value || '').trim();
   if (!kw) { toast('🔍 请输入关键词', 'info'); input.blur(); return; }
-  const k = kw.toLowerCase();
   const orders = _cachedOrders || [];
-  const n = orders.filter(o => {
-    return (o.title || '').toLowerCase().includes(k)
-      || (o.description || '').toLowerCase().includes(k)
-      || (o.location || '').toLowerCase().includes(k)
-      || (o.publisher_name || '').toLowerCase().includes(k)
-      || (o.publisher_dorm || '').toLowerCase().includes(k)
-      || (Array.isArray(o.search_keywords) && o.search_keywords.some(x => (x || '').toLowerCase().includes(k)));
-  }).length;
-  toast('🔍 关键词「' + kw + '」匹配 ' + n + ' 条' + (n ? '' : '，可换个词试试'), n ? 'success' : 'info');
+  const n = orders.filter(function (o) { return scorePost(o, kw) > 0; }).length;
+  const isSyn = !!_searchSynIdx[normQuery(kw)];
+  pushSearchHistory(kw);
+  hideSearchSuggest();
+  toast('🔍 关键词「' + kw + '」匹配 ' + n + ' 条'
+    + (n && isSyn ? '（已含同义词扩展）' : (n ? '' : '，可换个词试试')), n ? 'success' : 'info');
   input.blur();
+  resetTaskPageAndApply();
 }
 
 function applySearchAndSort() {
   if (!_cachedOrders) return;
   let orders = [..._cachedOrders];
 
-  // 搜索过滤
-  const keyword = (document.getElementById('taskSearchInput')?.value || '').trim().toLowerCase();
+  // 搜索过滤（v1.54.0：改用语义打分 —— 同义词扩展 + 拼音首字母 + 多字段加权）
+  const keyword = (document.getElementById('taskSearchInput')?.value || '').trim();
   const dormFilter = (document.getElementById('taskDormFilter')?.value || '').trim();
 
+  let scoreMap = null;
   if (keyword) {
+    scoreMap = new Map();
     orders = orders.filter(o => {
-      return (o.title || '').toLowerCase().includes(keyword)
-        || (o.description || '').toLowerCase().includes(keyword)
-        || (o.location || '').toLowerCase().includes(keyword)
-        || (o.publisher_name || '').toLowerCase().includes(keyword)
-        || (o.publisher_dorm || '').toLowerCase().includes(keyword)
-        || (Array.isArray(o.search_keywords) && o.search_keywords.some(k => (k || '').toLowerCase().includes(keyword)))
-        || (typeof o.search_keywords === 'string' && o.search_keywords.toLowerCase().includes(keyword))
-        // v1.41.0：教材的科目/书名/学期也进搜索范围（搜「微积分」能命中标题里没写科目的书）
-        || (o.ai_book_meta && ((o.ai_book_meta.subject || '') + (o.ai_book_meta.book_title || '') + (o.ai_book_meta.grade || '')).toLowerCase().includes(keyword));
+      const s = scorePost(o, keyword);
+      if (s > 0) { scoreMap.set(o, s); return true; }
+      return false;
     });
   }
 
@@ -4510,8 +4821,13 @@ function applySearchAndSort() {
         return new Date(b.created_at) - new Date(a.created_at); // 层内按时间倒序
       });
       break;
-    default: // newest
-      orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    default: // newest = 「综合」：有搜索词时按相关度排序，否则按时间
+      if (keyword && scoreMap) {
+        orders.sort((a, b) => (scoreMap.get(b) || 0) - (scoreMap.get(a) || 0)
+          || (new Date(b.created_at) - new Date(a.created_at)));
+      } else {
+        orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      }
   }
 
   renderOrders(orders);
