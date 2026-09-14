@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.51.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.52.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -1813,6 +1813,14 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
             </optgroup>
           </select>
         </div>
+        <!-- v1.52.0：默认收货地址（复用上方姓名/手机号/宿舍） -->
+        <div class="form-group" data-page-node-id="DaAddrChk01">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer" data-page-node-id="DaAddrChk02">
+            <input type="checkbox" id="authSetDefaultAddr" data-page-node-id="DaAddrChk03">
+            <span data-page-node-id="DaAddrChk04">设为我的默认收货地址</span>
+          </label>
+          <small id="authSetDefaultAddrHint" style="display:block;color:var(--text-muted);font-size:.72rem;margin-top:2px" data-page-node-id="DaAddrChk05">需先填写手机号（11位）并选择宿舍楼栋，发布跑腿时可一键带出</small>
+        </div>
         <!-- 验证方式选择 -->
         <div class="form-group" data-page-node-id="DMDzsDynJpE1RNJaB95nkV">
           <label data-page-node-id="gQsn8alwOiaVADtRSeBCp0">身份验证方式</label>
@@ -1926,6 +1934,12 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <div class="form-group" data-page-node-id="xAWn5ATTOphNZSVYcyWevz">
           <label data-page-node-id="QbP9gYWyFSsRTOiBpbNahQ">地点</label>
           <input type="text" id="publishLocation" placeholder="如：韵苑/紫菘/东校区" data-page-node-id="MoSW20GNFvw7NakLcrFCwG">
+          <!-- v1.52.0：默认收货地址快捷入口（显隐由 updatePublishAddrUI 控制） -->
+          <button type="button" id="pubUseDefault" class="btn btn-outline btn-sm" style="display:none;margin-top:6px" onclick="useDefaultAddress()" data-page-node-id="PubUseDef01">📍 用默认地址</button>
+          <label id="pubSaveDefaultWrap" style="display:none;margin-top:6px;font-size:.78rem;color:var(--text-secondary);cursor:pointer" data-page-node-id="PubSaveDef01">
+            <input type="checkbox" id="pubSaveDefault" data-page-node-id="PubSaveDef02">
+            保存为我的默认收货地址
+          </label>
         </div>
       </div>
       <details id="publishMore" style="margin-top:12px" data-page-node-id="hZrxqpmg4CjaQUbtwdPo8C">
@@ -2068,6 +2082,29 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       </div>
       <button class="btn btn-outline btn-sm" onclick="saveMyNickname()" data-page-node-id="YqG1GTVhT04Ox5bYFl4rFw">保存昵称</button>
       <p class="form-error" id="myNicknameError" style="display:none" data-page-node-id="RnXN8e5iudUfA5g4FeTWJH"></p>
+      <hr style="border:none;border-top:1px solid var(--border);margin:18px 0" data-page-node-id="DaDiv01">
+      <!-- v1.52.0：默认收货地址 -->
+      <div class="form-group" data-page-node-id="DaGroup01">
+        <label data-page-node-id="DaGroup02">默认收货地址 <span class="form-hint" style="display:inline" data-page-node-id="DaGroup03">（仅自己可见，发布跑腿时可一键带出）</span></label>
+        <input type="text" id="daName" placeholder="收货人姓名" maxlength="20" data-page-node-id="DaName01">
+        <input type="text" id="daPhone" placeholder="手机号（11位）" maxlength="11" style="margin-top:8px" data-page-node-id="DaPhone01">
+        <select id="daDorm" style="margin-top:8px" data-page-node-id="DaDorm01"></select>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveDefaultAddress()" data-page-node-id="DaSave01">保存默认地址</button>
+      <button class="btn btn-outline btn-sm" onclick="clearDefaultAddress()" style="margin-left:8px" data-page-node-id="DaClear01">清除</button>
+      <p class="form-error" id="daError" style="display:none" data-page-node-id="DaErr01"></p>
+      <hr style="border:none;border-top:1px solid var(--border);margin:18px 0" data-page-node-id="CcDiv01">
+      <!-- v1.52.0：私信自动清理 -->
+      <div class="form-group" data-page-node-id="CcGroup01">
+        <label data-page-node-id="CcGroup02">私信自动清理 <span class="form-hint" style="display:inline" data-page-node-id="CcGroup03">（仅作用于「我发起的」对话）</span></label>
+        <div id="chatCleanupChips" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px" data-page-node-id="CcChips01">
+          <button type="button" class="pref-chip" data-d="7" onclick="setChatCleanup(7)" data-page-node-id="CcChip07">7天</button>
+          <button type="button" class="pref-chip" data-d="30" onclick="setChatCleanup(30)" data-page-node-id="CcChip30">30天</button>
+          <button type="button" class="pref-chip" data-d="90" onclick="setChatCleanup(90)" data-page-node-id="CcChip90">90天</button>
+          <button type="button" class="pref-chip" data-d="0" onclick="setChatCleanup(0)" data-page-node-id="CcChip00">不清理</button>
+        </div>
+        <p class="form-hint" style="color:var(--danger)" data-page-node-id="CcGroup04">⚠️ 到点后自动清空聊天记录并关闭对话，<b>不可恢复</b>，对方那侧也会一并结束</p>
+      </div>
       <div id="myPaymentPreview" style="margin-top:12px" data-page-node-id="HT91CPPKc8Bghiy21UR9R6"></div>
     </div>
     <!-- 我的订单 -->
@@ -2642,7 +2679,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.51.0';
+const APP_VERSION = '1.52.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -4709,7 +4746,7 @@ async function showDetail(issueNum) {
         if (canClose) {
           const closeBtn = document.createElement('div');
           closeBtn.style.cssText = 'text-align:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)';
-          closeBtn.innerHTML = '<button class="btn btn-sm btn-outline" onclick="adminEndChat(' + issueNum + ')">结束对话并清除记录</button>';
+          closeBtn.innerHTML = '<button class="btn btn-sm btn-outline" onclick="userEndChat(' + issueNum + ')">结束对话并清除记录</button>';
           ct.appendChild(closeBtn);
         }
         // v1.18.0：聊天页拉黑按钮
@@ -7444,31 +7481,243 @@ async function cancelOrder(inum) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+// ============================================================
+// v1.52.0 新增：默认收货地址 + 私信定时清理
+// ============================================================
+
+// ---------- 默认收货地址 ----------
+// 把注册页宿舍下拉的选项克隆到「我的」页，保持单一数据源（不重复维护一套楼栋清单）
+function syncDormOptions() {
+  const src = document.getElementById('authDorm'), dst = document.getElementById('daDorm');
+  if (!src || !dst) return;
+  if (dst.options.length === 0) {
+    dst.innerHTML = src.innerHTML;
+    if (dst.options.length && dst.options[0]) dst.options[0].textContent = '请选择宿舍楼栋';
+  }
+}
+// 按「是否已有默认地址」「是否 qa/find 类型」控制发布弹窗两个控件的显隐
+function updatePublishAddrUI() {
+  const btn = document.getElementById('pubUseDefault');
+  const wrap = document.getElementById('pubSaveDefaultWrap');
+  if (!btn || !wrap) return;
+  const t = (document.getElementById('publishType') || {}).value || '';
+  if (t === 'qa' || t === 'find') { btn.style.display = 'none'; wrap.style.display = 'none'; return; }
+  const da = S.user && S.user.default_address;
+  if (da && da.dorm) {
+    btn.textContent = '📍 用默认地址（' + da.dorm + '）';
+    btn.style.display = '';
+    wrap.style.display = 'none';
+  } else {
+    btn.style.display = 'none';
+    wrap.style.display = '';
+  }
+}
+function useDefaultAddress() {
+  const da = S.user && S.user.default_address;
+  if (!da || !da.dorm) { toast('还没有设置默认地址', 'info'); return; }
+  const el = document.getElementById('publishLocation');
+  if (el) { el.value = da.dorm; toast('已填入：' + da.dorm, 'success'); }
+  savePublishDraft();
+}
+// 写入用户资料：改用 ghApi（带 Bearer），避免直连无 token 的老问题
+async function persistDefaultAddress(addr) {
+  const hasIssue = await ensureUserIssueNumber();
+  if (!hasIssue) throw new Error('用户信息不完整，请退出后重新登录');
+  const localRole = S.user && S.user.role;
+  try {
+    const res = await ghApi('/api/issue/' + S.user._issue_number, 'GET');
+    if (res.ok) {
+      const issue = await res.json();
+      let remote = null; try { remote = JSON.parse(issue.body); } catch (e) {}
+      if (remote) S.user = Object.assign({}, remote, { _issue_number: S.user._issue_number });
+    }
+  } catch (e) { /* 拉不到就按本地现状写回 */ }
+  S.user.default_address = addr;
+  await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user));
+  if (localRole) S.user.role = localRole;   // 内存里恢复 role（不落库，与 saveMyPayment 行为一致）
+  try { localStorage.setItem('hust_current_user', JSON.stringify(S.user)); } catch (e) {}
+}
+async function saveDefaultAddress() {
+  const errEl = document.getElementById('daError');
+  if (errEl) errEl.style.display = 'none';
+  if (!S.user) { toast('请先登录', 'error'); return; }
+  const name = ((document.getElementById('daName') || {}).value || '').trim();
+  const phone = ((document.getElementById('daPhone') || {}).value || '').trim();
+  const dorm = ((document.getElementById('daDorm') || {}).value || '').trim();
+  const fail = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'block'; } else { toast(m, 'error'); } };
+  if (!name) return fail('请填写收货人姓名');
+  if (!/^\d{11}$/.test(phone)) return fail('请填写 11 位手机号');
+  if (!dorm) return fail('请选择宿舍楼栋');
+  try {
+    await persistDefaultAddress({ name, phone, dorm });
+    toast('默认地址已保存', 'success');
+    updatePublishAddrUI();
+  } catch (e) { fail('保存失败：' + e.message); }
+}
+async function clearDefaultAddress() {
+  if (!S.user) { toast('请先登录', 'error'); return; }
+  if (!confirm('确定清除默认收货地址？')) return;
+  try {
+    await persistDefaultAddress(null);
+    ['daName', 'daPhone', 'daDorm'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+    toast('默认地址已清除', 'success');
+    updatePublishAddrUI();
+  } catch (e) { toast('清除失败：' + e.message, 'error'); }
+}
+// 发布成功后：按勾选把本次地点存为默认地址（姓名/手机号取用户资料）
+async function saveDefaultAddressFromProfile(dorm) {
+  const name = S.user && S.user.name;
+  const phone = S.user && S.user.phone;
+  if (!name || !phone) { toast('已发布。想保存默认地址，请先到「我的」补全手机号', 'info'); return; }
+  try { await persistDefaultAddress({ name, phone, dorm }); toast('已保存为默认收货地址：' + dorm, 'success'); }
+  catch (e) { console.warn('saveDefaultAddressFromProfile failed', e); }
+}
+// 注册页勾选框联动：手机号 11 位 + 已选宿舍才可勾选
+function syncDefaultAddrChk() {
+  const chk = document.getElementById('authSetDefaultAddr');
+  if (!chk) return;
+  const phone = ((document.getElementById('authPhone') || {}).value || '').trim();
+  const dorm = ((document.getElementById('authDorm') || {}).value || '').trim();
+  const ok = /^\d{11}$/.test(phone) && !!dorm;
+  chk.disabled = !ok;
+  if (!ok) chk.checked = false;
+  const hint = document.getElementById('authSetDefaultAddrHint');
+  if (hint) hint.style.color = ok ? 'var(--text-muted)' : '#f59e0b';
+}
+(function bindDefaultAddrChk() {
+  const bind = () => {
+    const p = document.getElementById('authPhone'), d = document.getElementById('authDorm');
+    if (p) p.addEventListener('input', syncDefaultAddrChk);
+    if (d) d.addEventListener('change', syncDefaultAddrChk);
+    syncDefaultAddrChk();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
+  else bind();
+})();
+
+// ---------- 私信定时清理 ----------
+function renderChatCleanupChips() {
+  const box = document.getElementById('chatCleanupChips');
+  if (!box) return;
+  const cur = Number((S.user && S.user.chat_cleanup_days) || 0);
+  box.querySelectorAll('.pref-chip').forEach(c => c.classList.toggle('active', Number(c.dataset.d) === cur));
+}
+async function setChatCleanup(days) {
+  if (!S.user) { toast('请先登录', 'error'); return; }
+  const d = Number(days) || 0;
+  const msg = d > 0
+    ? '开启后，你发起的私信对话超过 ' + d + ' 天将自动清空聊天记录并关闭，\n\n此操作不可恢复，对方那侧也会一并结束。确定开启？'
+    : '将不再自动清理私信对话。确定？';
+  if (!confirm(msg)) return;
+  try {
+    const hasIssue = await ensureUserIssueNumber();
+    if (!hasIssue) { toast('用户信息不完整，请退出后重新登录', 'error'); return; }
+    const localRole = S.user.role;
+    try {
+      const res = await ghApi('/api/issue/' + S.user._issue_number, 'GET');
+      if (res.ok) {
+        const issue = await res.json();
+        let remote = null; try { remote = JSON.parse(issue.body); } catch (e) {}
+        if (remote) S.user = Object.assign({}, remote, { _issue_number: S.user._issue_number });
+      }
+    } catch (e) {}
+    S.user.chat_cleanup_days = d;
+    await ghUpdateIssue(S.user._issue_number, JSON.stringify(S.user));
+    if (localRole) S.user.role = localRole;
+    try { localStorage.setItem('hust_current_user', JSON.stringify(S.user)); } catch (e) {}
+    renderChatCleanupChips();
+    toast(d > 0 ? '已设为 ' + d + ' 天后自动清理' : '已关闭自动清理', 'success');
+  } catch (e) { toast('保存失败：' + e.message, 'error'); }
+}
+// 每天最多跑一次（日期闸门，避免每次刷新都执行）
+function maybeRunChatCleanup() {
+  if (!S.user || document.hidden) return;
+  const today = new Date().toISOString().slice(0, 10);
+  let last = ''; try { last = localStorage.getItem('hust_chat_cleanup_last') || ''; } catch (e) {}
+  if (last === today) return;
+  try { localStorage.setItem('hust_chat_cleanup_last', today); } catch (e) {}
+  const days = Number(S.user.chat_cleanup_days || 0);
+  if (days > 0) runChatAutoCleanup(days);   // 异步，不阻塞
+}
+async function runChatAutoCleanup(days) {
+  try {
+    const uid = S.user._issue_number || S.user.student_id, sid = S.user.student_id;
+    const issues = await ghIssues('order', 'open');   // 只取 open，已关闭的不会再进来
+    const cutoff = Date.now() - days * 86400000;
+    let done = 0;
+    for (const it of issues) {
+      let d = null; try { d = JSON.parse(it.body); } catch (e) { continue; }
+      if (!d || d.type !== 'chat') continue;
+      if (!(d.publisher_id == uid || d.publisher_student_id == sid)) continue;   // 只清理「我发起的」
+      const t = new Date(d.created_at || 0).getTime();
+      if (!t || t > cutoff) continue;
+      try {
+        await deleteAllComments(it.number);      // 已改为走代理
+        await ghCloseIssue(it.number);           // 关闭后自动从「我的订单」列表消失
+        try {                                    // 同步清本地已读快照
+          const seen = JSON.parse(localStorage.getItem('hust_chat_seen') || '{}');
+          delete seen[String(it.number)];
+          localStorage.setItem('hust_chat_seen', JSON.stringify(seen));
+        } catch (e) {}
+        done++;
+        await new Promise(r => setTimeout(r, 800));   // 限速，避 GitHub 二级限流
+      } catch (e) { console.warn('chat cleanup failed #' + it.number, e); }
+    }
+    if (done > 0) {
+      try { cacheBust('myorders'); } catch (e) {}
+      if (S.page === 'my') loadMyOrders();
+      toast('已自动清理 ' + done + ' 个超期私信对话', 'info');
+    }
+  } catch (e) { console.warn('runChatAutoCleanup failed', e); }
+}
+// 手动：立即清空并结束这条对话（发起人可用）
+async function userEndChat(inum) {
+  if (!confirm('确定清空该对话的全部聊天记录并结束对话？\n\n此操作不可恢复，对方那侧也会一并结束。')) return;
+  try {
+    toast('正在清理…', 'info');
+    await deleteAllComments(inum);
+    await ghCloseIssue(inum);
+    toast('对话已清空并结束', 'success');
+    closeDetailModal();
+    try { cacheBust('myorders'); } catch (e) {}
+    if (S.page === 'my') loadMyOrders();
+  } catch (e) { toast('操作失败：' + e.message, 'error'); }
+}
+
 // 删除订单所有评论（分页拉取全部再逐条删除）
+// v1.52.0：USE_PROXY 模式下改走 SCF 代理（ghApi 自带 Bearer），
+//   原实现直连 API_BASE 且不带 token，在代理模式下必然失败（adminEndChat 长期静默失效）。
 async function deleteAllComments(inum) {
   try {
     let allComments = [];
-    let page = 1;
-    while (true) {
-      const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum + '/comments?per_page=100&page=' + page, {
-        headers: {}
-      });
-      if (!res.ok) break;
-      const comments = await res.json();
-      if (!comments || comments.length === 0) break;
-      allComments = allComments.concat(comments);
-      if (comments.length < 100) break;
-      page++;
+    if (USE_PROXY) {
+      const res = await ghApi('/api/comments/' + inum, 'GET');
+      if (res.ok) { try { allComments = await res.json(); } catch (e) { allComments = []; } }
+    } else {
+      let page = 1;
+      while (true) {
+        const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum + '/comments?per_page=100&page=' + page, {
+          headers: {}
+        });
+        if (!res.ok) break;
+        const comments = await res.json();
+        if (!comments || comments.length === 0) break;
+        allComments = allComments.concat(comments);
+        if (comments.length < 100) break;
+        page++;
+      }
     }
     // 并行删除，并发限制5，避免触发GitHub二级限流
     const BATCH = 5;
     for (let i = 0; i < allComments.length; i += BATCH) {
       const batch = allComments.slice(i, i + BATCH);
       await Promise.allSettled(batch.map(c =>
-        fetch(API_BASE + '/repos/' + REPO + '/issues/comments/' + c.id, {
-          method: 'DELETE',
-          headers: {}
-        })
+        USE_PROXY
+          ? ghApi('/api/issue/' + inum + '/comments/' + c.id, 'DELETE')
+          : fetch(API_BASE + '/repos/' + REPO + '/issues/comments/' + c.id, {
+              method: 'DELETE',
+              headers: { Authorization: 'Bearer ' + getToken() }
+            })
       ));
     }
   } catch(e) { /* 静默 */ }
@@ -7860,6 +8109,9 @@ async function handleAuth(e) {
       if (verifyMethod === 'email') initialStatus = 'approved'; // 邮箱验证通过即放行
       // 注意：密码不在前端存储，单独传给 /api/register，由服务端哈希后写入 Issue
       const userData = { student_id: sid, name, nickname: nicknameInput || name, name_nonstandard: nameValid.nonstandard, phone, dorm, balance: 0, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
+      // v1.52.0：注册时勾了「设为默认收货地址」→ 随注册一次性写入用户资料
+      const _daChk = document.getElementById('authSetDefaultAddr');
+      if (_daChk && _daChk.checked && phone && dorm) userData.default_address = { name: name, phone: phone, dorm: dorm };
       if (verifyMethod === 'email') { userData.email = (document.getElementById('authEmail').value || '').trim().toLowerCase(); userData.email_verified = true; }
       else { userData.email_verified = false; }
       // 7天会员试用改为在「跑腿认证通过」时赠送（见 approveRunner），注册/审核通过不再赠送
@@ -8052,6 +8304,7 @@ function showPublishModal(preType) {
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
   tomorrow.setMinutes(tomorrow.getMinutes() - tomorrow.getTimezoneOffset());
   document.getElementById('publishDeadline').value = tomorrow.toISOString().slice(0, 16);
+  updatePublishAddrUI();   // v1.52.0：按当前类型/是否已有默认地址刷新控件
 }
 
 function checkApproved() {
@@ -8140,6 +8393,7 @@ function updatePublishCategories() {
   if (pm) pm.open = (t === 'secondhand');
   if (window.clearAiTags) window.clearAiTags();   // v1.51.0：切换类型后旧标签失效，清空防误导
   updateFoodPublishTip();   // v1.19.0：外卖发布提示显隐
+  updatePublishAddrUI();    // v1.52.0：默认地址控件显隐（qa/find 类型隐藏）
 }
 
 // ---- v1.19.0 发布弹窗外卖提示（task + food 时显示）----
@@ -8438,6 +8692,11 @@ async function handlePublish(e) {
     try { localStorage.setItem('hust_last_publish', String(Date.now())); } catch(e) {}
     try { localStorage.setItem('hust_safety_tip_seen', '1'); } catch(e) {}
     clearPublishDraft();
+    // v1.52.0：勾了「保存为我的默认地址」→ 异步写入用户资料（不阻塞发布流程；须在 closePublishModal 重置表单之前读）
+    try {
+      const _sd = document.getElementById('pubSaveDefault');
+      if (_sd && _sd.checked && loc) saveDefaultAddressFromProfile(loc).catch(function () {});
+    } catch (e) {}
     resetOcrState();
     closePublishModal();
     if (S.page === 'task') {
@@ -8676,6 +8935,14 @@ async function loadMyOrders(myTab) {
   // 显示当前昵称（避免用户看不到已设内容）
   const nicknameInput = document.getElementById('myNickname');
   if (nicknameInput) nicknameInput.value = S.user.nickname || '';
+  // v1.52.0：默认收货地址回填 + 私信自动清理设置回填
+  syncDormOptions();
+  const _da = S.user.default_address || null;
+  const _daN = document.getElementById('daName'), _daP = document.getElementById('daPhone'), _daD = document.getElementById('daDorm');
+  if (_daN) _daN.value = _da ? (_da.name || '') : '';
+  if (_daP) _daP.value = _da ? (_da.phone || '') : '';
+  if (_daD) _daD.value = _da ? (_da.dorm || '') : '';
+  renderChatCleanupChips();
   // 显示昵称修改冷却倒计时
   const cooldownEl = document.getElementById('myNicknameCooldown');
   if (cooldownEl) {
@@ -10383,6 +10650,9 @@ handleAuth = async function(e) {
 setInterval(function() {
   if (S.user && !document.hidden) runNotificationCheck();
 }, 30000);
+
+// v1.52.0：每小时探一次私信自动清理（内部有日期闸门，保证每天最多真正执行一次）
+setInterval(maybeRunChatCleanup, 3600 * 1000);
 
 // 每60秒检测投诉进度，页面隐藏跳过
 setInterval(function() {

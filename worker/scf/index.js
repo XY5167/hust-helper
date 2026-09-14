@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.43.0';
+const VERSION = '1.43.1';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -208,7 +208,7 @@ function desensitizeIssue(data) {
   return data;
 }
 // 强脱敏：user 类 issue 剥离真实身份字段（学号/姓名/手机号/宿舍/邮箱等），纵深防御
-const PRIVATE_FIELDS = ['student_id', 'name', 'phone', 'dorm', 'email', 'real_name', 'wechat', 'qq'];
+const PRIVATE_FIELDS = ['student_id', 'name', 'phone', 'dorm', 'email', 'real_name', 'wechat', 'qq', 'default_address'];
 function desensitizeIssuePrivate(data) {
   if (Array.isArray(data)) return data.map(desensitizeIssuePrivate);
   if (issueHasUserLabel(data)) {
