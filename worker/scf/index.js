@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.44.0';
+const VERSION = '1.45.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -345,6 +345,72 @@ async function callHunyuan(messages, opts) {
     } finally { clearTimeout(timer); }
   }
   throw new Error('AI_BUSY: 模型繁忙，重试多次仍失败，请稍后再试');
+}
+
+// ---- v1.55.0 语义搜索：文本向量化 ----
+// 与 callHunyuan 共用 TOKENHUB_API_KEY / TOKENHUB_BASE_URL（智谱同一 key 即可调 /embeddings），
+// 模型名与维度可由环境变量覆盖，无需新增任何 SCF 环境变量。
+// 维度用 256 而非默认 2048：智谱按「输入 token」计费、与维度无关，降维纯粹为了让向量能塞进
+// GitHub Issue body（见 quantizeVec）。
+const EMBED_MODEL = process.env.TOKENHUB_EMBED_MODEL || 'embedding-3';
+const EMBED_DIMS = parseInt(process.env.TOKENHUB_EMBED_DIMS || '256', 10);
+async function callEmbed(texts) {
+  if (!TOKENHUB_API_KEY) throw new Error('TOKENHUB_NOT_CONFIGURED');
+  const arr = (Array.isArray(texts) ? texts : [texts])
+    .map(t => String(t == null ? '' : t).trim().slice(0, 2000))
+    .filter(t => t.length > 0);
+  if (!arr.length) throw new Error('EMBED_EMPTY_INPUT');
+  if (arr.length > 64) arr.length = 64;   // 智谱限制：单次数组最多 64 条
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const r = await fetch(TOKENHUB_BASE_URL + '/embeddings', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + TOKENHUB_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: EMBED_MODEL, input: arr, dimensions: EMBED_DIMS }),
+      signal: ctl.signal
+    });
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const em = (json && json.error && (json.error.message || json.error.code)) || ('HTTP ' + r.status);
+      throw new Error('EMBED_ERROR: ' + em);
+    }
+    const data = (json && json.data) || [];
+    if (!Array.isArray(data) || data.length !== arr.length) throw new Error('EMBED_EMPTY');
+    // 接口不保证返回顺序，按 index 归位
+    return data.slice().sort((a, b) => (a.index || 0) - (b.index || 0)).map(d => d.embedding);
+  } catch (er) {
+    if (er && er.name === 'AbortError') throw new Error('EMBED_TIMEOUT: embedding 15s 无响应');
+    throw er;
+  } finally { clearTimeout(timer); }
+}
+
+// 向量量化：L2 归一化 → int8 → base64。256 维仅 344 字符，约为 float JSON（1.5KB）的四分之一。
+// 归一化后余弦相似度只看方向，故无需存 scale —— 反量化除以 127 即是单位向量，点积即为余弦。
+function quantizeVec(vec) {
+  const n = vec.length;
+  let norm = 0;
+  for (let i = 0; i < n; i++) norm += vec[i] * vec[i];
+  norm = Math.sqrt(norm) || 1;
+  const buf = Buffer.alloc(n);
+  for (let i = 0; i < n; i++) {
+    let q = Math.round((vec[i] / norm) * 127);
+    if (q > 127) q = 127;
+    if (q < -127) q = -127;
+    buf.writeInt8(q, i);
+  }
+  return buf.toString('base64');
+}
+
+// 帖子 → 待向量化文本。⚠️ 前端 genPostVectorText() 必须与此保持逐字一致，
+// 否则「查询向量」与「帖子向量」不在同一语义空间，余弦相似度失去意义。
+function postVectorText(o) {
+  const kw = Array.isArray(o.search_keywords) ? o.search_keywords.join(' ') : String(o.search_keywords || '');
+  const bk = o.ai_book_meta
+    ? [o.ai_book_meta.subject, o.ai_book_meta.book_title, o.ai_book_meta.grade].filter(Boolean).join(' ')
+    : '';
+  return [o.title, o.description, kw, o.category, bk]
+    .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().slice(0, 600);
 }
 
 // ---- 多模态视觉模型（图生文 / 识图）：智谱 GLM-4V-Flash（免费不限量）----
@@ -983,7 +1049,19 @@ const server = http.createServer(async (req, res) => {
                 : String((e && e.message) || e)
             };
           } finally { clearTimeout(timer); }
-          return sendJSON(res, 200, { version: VERSION, config: { baseUrl: TOKENHUB_BASE_URL, model: TOKENHUB_MODEL, hasKey: !!TOKENHUB_API_KEY }, probe: probe }, headers);
+          // v1.55.0：?embed=1 时额外探测向量模型可用性（语义搜索的前置条件：
+          // 未配 key / 无权限 / 欠费 都会在此原样暴露，避免前端静默降级后无从排查）
+          let embedProbe = null;
+          if (url.searchParams.get('embed') === '1') {
+            try {
+              const vecs = await callEmbed(['华中科技大学校园互助平台测试文本']);
+              const first = (vecs && vecs[0]) || [];
+              embedProbe = { ok: true, model: EMBED_MODEL, dims: first.length, stored: quantizeVec(first).length + '字符/帖' };
+            } catch (e) {
+              embedProbe = { ok: false, model: EMBED_MODEL, error: String((e && e.message) || e) };
+            }
+          }
+          return sendJSON(res, 200, { version: VERSION, config: { baseUrl: TOKENHUB_BASE_URL, model: TOKENHUB_MODEL, hasKey: !!TOKENHUB_API_KEY }, probe: probe, embed: embedProbe }, headers);
         }
         if (statsMatch) {
           const ck = 'stats';
@@ -1182,6 +1260,65 @@ const server = http.createServer(async (req, res) => {
             const params = (parsed.params && typeof parsed.params === 'object' && !Array.isArray(parsed.params)) ? parsed.params : {};
             if (intent === 'publish' && params.price !== undefined) params.price = parseInt(params.price, 10) || 0;
             return sendJSON(res, 200, { ok: true, intent, params }, headers);
+          } catch (e) { return sendJSON(res, 502, { error: e.message }, headers); }
+        }
+
+        // ---- v1.55.0 语义搜索：文本向量化（纯计算，不落库）----
+        // 输入 { texts: [...] }，输出 { ok, dims, vectors: [base64...] }
+        if (method === 'POST' && path === '/api/ai/embed') {
+          const tk = bearerPayload(req);
+          if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED' }, headers);
+          if (rateLimited(clientIp(req), AI_RATE_LIMIT)) return sendJSON(res, 429, { error: 'RATE_LIMITED' }, headers);
+          const texts = ghBody && ghBody.texts;
+          if (!Array.isArray(texts) || texts.length === 0) return sendJSON(res, 400, { error: 'INVALID_INPUT' }, headers);
+          try {
+            const vecs = await callEmbed(texts);
+            return sendJSON(res, 200, { ok: true, dims: EMBED_DIMS, vectors: vecs.map(quantizeVec) }, headers);
+          } catch (e) { return sendJSON(res, 502, { error: e.message }, headers); }
+        }
+
+        // ---- v1.55.0 语义搜索：存量帖子补向量 ----
+        // 为何必须放服务端：PATCH /api/issue/{n} 有 ownership 校验（:1528），普通用户改不了别人的帖子，
+        // 而补向量要覆盖全站存量。服务端持 GITHUB_TOKEN，以自身身份写入，绕开该限制。
+        // ?limit=N 控制单次处理量（默认 10、上限 30）—— 每条需 1 次 GitHub PATCH，取太大有 SCF 超时风险。
+        if (method === 'POST' && path === '/api/ai/backfill-vectors') {
+          const tk = bearerPayload(req);
+          if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED' }, headers);
+          if (rateLimited(clientIp(req), AI_RATE_LIMIT)) return sendJSON(res, 429, { error: 'RATE_LIMITED' }, headers);
+          const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '10', 10) || 10, 1), 30);
+          try {
+            const all = await ghIssuesAll('order', 'open');
+            const pending = [];
+            let haveVec = 0, missingTotal = 0;
+            for (const it of all) {
+              let o = null;
+              try { o = JSON.parse(it.body); } catch (e) { continue; }
+              if (!o || o.type === 'chat') continue;   // 对话类无需向量
+              if (o._v) { haveVec++; continue; }
+              const txt = postVectorText(o);
+              if (!txt) continue;
+              missingTotal++;
+              if (pending.length < limit) pending.push({ num: it.number, text: txt, body: it.body });
+            }
+            if (!pending.length) {
+              return sendJSON(res, 200, { ok: true, scanned: all.length, done: 0, have: haveVec, remaining: 0 }, headers);
+            }
+            const vecs = await callEmbed(pending.map(p => p.text));
+            let done = 0;
+            for (let i = 0; i < pending.length; i++) {
+              // 直接基于列表 body 追加字段，省掉逐条 GET（每条少一次 GitHub 往返）
+              let obj = null;
+              try { obj = JSON.parse(pending[i].body || '{}'); } catch (e) { continue; }
+              if (!obj || obj._v) continue;   // 并发已被补过则跳过
+              obj._v = quantizeVec(vecs[i]);
+              const upd = await ghProxy(`/repos/${REPO}/issues/${pending[i].num}`, 'PATCH', { body: JSON.stringify(obj) });
+              if (upd.status >= 200 && upd.status < 300) done++;
+            }
+            clearCache();
+            return sendJSON(res, 200, {
+              ok: true, scanned: all.length, done, have: haveVec + done,
+              remaining: Math.max(0, missingTotal - done)
+            }, headers);
           } catch (e) { return sendJSON(res, 502, { error: e.message }, headers); }
         }
 
