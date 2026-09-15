@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.54.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.55.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2710,7 +2710,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.54.0';
+const APP_VERSION = '1.55.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -4311,6 +4311,8 @@ async function loadOrders(type, cat) {
     _cachedType = type;
     cacheSet(cacheKey, orders);
     renderOrders(orders);
+    // v1.55.0：发现缺向量的帖子就在后台静默补齐（不阻塞界面，也不打断浏览）
+    try { maybeBackfillVectors(orders); } catch (e) {}
   } catch(e) {
     // 如果缓存也用完了，显示错误
     if (!cached) grid.innerHTML = '<div class="empty-state"><p>加载失败：' + esc(e.message) + '</p></div>';
@@ -4654,6 +4656,140 @@ function scorePost(o, rawQ) {
   return total;
 }
 
+// ===== v1.55.0 语义搜索（向量召回）=====
+// 与后端 postVectorText() 必须逐字一致 —— 一旦不一致，查询向量与帖子向量就不在同一语义空间，
+// 余弦相似度会失去意义（注意：这种错不会报错，只会静默变差），故改这里必须同步改 worker/scf/index.js。
+function genPostVectorText(o) {
+  const kw = Array.isArray(o.search_keywords) ? o.search_keywords.join(' ') : String(o.search_keywords || '');
+  const bk = o.ai_book_meta
+    ? [o.ai_book_meta.subject, o.ai_book_meta.book_title, o.ai_book_meta.grade].filter(Boolean).join(' ')
+    : '';
+  return [o.title, o.description, kw, o.category, bk]
+    .filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().slice(0, 600);
+}
+// int8 → base64 的反量化（后端 quantizeVec 的逆操作）。原向量已 L2 归一化，
+// 反量化仅剩极小模长误差，故直接按完整余弦计算更稳。
+function decodeVec(b64) {
+  if (!b64 || typeof b64 !== 'string') return null;
+  try {
+    const bin = atob(b64);
+    const n = bin.length;
+    if (!n) return null;
+    const out = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const c = bin.charCodeAt(i); out[i] = c > 127 ? c - 256 : c; }
+    return out;
+  } catch (e) { return null; }
+}
+function cosVec(a, b) {
+  if (!a || !b || a.length !== b.length) return -1;
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  const den = Math.sqrt(na) * Math.sqrt(nb);
+  return den ? dot / den : -1;
+}
+// 解码缓存：同一段 base64 只解一次（帖子向量内容重复度高，省掉大量重复解码）
+const _vecCache = new Map();
+function postVec(o) {
+  if (!o || !o._v) return null;
+  let v = _vecCache.get(o._v);
+  if (v === undefined) {
+    v = decodeVec(o._v);
+    if (_vecCache.size > 4000) _vecCache.clear();
+    _vecCache.set(o._v, v);
+  }
+  return v;
+}
+
+// ---- 语义检索参数（想调效果只动这三个常量）----
+const SEM_COS_FLOOR = 0.55;   // 余弦低于此值不计语义分
+const SEM_WEIGHT    = 80;     // 语义分权重：cos=0.75 → +16 分（约合一次关键词命中）
+const SEM_KEEP      = 0.62;   // 关键词零命中时，语义高于此值才召回（防召回过宽把无关帖拉进来）
+const SEM_MIN_LEN   = 2;      // 查询短于此长度不做语义（单字含义太泛）
+
+// 查询向量：输入/回车时异步预取，取到后自动重排一次；同一关键词只请求一次。
+let _queryVec = null, _queryVecKey = '', _queryVecPendingKey = null, _semDebounce = null;
+
+function ensureQueryVec(kw) {
+  const key = normQuery(kw);
+  if (!key || key.length < SEM_MIN_LEN) { _queryVec = null; _queryVecKey = ''; return; }
+  if (key === _queryVecKey) return;                  // 该词的向量已在手
+  if (_queryVecPendingKey === key) return;           // 同一个词正在请求中
+  _queryVecKey = key; _queryVec = null; _queryVecPendingKey = key;
+  if (!window.AIClient) { _queryVecPendingKey = null; return; }
+  window.AIClient.call('/api/ai/embed', { texts: [String(kw).slice(0, 200)] }, { timeout: 12000 })
+    .then(function (r) {
+      if (_queryVecPendingKey === key) _queryVecPendingKey = null;
+      if (!r || !r.ok || !r.data || !Array.isArray(r.data.vectors)) return;
+      const v = decodeVec(r.data.vectors[0]);
+      if (!v) return;
+      if (_queryVecKey !== key) return;              // 期间用户改了词 → 丢弃过期结果
+      _queryVec = v;
+      if (typeof applySearchAndSort === 'function') applySearchAndSort();   // 向量到手后重排一次
+    })
+    .catch(function () { if (_queryVecPendingKey === key) _queryVecPendingKey = null; });
+}
+// 输入防抖：避免每敲一个字都调一次 embedding（既费额度又拖慢）
+function scheduleQueryVec(kw) {
+  if (_semDebounce) clearTimeout(_semDebounce);
+  _semDebounce = setTimeout(function () { ensureQueryVec(kw); }, 500);
+}
+function clearQueryVec() {
+  if (_semDebounce) clearTimeout(_semDebounce);
+  _semDebounce = null; _queryVec = null; _queryVecKey = ''; _queryVecPendingKey = null;
+}
+function semanticScore(o) {
+  if (!_queryVec) return 0;
+  const pv = postVec(o);
+  if (!pv) return 0;
+  return Math.max(0, cosVec(_queryVec, pv) - SEM_COS_FLOOR) * SEM_WEIGHT;
+}
+function semanticHit(o) {
+  if (!_queryVec) return false;
+  const pv = postVec(o);
+  return !!pv && cosVec(_queryVec, pv) >= SEM_KEEP;
+}
+
+// 发布后异步写入向量（不阻塞发布流程；万一失败，后台补齐会兜底）
+function enqueuePostVector(createdIssue, orderObj) {
+  const num = createdIssue && (createdIssue.number || createdIssue.id);
+  const txt = genPostVectorText(orderObj || {});
+  if (!num || !txt || !window.AIClient) return;
+  window.AIClient.call('/api/ai/embed', { texts: [txt] }, { timeout: 15000 })
+    .then(function (r) {
+      if (!r || !r.ok || !r.data || !Array.isArray(r.data.vectors) || !r.data.vectors[0]) return;
+      const body = Object.assign({}, orderObj, { _v: r.data.vectors[0] });
+      if (typeof ghUpdateIssue === 'function') {
+        try { ghUpdateIssue(num, JSON.stringify(body)).catch(function () {}); } catch (e) {}
+      }
+    })
+    .catch(function () {});
+}
+
+// 存量帖子后台静默补向量：每批 20 条，补完一批隔 45 秒再补下一批，
+// 单次访问最多 5 批（100 条），避免长时间占用 GitHub 写入配额。
+let _vecBackfillBusy = false, _vecBackfillRounds = 0;
+function maybeBackfillVectors(orders) {
+  if (_vecBackfillBusy || !S.user || !window.AIClient) return;
+  const list = (orders || []).filter(function (o) { return o && o.type !== 'chat'; });
+  if (!list.length) return;
+  if (!list.some(function (o) { return !o._v; })) return;   // 当前列表已全覆盖 → 无需补
+  _vecBackfillBusy = true;
+  nextBackfillRound();
+}
+function nextBackfillRound() {
+  if (document.hidden || _vecBackfillRounds >= 5) { _vecBackfillBusy = false; return; }
+  _vecBackfillRounds++;
+  window.AIClient.call('/api/ai/backfill-vectors?limit=20', {}, { timeout: 45000 })
+    .then(function (r) {
+      const d = (r && r.ok) ? r.data : null;
+      if (!d || !d.done) { _vecBackfillBusy = false; return; }
+      _vecCache.clear();                                   // 向量已更新，丢弃旧缓存
+      if (d.remaining > 0) setTimeout(nextBackfillRound, 45000);
+      else _vecBackfillBusy = false;
+    })
+    .catch(function () { _vecBackfillBusy = false; });
+}
+
 // ---- 搜索历史（本地，最多 8 条）----
 const SEARCH_HIST_KEY = 'hust_search_hist';
 function getSearchHistory() {
@@ -4723,7 +4859,7 @@ function renderSearchSuggest(kw, which) {
   box.innerHTML = html;
   box.style.display = 'block';
 }
-function onSearchInput(kw, which) { renderSearchSuggest(kw, which); }
+function onSearchInput(kw, which) { renderSearchSuggest(kw, which); scheduleQueryVec(kw); }
 function onSearchFocus(el, which) { renderSearchSuggest((el && el.value) || '', which); }
 function onSearchBlur() { setTimeout(hideSearchSuggest, 180); }
 function hideSearchSuggest() {
@@ -4758,13 +4894,18 @@ function forumSearchInput(v) {
 function searchEnterFeedback(input) {
   const kw = (input.value || '').trim();
   if (!kw) { toast('🔍 请输入关键词', 'info'); input.blur(); return; }
+  ensureQueryVec(kw);                       // v1.55.0：回车即预取语义向量（不等输入防抖那 500ms）
   const orders = _cachedOrders || [];
-  const n = orders.filter(function (o) { return scorePost(o, kw) > 0; }).length;
+  const sem = !!_queryVec;
+  const n = orders.filter(function (o) { return scorePost(o, kw) > 0 || (sem && semanticHit(o)); }).length;
   const isSyn = !!_searchSynIdx[normQuery(kw)];
   pushSearchHistory(kw);
   hideSearchSuggest();
-  toast('🔍 关键词「' + kw + '」匹配 ' + n + ' 条'
-    + (n && isSyn ? '（已含同义词扩展）' : (n ? '' : '，可换个词试试')), n ? 'success' : 'info');
+  let tip = '';
+  if (n && isSyn) tip += '（已含同义词扩展）';
+  if (sem) tip += '（含语义匹配）';
+  toast('🔍 关键词「' + kw + '」匹配 ' + n + ' 条' + tip
+    + (!n ? '，可换个词试试' : ''), n ? 'success' : 'info');
   input.blur();
   resetTaskPageAndApply();
 }
@@ -4773,16 +4914,19 @@ function applySearchAndSort() {
   if (!_cachedOrders) return;
   let orders = [..._cachedOrders];
 
-  // 搜索过滤（v1.54.0：改用语义打分 —— 同义词扩展 + 拼音首字母 + 多字段加权）
+  // 搜索过滤（v1.54.0 关键词+同义词+拼音打分；v1.55.0 叠加向量语义召回）
   const keyword = (document.getElementById('taskSearchInput')?.value || '').trim();
   const dormFilter = (document.getElementById('taskDormFilter')?.value || '').trim();
 
   let scoreMap = null;
   if (keyword) {
     scoreMap = new Map();
+    const semOn = !!_queryVec;
     orders = orders.filter(o => {
       const s = scorePost(o, keyword);
       if (s > 0) { scoreMap.set(o, s); return true; }
+      // 关键词零命中时给语义兜底一次机会：搜「想找人倾诉」也能召回只写了「有偿倾听」的帖
+      if (semOn && semanticHit(o)) { scoreMap.set(o, 0); return true; }
       return false;
     });
   }
@@ -4821,9 +4965,12 @@ function applySearchAndSort() {
         return new Date(b.created_at) - new Date(a.created_at); // 层内按时间倒序
       });
       break;
-    default: // newest = 「综合」：有搜索词时按相关度排序，否则按时间
+    default: // newest = 「综合」：有关键词时按「关键词分 + 语义分」排序，否则按时间
       if (keyword && scoreMap) {
-        orders.sort((a, b) => (scoreMap.get(b) || 0) - (scoreMap.get(a) || 0)
+        // 先算一遍总分再排（避免比较器内重复做余弦运算，O(N) 而非 O(N log N) 次）
+        const fs = new Map();
+        orders.forEach(function (o) { fs.set(o, (scoreMap.get(o) || 0) + semanticScore(o)); });
+        orders.sort((a, b) => (fs.get(b) || 0) - (fs.get(a) || 0)
           || (new Date(b.created_at) - new Date(a.created_at)));
       } else {
         orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -9032,6 +9179,8 @@ async function handlePublish(e) {
     const prefix = type === 'qa' ? '[问答] ' : (type === 'borrow' ? '[借物] ' : '[订单] ');
     const created = await ghCreateIssue(prefix + title, JSON.stringify(order), [label, type, cat]);
     toast('发布成功！', 'success');
+    // v1.55.0：异步给新帖算向量并写回（不阻塞发布；失败也无妨，后台补齐会兜底）
+    try { enqueuePostVector(created, order); } catch (e) {}
     try { localStorage.setItem('hust_last_publish', String(Date.now())); } catch(e) {}
     try { localStorage.setItem('hust_safety_tip_seen', '1'); } catch(e) {}
     clearPublishDraft();
@@ -11058,6 +11207,7 @@ if ('serviceWorker' in navigator) {
     <button class="ai-quick-hub" onclick="aiHubPrompt('lost')">🎒 找失物</button>
     <button class="ai-quick-hub" onclick="aiHubPrompt('secondhand')">🛒 搜二手</button>
     <button class="ai-quick-hub" onclick="aiHubPrompt('qa')">🤖 解难题</button>
+    <button class="ai-quick-hub" onclick="aiHubPrompt('semfind')">🔍 帮我找找</button>
   </div>
   <div class="ai-panel-body" id="aiBody" data-page-node-id="LOJjNFvcU1EAoLlbTdhWl1"></div>
   <div class="ai-quota" id="aiQuota" data-page-node-id="JnvABGVXKbyeGTYF2yMYSb"></div>
@@ -11461,6 +11611,8 @@ if ('serviceWorker' in navigator) {
     if(/(想|要|求)?(收|求购|买)(个|一|台|本|件|辆)|出售|出个|出一|卖个|闲置|(想|要)?(租|出租|求租)/.test(t)) return 'secondhand';
     if(/这题|这道题|怎么做|不会做|求思路|解题|帮我算|证明题|第\s*\d+\s*题|作业题|高数|线代|微积分|概率论/.test(t)) return 'qa';
     if(/帮我(发|写|发个|发一)|发个(单|需求)|发布|代取|代拿|帮带|带个饭|帮买|帮送|打印|维修|跑腿/.test(t)) return 'publish';
+    // v1.55.0 兜底：「想找点什么」的句子走语义检索（放最后，不抢上面几种明确意图）
+    if(/找找|搜搜|搜一下|找一下|有没有人|有没有|谁有|求推荐|类似的|想找/.test(t)) return 'semfind';
     return null;
   }
   // 只有"像行动请求"的句子才值得花一次 AI 调用去识别意图（省额度）
@@ -11485,6 +11637,7 @@ if ('serviceWorker' in navigator) {
       if(intent === 'lost') return await aiHubLost(text, typingEl);
       if(intent === 'secondhand') return await aiHubSecondhand(text, typingEl);
       if(intent === 'qa') return await aiHubQa(text, typingEl);
+      if(intent === 'semfind') return await aiHubSemanticFind(text, typingEl);
     }catch(e){ return false; }
     return false;
   }
@@ -11633,12 +11786,84 @@ if ('serviceWorker' in navigator) {
     return true;
   }
 
+  // E. 语义检索：纯向量召回全站帖子（v1.55.0）
+  // 与搜索框的区别：搜索框是「关键词打分为主、语义兜底」，这里是「纯按意思找」，
+  // 所以哪怕一个字都不重合也能命中（搜「想找人倾诉」能召回「有偿倾听」）。
+  async function aiHubSemanticFind(text, typingEl){
+    const q = String(text || '').trim();
+    if(!q){ aiHubRemoveTyping(typingEl); addAiMsg('bot','想找什么？说一句话就行，比如「有没有人帮带饭」「谁在出二手自行车」。'); return true; }
+    const emb = await AIClient.call('/api/ai/embed', { texts:[q.slice(0,200)] }, { timeout:15000 });
+    aiHubRemoveTyping(typingEl);
+    if(!emb.ok || !emb.data || !Array.isArray(emb.data.vectors) || !emb.data.vectors[0]){
+      addAiMsg('bot','语义检索暂时不可用（可能是 AI 额度或网络问题）。你可以用顶部的搜索框按关键词找找，效果也不错。');
+      return true;
+    }
+    const qv = decodeVec(emb.data.vectors[0]);
+    if(!qv){ addAiMsg('bot','向量解析失败，请稍后再试。'); return true; }
+    let pool = [];
+    try{ pool = (await ghIssues('order')) || []; }catch(e){ pool = []; }
+    let anyVec = false;
+    const cands = [];
+    for(let i=0;i<pool.length;i++){
+      let o = null; try{ o = JSON.parse(pool[i].body || '{}'); }catch(e){ continue; }
+      if(!o || o.type === 'chat') continue;
+      if(o._v) anyVec = true;
+      if(o.status !== 'open') continue;
+      const pv = postVec(o);
+      if(!pv) continue;
+      const c = cosVec(qv, pv);
+      if(c < SEM_KEEP) continue;
+      o._issue_number = pool[i].number;
+      cands.push({ o:o, c:c });
+    }
+    cands.sort(function(a,b){ return b.c - a.c; });
+    const top = cands.slice(0,6);
+    window._aiLastSemQuery = q;
+    const body = document.getElementById('aiBody');
+    const card = document.createElement('div'); card.className = 'ai-hub-card';
+    let html = '<div class="ai-hub-card-h">🔍 按意思找到 ' + top.length + ' 条相关帖子</div>';
+    if(!top.length){
+      html += '<div class="ai-hub-card-d">' + (anyVec
+        ? '没有找到意思相近的帖子，换个说法再试试？'
+        : '语义索引还在后台建立中（首次使用需给历史帖子补向量），过一会儿再试，或先用顶部搜索框找找～') + '</div>';
+    } else {
+      const tmap = { task:'跑腿', errand:'跑腿', skill:'技能', secondhand:'闲置', borrow:'借物', qa:'问答', academic:'学业', find:'找人' };
+      html += '<div class="ai-hub-list">';
+      top.forEach(function(it){
+        const o = it.o;
+        const meta = (tmap[o.type] || o.type || '') + (o.price ? (' · ¥' + o.price) : '');
+        html += '<button type="button" class="ai-hub-item" onclick="aiHubOpenOrder(' + (o._issue_number || 0) + ')">'
+          + '<span class="ai-hub-item-t">' + esc(o.title || ('帖子 #' + o._issue_number)) + '</span>'
+          + '<span class="ai-hub-item-s">' + esc(meta) + ' · ' + Math.round(it.c * 100) + '%</span></button>';
+      });
+      html += '</div>'
+        + '<div class="ai-hub-card-actions"><button type="button" class="ai-action-btn" onclick="aiHubApplySearch()">📋 回到列表继续筛</button></div>';
+    }
+    card.innerHTML = html;
+    if(body){ body.appendChild(card); body.scrollTop = body.scrollHeight; }
+    aiHubPushHistory('assistant', '按意思为你找到 ' + top.length + ' 条相关帖子');
+    return true;
+  }
+  // 把「帮我找找」的这句话带回列表搜索框（复用同一套语义排序）
+  function aiHubApplySearch(){
+    const q = window._aiLastSemQuery; if(!q) return;
+    try{ toggleAiChat(false); }catch(e){}
+    try{ navigate('task'); }catch(e){}
+    const inp = document.getElementById('taskSearchInput');
+    if(inp) inp.value = q;
+    ensureQueryVec(q);
+    setTimeout(function(){ try{ resetTaskPageAndApply(); }catch(e){} }, 60);
+    if(window.toast) toast('已在列表中按「' + q + '」筛选', 'success');
+  }
+  window.aiHubApplySearch = aiHubApplySearch;
+
   // 中枢快捷指令：点一下进入对应流程（设定待处理意图 + 输入提示）
   const AI_HUB_PROMPTS = {
     publish: '说说你想发布什么需求（例如"帮我在菜鸟驿站拿个快递到韵苑"），我帮你写好～',
     lost: '描述一下丢了什么、在哪丢的（例如"昨天在图书馆丢了一张校园卡"），我帮你找找～',
     secondhand: '说说想买或想卖什么（例如"想收一个二手台灯"），我帮你找相似闲置～',
-    qa: '把题目发给我，我给你解题思路～'
+    qa: '把题目发给我，我给你解题思路～',
+    semfind: '说一句话就行（例如"想找人帮我带饭""有没有人出二手自行车"），我按意思帮你从全站找～'
   };
   function aiHubPrompt(kind){
     window._aiPendingIntent = kind;
