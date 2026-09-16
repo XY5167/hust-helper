@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.57.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.58.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -1296,6 +1296,23 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 .my-fav-entry-main{display:flex;flex-direction:column;flex:1;min-width:0}
 .my-fav-entry-title{font-size:.95rem;font-weight:600;color:var(--text-primary)}
 .my-fav-entry-sub{font-size:.75rem;color:var(--text-muted);margin-top:2px}
+/* ===== v1.58.0 消息中心 / 社会证明 / 账单 ===== */
+.msg-sec-title{font-size:.8rem;font-weight:600;color:var(--text-secondary);margin:14px 0 8px}
+.msg-sec-title:first-child{margin-top:0}
+.bottom-nav-item{position:relative}
+.nav-msg-badge{position:absolute;top:5px;left:50%;margin-left:6px;min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:#dc2626;color:#fff;font-size:.6rem;line-height:15px;text-align:center}
+.proof-strip{display:flex;gap:8px;margin-top:10px}
+.proof-cell{flex:1;text-align:center;padding:10px 6px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px}
+.proof-num{font-size:1.05rem;font-weight:700;color:var(--text-primary)}
+.proof-lab{font-size:.68rem;color:var(--text-secondary);margin-top:2px}
+.proof-recent{margin-top:8px;font-size:.74rem;color:var(--text-secondary);line-height:1.6}
+.bill-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;margin-bottom:7px}
+.bill-row-main{flex:1;min-width:0}
+.bill-row-title{font-size:.88rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bill-row-sub{font-size:.72rem;color:var(--text-muted);margin-top:2px}
+.bill-amt{font-size:.9rem;font-weight:600;white-space:nowrap}
+.bill-total{margin-top:10px;padding:12px;background:var(--bg);border-radius:10px;font-size:.82rem;line-height:1.8}
+
 </style>
 </head>
 <body data-page-node-id="bfreJjpoF6FdvAS5rpVNIW">
@@ -1314,6 +1331,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <a href="#" class="nav-link active" data-page="home" onclick="navigate('home')" data-page-node-id="QvZVQHkXGthlMOcmEhMasS">广场</a>
       <a href="#" class="nav-link" data-page="ershou" onclick="navigate('ershou')" data-page-node-id="UQzXDauhL4DZD6PFPmD9zf">二手</a>
       <a href="#" class="nav-link" data-page="help" onclick="navigate('help')" data-page-node-id="3UuSqhBBfIHNACdHTeR4mo">互助</a>
+      <a href="#" class="nav-link" data-page="msg" onclick="openMsgCenter();return false">消息</a>
       <a href="#" class="nav-link" data-page="my" onclick="navigate('my')" data-page-node-id="Nri0xRhFjCQFWyKDSFFgs3">我的</a>
     </nav>
     <div class="header-actions" id="headerActions" data-page-node-id="nFc6QgEmejHahCJpHyIlFG">
@@ -1335,6 +1353,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
   <a href="#" class="bottom-nav-item active" data-page="home" onclick="navigate('home');return false" data-page-node-id="m2IXoPudvHIkxU7xJqbylM"><span class="bi" data-page-node-id="T7epEjkkrOqpha9AUzXNvb">🧭</span><span data-page-node-id="TIVx1n0dxI3PLFhmhRjKs3">广场</span></a>
   <a href="#" class="bottom-nav-item" data-page="ershou" onclick="navigate('ershou');return false" data-page-node-id="62XgmfuoUAG7w3x0IqeMEF"><span class="bi" data-page-node-id="IvcV9NDv0ePtdhDTSSgLxz">🛒</span><span data-page-node-id="qU5zpq0yIupRuzds37lnCG">二手</span></a>
   <a href="#" class="bottom-nav-item" data-page="help" onclick="navigate('help');return false" data-page-node-id="gStSSqcGxSoFl3b82qvb2L"><span class="bi" data-page-node-id="F6OahDH2OVtBTRAAcHF11c">🤝</span><span data-page-node-id="dvPxQctMLgI1j5b39TGEtI">互助</span></a>
+  <a href="#" class="bottom-nav-item" data-page="msg" onclick="openMsgCenter();return false" id="navMsgItem"><span class="bi">💬</span><span>消息</span><span id="navMsgBadge" class="nav-msg-badge" style="display:none"></span></a>
   <a href="#" class="bottom-nav-item" data-page="my" onclick="navigate('my');return false" data-page-node-id="6jBsjdRGI8qDHxLimY4G5n"><span class="bi" data-page-node-id="6NwUSY4Up4Mv0chuNfeQSl">👤</span><span data-page-node-id="9Ai8JOwCaqglnvsecqEgEC">我的</span></a>
 </nav>
 
@@ -1370,6 +1389,12 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <div class="forum-search" id="forumSearchBox" onclick="document.getElementById('homeSearchInput').focus()">
         <span class="forum-search-ico" aria-hidden="true">🔍</span>
         <input type="text" id="homeSearchInput" class="forum-search-input" placeholder="搜索求助 / 二手 / 失物 / 跑腿…" aria-label="站内搜索" onkeydown="if(event.key==='Enter'){event.preventDefault();homeSearchSubmit();}">
+      </div>
+
+      <!-- v1.58.0 社会证明：用真实数据消除陌生人第一屏的"空站感" -->
+      <div id="homeProof" style="display:none">
+        <div class="proof-strip" id="homeProofStrip"></div>
+        <div class="proof-recent" id="homeProofRecent" style="display:none"></div>
       </div>
 
       <!-- v1.50.0 Hero 大图区：暗色蒙层压校园图 + 超大汉字水印，点击跳转对应分区 -->
@@ -2100,6 +2125,10 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     <div id="statsDetail" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px" data-page-node-id="9JceuEicgAZVoYhCFECPnd">
       <p class="form-hint" data-page-node-id="FR64S8SSJjHKqvkRdu2MXG">加载中…</p>
     </div>
+    <!-- v1.58.0 行为与漏斗：陌生人来没来、来了干什么、搜了什么 -->
+    <div id="statsBehavior" style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-top:16px">
+      <p class="form-hint">行为数据加载中…</p>
+    </div>
   </div>
 </section>
 
@@ -2193,6 +2222,31 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       </span>
       <span class="my-arrow">›</span>
     </div>
+    <!-- v1.58.0 消息 / 新单提醒 / 我的账单 -->
+    <div class="my-fav-entry" onclick="openMsgCenter()" role="button" tabindex="0">
+      <span class="my-fav-entry-ic">💬</span>
+      <span class="my-fav-entry-main">
+        <span class="my-fav-entry-title">消息</span>
+        <span class="my-fav-entry-sub" id="myMsgCount">未读提醒和进行中的对话</span>
+      </span>
+      <span class="my-arrow">›</span>
+    </div>
+    <div class="my-fav-entry" onclick="openSubModal()" role="button" tabindex="0">
+      <span class="my-fav-entry-ic">🔔</span>
+      <span class="my-fav-entry-main">
+        <span class="my-fav-entry-title">新单提醒</span>
+        <span class="my-fav-entry-sub" id="mySubCount">未开启，点这里订阅你关心的分类</span>
+      </span>
+      <span class="my-arrow">›</span>
+    </div>
+    <div class="my-fav-entry" onclick="openMyBill()" role="button" tabindex="0">
+      <span class="my-fav-entry-ic">🧾</span>
+      <span class="my-fav-entry-main">
+        <span class="my-fav-entry-title">我的账单</span>
+        <span class="my-fav-entry-sub">订单记录与金额汇总，可导出 CSV</span>
+      </span>
+      <span class="my-arrow">›</span>
+    </div>
     <div id="inviteCard" class="my-invite" data-page-node-id="nTf7FFRzVFqBgaVdkvAWpK">
       <div class="my-invite-left" data-page-node-id="xSzzIt72L8eggGQBMwTZXc">
         <div class="my-invite-title" data-page-node-id="oHYBJAwcwb95oCI5iOsYh0">📢 邀请同学</div>
@@ -2276,6 +2330,45 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     <div style="margin-top:14px;text-align:right">
       <button class="btn btn-outline btn-sm" onclick="clearAllFavs()">清空收藏</button>
     </div>
+  </div>
+</div>
+
+<!-- 消息中心（v1.58.0）：未读提醒 + 进行中的对话，私信不再混在订单里 -->
+<div class="modal-overlay" id="msgCenterModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeMsgCenter()">&times;</button>
+    <h3 style="margin-bottom:6px">💬 消息</h3>
+    <p class="form-hint" style="margin-bottom:14px">未读提醒和进行中的对话都在这里，点任意一条直接进入。</p>
+    <div id="msgCenterBody"><p style="color:var(--text-secondary)">加载中…</p></div>
+  </div>
+</div>
+
+<!-- 我的账单（v1.58.0）：让成交与费用口径看得见，可导出 CSV -->
+<div class="modal-overlay" id="myBillModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeMyBill()">&times;</button>
+    <h3 style="margin-bottom:6px">🧾 我的账单</h3>
+    <p class="form-hint" style="margin-bottom:14px">按下单时间列出我参与过的订单，金额为双方线下结算的约定价，平台不代收。</p>
+    <div id="myBillBody"><p style="color:var(--text-secondary)">加载中…</p></div>
+  </div>
+</div>
+
+<!-- 新单提醒订阅（v1.58.0）：不依赖跑腿认证，任何登录用户都能订阅 -->
+<div class="modal-overlay" id="subModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeSubModal()">&times;</button>
+    <h3 style="margin-bottom:6px">🔔 新单提醒</h3>
+    <p class="form-hint" style="margin-bottom:14px">订阅你关心的分类，有新帖时在「消息」里提醒你。设置只存在本机，不上传。</p>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:.86rem;cursor:pointer">
+      <input type="checkbox" id="subOn"> 开启新单提醒
+    </label>
+    <div style="font-size:.82rem;font-weight:600;margin-bottom:8px">关心哪些分类（不选＝全部分类）</div>
+    <div id="subCats" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px"></div>
+    <div style="font-size:.82rem;font-weight:600;margin-bottom:8px">只看这些地点（可留空）</div>
+    <input type="text" id="subArea" class="form-control" placeholder="如：紫菘、韵苑、东小门" maxlength="20" style="margin-bottom:16px">
+    <div style="font-size:.82rem;font-weight:600;margin-bottom:8px">最低金额（元，可留空）</div>
+    <input type="number" id="subMinPrice" class="form-control" placeholder="如：3" min="0" step="0.5" style="margin-bottom:18px">
+    <button class="btn btn-primary btn-block" onclick="saveSubPrefsFromUI()">保存设置</button>
   </div>
 </div>
 
@@ -2779,7 +2872,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.57.0';
+const APP_VERSION = '1.58.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2907,6 +3000,12 @@ function cacheGetStale(key) {
   restoreHomeSections();
   loadHomeLiveData();
   loadHomeLeaderboard();
+  try { loadHomeProof(); } catch (e) {}
+  // v1.58.0：埋点与深链要在整个脚本解析完再跑（trackEvt/parseDeepLink 用到后面声明的常量）
+  setTimeout(function () {
+    try { trackEvt('app_open'); } catch (e) {}
+    try { parseDeepLink(); } catch (e) {}
+  }, 0);
 })();
 
 // ============ GITHUB API ============
@@ -3299,11 +3398,11 @@ function navigate(page) {
   // 列表引擎（发布/接单后刷新等）依赖 S.page==='task'，故复用 task 作为底层页标识
   if (page === 'ershou') { S.page = 'task'; applyListingMode('ershou'); }
   else if (page === 'help') { S.page = 'task'; applyListingMode('help'); }
-  else if (page === 'home') { loadStats(); restoreHomeSections(); loadHomeLiveData(); loadHomeLeaderboard(); loadForumStats(); loadForumFeed(); startForumBanner(); maybeShowHomeOnboarding(); }
+  else if (page === 'home') { loadStats(); restoreHomeSections(); loadHomeLiveData(); loadHomeLeaderboard(); loadForumStats(); loadForumFeed(); startForumBanner(); maybeShowHomeOnboarding(); loadHomeProof(); }
   else if (page === 'forum') { loadForumList(); }
   else if (page === 'forum-detail') { loadForumDetail(S._forumDetailNum); }
   else if (page === 'my') loadMyOrders();
-  else if (page === 'stats') loadStatsPage();
+  else if (page === 'stats') { loadStatsPage(); loadStatsBehavior(); }
   else if (page === 'safety') loadTrustWall();
 }
 
@@ -3555,8 +3654,9 @@ async function loadForumDetail(num) {
       + '<div class="forum-detail-content">' + esc(p.content).replace(/\n/g, '<br>') + '</div>'
       + imgs
       + renderAiLostMatches(p)
-      + '<div class="forum-card-foot"><span class="forum-like-btn" onclick="toggleForumLike(' + num + ')">❤️ <span id="forumLikeNum">' + (p.upvotes || 0) + '</span></span><span>💬 ' + (p.comment_count || p._comments || 0) + '</span><span>👁️ ' + (p.views || 0) + '</span><span class="forum-report-btn" onclick="reportForumPost(' + num + ')">⚠️ 举报</span></div>'
+      + '<div class="forum-card-foot"><span class="forum-like-btn" onclick="toggleForumLike(' + num + ')">❤️ <span id="forumLikeNum">' + (p.upvotes || 0) + '</span></span><span>💬 ' + (p.comment_count || p._comments || 0) + '</span><span>👁️ ' + (p.views || 0) + '</span><span class="forum-report-btn" onclick="sharePost(' + num + ',\'' + escAttr(p.title || '') + '\')">🔗 分享</span><span class="forum-report-btn" onclick="reportForumPost(' + num + ')">⚠️ 举报</span></div>'
       + '</div>';
+    try { trackEvt('open_forum', { p: num }); } catch (e) {}
     await renderForumComments(num);
     const cf = document.getElementById('forumDetailCommentForm');
     if (cf) cf.style.display = S.user ? 'flex' : 'none';
@@ -4513,6 +4613,12 @@ function priceText(o) {
     : ((o && o.type === 'secondhand') ? '价格面议' : '免费互助');
   return '<span style="color:var(--text-muted);font-size:.85rem">' + label + '</span>';
 }
+// v1.58.0：纯文本版价格（通知文案、CSV 等不能放 HTML 的地方用这个）
+function priceLabel(o) {
+  const n = (o && o.price != null) ? Number(o.price) : 0;
+  if (n > 0) return '¥' + n.toFixed(2);
+  return (o && o.type === 'borrow') ? '免费借' : ((o && o.type === 'secondhand') ? '价格面议' : '免费互助');
+}
 
 // ============ v1.57.0 收藏（先本地落地：hust_favs = { issueNumber: {t,ty,ti} }）============
 const FAV_KEY = 'hust_favs';
@@ -4562,6 +4668,491 @@ function favToggleDetail(num, el, title, type) {
   toast(on ? '已收藏，可在「我的 → 我的收藏」查看' : '已取消收藏', on ? 'success' : 'info');
   syncFavCount();
 }
+// ============================================================
+// v1.58.0 公共内核：匿名埋点 / 帖级分享深链 / 搜索 A-B 开关
+// 设计原则：
+//   ① 埋点不采集学号等身份信息，只用本地随机访客 id（aid）区分设备 → 隐私安全
+//   ② 埋点任何环节失败都静默，绝不影响主流程（写入、分享、浏览）
+//   ③ A-B 开关走 URL 参数，测试者可随时切换、可复现；模式随每条搜索埋点一起记录
+// ============================================================
+
+// ---- ① 匿名埋点 ----
+var EVT_MAX = 300;                 // 本地环形缓冲上限
+var EVT_KEY = 'hust_evt';
+var AID_KEY = 'hust_aid';
+function anonId() {
+  try {
+    let a = localStorage.getItem(AID_KEY);
+    if (!a) {
+      a = 'a' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+      localStorage.setItem(AID_KEY, a);
+    }
+    return a;
+  } catch (e) { return 'anon'; }
+}
+function evtLoad() {
+  try { return JSON.parse(localStorage.getItem(EVT_KEY) || '[]') || []; } catch (e) { return []; }
+}
+function evtSave(a) {
+  try { localStorage.setItem(EVT_KEY, JSON.stringify(a.slice(-EVT_MAX))); } catch (e) {}
+}
+let _evtQueue = [];
+// 记录一个事件：先落本地（离线也有数据），攒够 10 条批量上报
+function trackEvt(name, meta) {
+  if (!name) return;
+  const row = { e: name, t: Date.now(), m: meta || null };
+  try { const a = evtLoad(); a.push(row); evtSave(a); } catch (e) {}
+  _evtQueue.push(row);
+  if (_evtQueue.length >= 10) flushEvt();
+}
+async function flushEvt() {
+  if (!_evtQueue.length) return;
+  const batch = _evtQueue.splice(0, 50);
+  try {
+    await fetch(PROXY_BASE + '/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ aid: anonId(), v: APP_VERSION, evts: batch })
+    });
+  } catch (e) {
+    // 上报失败退回队列（上限 100，避免内存膨胀），下次再试
+    _evtQueue = batch.concat(_evtQueue).slice(-100);
+  }
+}
+// 本地漏斗统计（无网络也能在看板里看到本机数据）
+function evtSummary() {
+  const c = {};
+  evtLoad().forEach(function (r) { c[r.e] = (c[r.e] || 0) + 1; });
+  return c;
+}
+window.addEventListener('pagehide', function () { try { flushEvt(); } catch (e) {} });
+
+// ---- ② 帖级分享 + 深链落地 ----
+// 本站没有 URL 路由（navigate 只切 DOM），所以分享链走 ?p=issue号，启动时由 parseDeepLink 落地
+function postShareUrl(num) {
+  return location.origin + location.pathname + '?p=' + encodeURIComponent(num);
+}
+function sharePost(num, title) {
+  const url = postShareUrl(num);
+  const text = (title ? '「' + title + '」\n' : '') + '华科校园互助 · ' + url;
+  trackEvt('share', { p: num });
+  if (navigator.share) {
+    navigator.share({ title: title || '华科校园互助', text: text, url: url })
+      .catch(function () { copyText(url, '链接已复制，发到班级群里吧'); });
+  } else {
+    copyText(url, '链接已复制，发到班级群里吧');
+  }
+}
+// 启动时解析 ?p=N 与 ?sem=0|1
+async function parseDeepLink() {
+  let p = '';
+  try {
+    const sp = new URLSearchParams(location.search);
+    p = sp.get('p') || '';
+    const sm = sp.get('sem');
+    if (sm === '0' || sm === '1') { try { localStorage.setItem('hust_sem_mode', sm); } catch (e) {} }
+  } catch (e) {}
+  const num = parseInt(p, 10);
+  if (!num || isNaN(num)) return;
+  trackEvt('deeplink_open', { p: num });
+  for (let i = 0; i < 6; i++) {
+    try {
+      const res = await ghApi('/api/issue/' + num, 'GET', null, { retries: 1, timeout: 10000 });
+      if (res && res.ok) {
+        const issue = await res.json();
+        const o = JSON.parse(issue.body);
+        if (o && o.type === 'forum') { openForumDetail(num); return; }
+        showDetail(num);
+        return;
+      }
+    } catch (e) {}
+    await new Promise(function (r) { setTimeout(r, 600); });
+  }
+  if (window.toast) toast('分享的帖子暂时打不开，请稍后重试', 'error');
+}
+
+// ---- ③ 搜索 A-B 开关（?sem=0 旧关键词排序 / ?sem=1 新语义排序，默认 1）----
+function semMode() {
+  try {
+    const v = localStorage.getItem('hust_sem_mode');
+    if (v === '0' || v === '1') return v;
+  } catch (e) {}
+  return '1';
+}
+
+// ============================================================
+// v1.58.0 ⑤ 消息中心：把私信从「我的订单」里解放出来
+//   背景：私信此前被 createChatOrder 伪装成 type:'chat' 的订单，塞进我的订单列表，
+//   导致没会话列表、历史聊天混在订单里、底栏也没有正经入口。
+// ============================================================
+function updateMsgBadge() {
+  let n = 0;
+  try { n = (_notifications || []).filter(function (x) { return !x.read; }).length; } catch (e) { n = 0; }
+  const b = document.getElementById('navMsgBadge');
+  if (b) {
+    if (n > 0) { b.textContent = n > 99 ? '99+' : String(n); b.style.display = 'block'; }
+    else { b.style.display = 'none'; }
+  }
+  const mc = document.getElementById('myMsgCount');
+  if (mc) mc.textContent = n > 0 ? (n + ' 条未读提醒 · 进行中的对话也在里面') : '未读提醒和进行中的对话';
+}
+function openMsgCenter() {
+  if (!S.user) { showAuthModal(); return; }
+  const m = document.getElementById('msgCenterModal');
+  if (!m) return;
+  m.classList.add('active');
+  try { trackEvt('open_msg_center'); } catch (e) {}
+  renderMsgCenter();
+}
+function closeMsgCenter() {
+  const m = document.getElementById('msgCenterModal');
+  if (m) m.classList.remove('active');
+}
+async function renderMsgCenter() {
+  const el = document.getElementById('msgCenterBody');
+  if (!el) return;
+  if (!S.user) { el.innerHTML = '<p style="color:var(--text-secondary)">请先登录</p>'; return; }
+  el.innerHTML = '<p style="color:var(--text-secondary)">加载中…</p>';
+  const uid = S.user._issue_number || S.user.student_id;
+  const sid = S.user.student_id;
+  let issues = [];
+  try { issues = await ghIssues('order'); } catch (e) { issues = []; }
+  const all = (issues || []).map(function (i) {
+    try {
+      const o = JSON.parse(i.body);
+      o._issue_number = i.number;
+      o._comments_n = i.comments || 0;
+      o._updated = i.updated_at || i.created_at;
+      return o;
+    } catch (e) { return null; }
+  }).filter(Boolean);
+  const mine = all.filter(function (o) {
+    return o.publisher_id == uid || o.taker_id == uid || o.publisher_student_id == sid || o.taker_student_id == sid;
+  });
+  // 会话排前面，其次按最后活动时间
+  mine.sort(function (a, b) {
+    const ca = (a.type === 'chat' ? 1 : 0), cb = (b.type === 'chat' ? 1 : 0);
+    if (ca !== cb) return cb - ca;
+    return new Date(b._updated || 0) - new Date(a._updated || 0);
+  });
+  const unread = (_notifications || []).filter(function (n) { return !n.read; });
+  let html = '';
+  if (unread.length) {
+    html += '<div class="msg-sec-title">未读提醒 · ' + unread.length + '</div>';
+    html += unread.slice(0, 8).map(function (n) {
+      const idx = _notifications.indexOf(n);
+      return '<div class="fav-row" onclick="closeMsgCenter();openNotifyLink(' + idx + ')">'
+        + '<div class="fav-row-main"><div class="fav-row-title">' + (n.icon || '🔔') + ' ' + esc(n.title || '') + '</div>'
+        + '<div class="fav-row-sub">' + esc(n.body || '') + ' · ' + timeAgo(n.time) + '</div></div></div>';
+    }).join('');
+  }
+  html += '<div class="msg-sec-title">进行中的对话 · ' + mine.length + '</div>';
+  if (!mine.length) {
+    html += '<p class="form-hint">还没有对话。在跑腿/二手帖子详情页点「💬 询问发布者」就能开始。</p>';
+  } else {
+    html += mine.slice(0, 20).map(function (o) {
+      const isChat = o.type === 'chat';
+      const isPub = (o.publisher_id == uid || o.publisher_student_id == sid);
+      const stMap = { open: '待接单', taken: '已接单', awaiting_confirm: '待确认', completed: '已完成', cancelled: '已取消', expired: '已过期' };
+      const st = stMap[o.status] || o.status || '';
+      const title = isChat ? ('私信对话 · ' + (isPub ? '与接单者' : '与发布者')) : (o.title || '无标题');
+      const cm = (o._comments_n > 0) ? ('💬 ' + o._comments_n + ' 条消息 · ') : '';
+      return '<div class="fav-row" onclick="closeMsgCenter();showDetail(' + o._issue_number + ')">'
+        + '<div class="fav-row-main"><div class="fav-row-title">' + (isChat ? '💬 ' : '📋 ') + esc(title) + '</div>'
+        + '<div class="fav-row-sub">' + cm + esc(st) + ' · ' + timeAgo(o._updated || o.created_at) + '</div></div></div>';
+    }).join('');
+  }
+  el.innerHTML = html;
+  updateMsgBadge();
+}
+
+// ============================================================
+// v1.58.0 ⑨ 我的账单：把成交与费用口径摆明（平台不代收、不抽成），可导出 CSV
+//   这一页同时回应评审必问的"10% 中介费收入是多少"——答案是 0，且口径写清楚
+// ============================================================
+let _billRows = [];
+function openMyBill() {
+  if (!S.user) { showAuthModal(); return; }
+  const m = document.getElementById('myBillModal');
+  if (!m) return;
+  m.classList.add('active');
+  try { trackEvt('open_bill'); } catch (e) {}
+  renderMyBill();
+}
+function closeMyBill() {
+  const m = document.getElementById('myBillModal');
+  if (m) m.classList.remove('active');
+}
+async function renderMyBill() {
+  const el = document.getElementById('myBillBody');
+  if (!el) return;
+  if (!S.user) { el.innerHTML = '<p style="color:var(--text-secondary)">请先登录</p>'; return; }
+  el.innerHTML = '<p style="color:var(--text-secondary)">加载中…</p>';
+  const uid = S.user._issue_number || S.user.student_id;
+  const sid = S.user.student_id;
+  let issues = [];
+  try { issues = await ghIssues('order'); } catch (e) { issues = []; }
+  const rows = (issues || []).map(function (i) {
+    try {
+      const o = JSON.parse(i.body);
+      o._issue_number = i.number;
+      return o;
+    } catch (e) { return null; }
+  }).filter(function (o) {
+    return o && o.type !== 'chat' && (o.publisher_id == uid || o.taker_id == uid || o.publisher_student_id == sid || o.taker_student_id == sid);
+  });
+  rows.sort(function (a, b) { return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
+  _billRows = rows;
+  if (!rows.length) { el.innerHTML = '<p class="form-hint">还没有订单记录。</p>'; return; }
+
+  const listHtml = rows.slice(0, 40).map(function (o) {
+    const isPub = (o.publisher_id == uid || o.publisher_student_id == sid);
+    const stMap = { open: '待接单', taken: '已接单', awaiting_confirm: '待确认', completed: '已完成', cancelled: '已取消', expired: '已过期' };
+    // 注意：不能用 priceText()——它返回的是带样式的 HTML 片段，放进需要 esc 的文本位会漏出标签源码
+    const amt = (Number(o.price) > 0)
+      ? ('¥' + Number(o.price).toFixed(2))
+      : (o.type === 'borrow' ? '免费借' : (o.type === 'secondhand' ? '价格面议' : '免费互助'));
+    return '<div class="bill-row">'
+      + '<div class="bill-row-main">'
+      + '<div class="bill-row-title">' + esc(o.title || '无标题') + '</div>'
+      + '<div class="bill-row-sub">' + (isPub ? '我发布' : '我接单') + ' · ' + esc(stMap[o.status] || o.status || '') + ' · ' + timeAgo(o.created_at) + '</div>'
+      + '</div>'
+      + '<div class="bill-amt">' + esc(amt) + '</div>'
+      + '</div>';
+  }).join('');
+
+  const done = rows.filter(function (o) { return o.status === 'completed'; });
+  const doneAmt = done.reduce(function (s, o) { return s + (Number(o.price) || 0); }, 0);
+  const allAmt = rows.reduce(function (s, o) { return s + (Number(o.price) || 0); }, 0);
+
+  el.innerHTML = listHtml
+    + '<div class="bill-total">'
+    + '<div>订单总数：<b>' + rows.length + '</b> 笔（已完成 ' + done.length + ' 笔）</div>'
+    + '<div>已完成订单金额合计：<b>¥' + doneAmt.toFixed(2) + '</b></div>'
+    + '<div>全部订单约定金额：¥' + allAmt.toFixed(2) + '</div>'
+    + '<div style="color:var(--text-secondary)">平台服务费：<b>暂未收取</b>（所有订单均为双方线下自行结算，平台不经手资金、不抽成）</div>'
+    + '</div>'
+    + '<div style="margin-top:12px;text-align:right">'
+    + '<button class="btn btn-outline btn-sm" onclick="exportMyBillCsv()">📥 导出 CSV</button>'
+    + '</div>';
+}
+function exportMyBillCsv() {
+  if (!_billRows || !_billRows.length) { toast('没有可导出的记录', 'info'); return; }
+  const uid = S.user ? (S.user._issue_number || S.user.student_id) : '';
+  const sid = S.user ? S.user.student_id : '';
+  const head = ['订单号', '标题', '我的角色', '状态', '金额', '下单时间'];
+  const stMap = { open: '待接单', taken: '已接单', awaiting_confirm: '待确认', completed: '已完成', cancelled: '已取消', expired: '已过期' };
+  const lines = [head.join(',')];
+  _billRows.forEach(function (o) {
+    const isPub = (o.publisher_id == uid || o.publisher_student_id == sid);
+    const cells = [
+      o._issue_number || '',
+      String(o.title || '').replace(/[",\n]/g, ' '),
+      isPub ? '我发布' : '我接单',
+      stMap[o.status] || o.status || '',
+      (Number(o.price) || 0).toFixed(2),
+      String(o.created_at || '').slice(0, 19).replace('T', ' ')
+    ];
+    lines.push(cells.join(','));
+  });
+  try {
+    const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'hust-helper-bill-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    toast('已导出账单 CSV', 'success');
+    trackEvt('bill_export', { n: _billRows.length });
+  } catch (e) { toast('导出失败：' + e.message, 'error'); }
+}
+
+// ============================================================
+// v1.58.0 ⑥ 新单订阅设置弹窗（界面层）
+// ============================================================
+var SUB_CATS = [
+  { v: 'express', l: '代拿快递' }, { v: 'food', l: '代取外卖' }, { v: 'buy', l: '帮买帮送' },
+  { v: 'print', l: '帮忙打印' }, { v: 'repair', l: '维修' }, { v: 'queue', l: '排队代办' },
+  { v: 'book', l: '教材书籍' }, { v: 'electronic', l: '电子产品' }, { v: 'daily', l: '生活用品' },
+  { v: 'sports', l: '运动器材' }, { v: 'other', l: '其他' }
+];
+function openSubModal() {
+  if (!S.user) { showAuthModal(); return; }
+  const m = document.getElementById('subModal');
+  if (!m) return;
+  const p = getSubPrefs() || { on: false, cats: [], area: '', minPrice: 0 };
+  const onEl = document.getElementById('subOn'); if (onEl) onEl.checked = !!p.on;
+  const catBox = document.getElementById('subCats');
+  if (catBox) {
+    catBox.innerHTML = SUB_CATS.map(function (c) {
+      const active = (p.cats || []).indexOf(c.v) >= 0;
+      return '<span class="pref-chip' + (active ? ' active' : '') + '" data-cat="' + c.v + '" onclick="this.classList.toggle(\'active\')">' + c.l + '</span>';
+    }).join('');
+  }
+  const aEl = document.getElementById('subArea'); if (aEl) aEl.value = p.area || '';
+  const mEl = document.getElementById('subMinPrice'); if (mEl) mEl.value = p.minPrice > 0 ? p.minPrice : '';
+  m.classList.add('active');
+  try { trackEvt('open_sub_modal'); } catch (e) {}
+}
+function closeSubModal() {
+  const m = document.getElementById('subModal');
+  if (m) m.classList.remove('active');
+}
+function saveSubPrefsFromUI() {
+  const onEl = document.getElementById('subOn');
+  const cats = [];
+  document.querySelectorAll('#subCats .pref-chip.active').forEach(function (c) { cats.push(c.dataset.cat); });
+  const aEl = document.getElementById('subArea');
+  const mEl = document.getElementById('subMinPrice');
+  const mp = parseFloat(mEl ? mEl.value : '');
+  const p = {
+    on: !!(onEl && onEl.checked),
+    cats: cats,
+    area: (aEl ? aEl.value : '').trim(),
+    minPrice: (isNaN(mp) || mp < 0) ? 0 : mp
+  };
+  saveSubPrefs(p);
+  closeSubModal();
+  toast(p.on ? ('已开启新单提醒' + (cats.length ? '（' + cats.length + ' 个分类）' : '（全部分类）')) : '已关闭新单提醒', p.on ? 'success' : 'info');
+}
+function syncSubEntry() {
+  const el = document.getElementById('mySubCount');
+  if (!el) return;
+  const p = getSubPrefs();
+  if (p && p.on) {
+    const n = (p.cats || []).length;
+    el.textContent = '已开启' + (n ? ' · ' + n + ' 个分类' : ' · 全部分类') + (p.area ? ' · ' + p.area : '');
+  } else {
+    el.textContent = '未开启，点这里订阅你关心的分类';
+  }
+}
+
+// ============================================================
+// v1.58.0 ⑦ 首页社会证明：陌生人的第一屏要能看出"这站有人在用"
+//   数据全部来自线上真实 issue，客户端统计，不加后端负担。
+// ============================================================
+async function loadHomeProof() {
+  const box = document.getElementById('homeProof');
+  const strip = document.getElementById('homeProofStrip');
+  const recentEl = document.getElementById('homeProofRecent');
+  if (!box || !strip) return;
+  let issues = [];
+  try { issues = await ghIssues('order'); } catch (e) { return; }
+  const objs = (issues || []).map(function (i) {
+    try { const o = JSON.parse(i.body); o._issue_number = i.number; return o; } catch (e) { return null; }
+  }).filter(function (o) { return o && o.type !== 'chat'; });
+  if (!objs.length) return;
+  const done = objs.filter(function (o) { return o.status === 'completed'; });
+  const open = objs.filter(function (o) { return o.status === 'open'; });
+  const people = {};
+  objs.forEach(function (o) {
+    if (o.publisher_student_id) people[o.publisher_student_id] = 1;
+    if (o.taker_student_id) people[o.taker_student_id] = 1;
+  });
+  let good = 0;
+  done.forEach(function (o) {
+    if (Number(o.publisher_rated) >= 4) good++;
+    if (Number(o.taker_rated) >= 4) good++;
+  });
+  const third = good > 0
+    ? { n: good, l: '好评' }
+    : { n: open.length, l: '正在进行' };
+  strip.innerHTML = ''
+    + '<div class="proof-cell"><div class="proof-num">' + done.length + '</div><div class="proof-lab">已完成互助</div></div>'
+    + '<div class="proof-cell"><div class="proof-num">' + Object.keys(people).length + '</div><div class="proof-lab">参与同学</div></div>'
+    + '<div class="proof-cell"><div class="proof-num">' + third.n + '</div><div class="proof-lab">' + third.l + '</div></div>';
+  if (recentEl) {
+    const rec = done.slice(0, 3);
+    if (rec.length) {
+      recentEl.style.display = 'block';
+      recentEl.innerHTML = '最近完成：' + rec.map(function (o) {
+        return esc(String(o.title || '订单').slice(0, 14));
+      }).join(' · ');
+    } else { recentEl.style.display = 'none'; }
+  }
+  box.style.display = 'block';
+}
+
+// ============================================================
+// v1.58.0 ④ 数据看板 · 行为与漏斗
+//   服务端：读 label=telemetry 的当日 issue（由 POST /api/track 写入）
+//   本机：读 hust_evt 本地缓冲，无网络也能看到这台设备的数据
+//   口径说明：事件里不含学号等身份信息，只有匿名访客 id，用于"今天有几个人来过"。
+// ============================================================
+async function loadStatsBehavior() {
+  const el = document.getElementById('statsBehavior');
+  if (!el) return;
+  el.innerHTML = '<p class="form-hint">行为数据加载中…</p>';
+  try { await flushEvt(); } catch (e) {}   // 先把自己这台设备攒的事件推上去，再看数字
+  let docs = [];
+  try { docs = await ghIssues('telemetry'); } catch (e) { docs = []; }
+  let evts = [];
+  const aids = {};
+  (docs || []).forEach(function (i) {
+    try {
+      const d = JSON.parse(i.body || '{}');
+      if (d && Array.isArray(d.evts)) evts = evts.concat(d.evts);
+      if (d && d.aids && typeof d.aids === 'object') Object.keys(d.aids).forEach(function (k) { aids[k] = 1; });
+    } catch (e) {}
+  });
+  const local = evtSummary();
+  const cnt = function (name) {
+    return evts.filter(function (x) { return x && x.e === name; }).length;
+  };
+  const searches = evts.filter(function (x) { return x && x.e === 'search' && x.m; });
+  const semArr = searches.filter(function (s) { return s.m && s.m.mode === '1'; });
+  const keyArr = searches.filter(function (s) { return s.m && s.m.mode === '0'; });
+  const kw = {};
+  searches.forEach(function (s) {
+    const q = String((s.m && s.m.q) || '').trim();
+    if (q) kw[q] = (kw[q] || 0) + 1;
+  });
+  const topKw = Object.keys(kw).sort(function (a, b) { return kw[b] - kw[a]; }).slice(0, 10);
+  const avgHit = function (arr) {
+    if (!arr.length) return '—';
+    const t = arr.reduce(function (a, s) { return a + (Number(s.m && s.m.n) || 0); }, 0);
+    return (t / arr.length).toFixed(1);
+  };
+  const row = function (label, num, note) {
+    return '<div style="margin-bottom:10px;display:flex;align-items:baseline;gap:8px">'
+      + '<span style="font-size:.85rem;min-width:104px">' + label + '</span>'
+      + '<b style="font-size:1.05rem;color:var(--primary)">' + num + '</b>'
+      + (note ? '<span style="font-size:.72rem;color:var(--text-secondary)">' + note + '</span>' : '')
+      + '</div>';
+  };
+  el.innerHTML = '<h3 style="margin-bottom:6px">📈 行为与漏斗</h3>'
+    + '<p class="form-hint" style="margin-bottom:14px">匿名采集，累计 ' + evts.length + ' 条事件，来自 '
+    + Object.keys(aids).length + ' 台设备。埋点数据存在 label=telemetry 的单独 issue 里，与业务数据隔离。</p>'
+    + '<div style="font-size:.82rem;font-weight:600;margin-bottom:8px">漏斗：从有人点进来，到内容发得出去</div>'
+    + row('① 打开页面', cnt('app_open'), '含未登录的陌生人')
+    + row('② 分享/复制链接', cnt('share'), '外部用户进站的唯一通道')
+    + row('③ 从分享链进入', cnt('deeplink_open'))
+    + row('④ 发起搜索', cnt('search'))
+    + row('⑤ 打开帖子详情', cnt('open_detail'))
+    + row('⑥ 打开论坛帖', cnt('open_forum'))
+    + row('⑦ 打开消息中心', cnt('open_msg_center'))
+    + '<div style="font-size:.82rem;font-weight:600;margin:16px 0 8px">搜索质量（A/B：?sem=0 旧关键词 / ?sem=1 新语义）</div>'
+    + row('语义模式', semArr.length, '平均命中 ' + avgHit(semArr) + ' 条')
+    + row('关键词模式', keyArr.length, '平均命中 ' + avgHit(keyArr) + ' 条')
+    + '<div style="font-size:.82rem;font-weight:600;margin:16px 0 8px">搜得最多的词</div>'
+    + (topKw.length
+        ? '<div style="display:flex;flex-wrap:wrap;gap:8px">' + topKw.map(function (k) {
+            return '<span class="pref-chip">' + esc(k) + ' · ' + kw[k] + '</span>';
+          }).join('') + '</div>'
+        : '<p class="form-hint">还没有搜索记录。</p>')
+    + '<div style="font-size:.82rem;font-weight:600;margin:16px 0 8px">本机事件（这台设备，含未上报的）</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:8px">'
+    + (Object.keys(local).length
+        ? Object.keys(local).sort(function (a, b) { return local[b] - local[a]; }).map(function (k) {
+            return '<span class="pref-chip">' + esc(k) + ' · ' + local[k] + '</span>';
+          }).join('')
+        : '<span class="form-hint">本机暂无记录。</span>')
+    + '</div>'
+    + (docs && docs.length
+        ? '<p class="form-hint" style="margin-top:12px">已收到服务端埋点日志 ' + docs.length + ' 份' + (docs[0] && docs[0].title ? '（最新：' + esc(docs[0].title) + '）' : '') + '</p>'
+        : '<p class="form-hint" style="margin-top:12px">尚未收到服务端埋点数据。事件累计满 10 条会自动上报一次，刷新页面也会触发上报。</p>');
+}
+
 function showMyFavs() {
   const m = document.getElementById('myFavModal');
   if (!m) return;
@@ -5035,12 +5626,14 @@ function clearQueryVec() {
   _semDebounce = null; _queryVec = null; _queryVecKey = ''; _queryVecPendingKey = null;
 }
 function semanticScore(o) {
+  if (semMode() === '0') return 0;   // v1.58.0 A-B：?sem=0 时彻底关闭语义分，退回纯关键词排序
   if (!_queryVec) return 0;
   const pv = postVec(o);
   if (!pv) return 0;
   return Math.max(0, cosVec(_queryVec, pv) - SEM_COS_FLOOR) * SEM_WEIGHT;
 }
 function semanticHit(o) {
+  if (semMode() === '0') return false;  // v1.58.0 A-B：?sem=0 时不做语义召回
   if (!_queryVec) return false;
   const pv = postVec(o);
   return !!pv && cosVec(_queryVec, pv) >= SEM_KEEP;
@@ -5198,6 +5791,8 @@ function searchEnterFeedback(input) {
   const isSyn = !!_searchSynIdx[normQuery(kw)];
   pushSearchHistory(kw);
   hideSearchSuggest();
+  // v1.58.0 埋点：记录查询词 + 当时的排序模式 + 命中数 → A-B 对照的原始数据
+  try { trackEvt('search', { q: kw, mode: semMode(), sem: sem ? 1 : 0, n: n }); } catch (e) {}
   let tip = '';
   if (n && isSyn) tip += '（已含同义词扩展）';
   if (sem) tip += '（含语义匹配）';
@@ -5465,6 +6060,7 @@ async function showDetail(issueNum) {
   const ct = document.getElementById('detailContent');
   modal.classList.add('active');
   ct.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
+  try { trackEvt('open_detail', { p: issueNum }); } catch (e) {}
 
   try {
     // v1.42.10：改用 ghApi('/api/issue/N') 走语义路由，免登录且带缓存
@@ -5745,6 +6341,7 @@ async function showDetail(issueNum) {
       + ((o.type === 'secondhand' || o.type === 'borrow') ? renderAiSecondhandMatches(o) : '')
       // v1.57.0 详情内收藏（收藏是「个人可见」动作，不改任何服务端数据）
       + '<div class="detail-actions">'
+      + '<button type="button" class="btn btn-outline btn-sm" onclick="sharePost(' + issueNum + ',\'' + escAttr(o.title || '') + '\')">🔗 分享</button>'
       + '<button type="button" class="btn btn-outline btn-sm" onclick="favToggleDetail(' + issueNum + ',this,\'' + escAttr(o.title || '') + '\',\'' + escAttr(o.type || '') + '\')">' + (favHas(issueNum) ? '★ 已收藏' : '☆ 收藏') + '</button>'
       + actions + '</div>';
     // 加载评论区
@@ -9736,7 +10333,11 @@ function renderMyOrders(orders, tab, subTab) {
       const isPublisher = isMyPub;
       const hasRated = isPublisher ? o.publisher_rated : o.taker_rated;
       if (!hasRated) {
-        rateBtn = '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();rateOrder(' + o._issue_number + ')" style="margin-top:4px">⭐ 评价</button>';
+        // v1.58.0 ⑧：互评机制早已存在，但入口太弱、又没人提醒 → 线上 0 条评价。
+        //   这里把它做成主色按钮 + 文案说明为什么要评（影响对方信用分）。
+        rateBtn = '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();rateOrder(' + o._issue_number + ')" style="margin-top:6px">⭐ 去评价（影响对方信用分）</button>';
+      } else {
+        rateBtn = '<span style="display:inline-block;margin-top:6px;font-size:.75rem;color:var(--text-muted)">已评价 · 感谢反馈</span>';
       }
     }
     const metaHTML = isChat
@@ -9760,6 +10361,8 @@ function renderMyOrders(orders, tab, subTab) {
 
 async function loadMyOrders(myTab) {
   syncFavCount();   // v1.57.0 收藏数同步（未登录也显示本地收藏）
+  syncSubEntry();   // v1.58.0 新单提醒入口文案同步
+  updateMsgBadge(); // v1.58.0 消息角标同步
   const profile = document.getElementById('myProfile');
   const tabsEl = document.getElementById('myOrderTabs');
   const listEl = document.getElementById('myOrdersList');
@@ -9926,7 +10529,9 @@ async function loadMyOrders(myTab) {
       else if (subTab === 'chat') orders = orders.filter(o => o.type === 'chat');
     }
     else if (tab === 'taken') orders = orders.filter(o => o.taker_id == uid || o.taker_student_id == sid);
-    else orders = orders.filter(o => o.publisher_id == uid || o.taker_id == uid || o.publisher_student_id == sid || o.taker_student_id == sid);
+    else orders = orders.filter(o => (o.publisher_id == uid || o.taker_id == uid || o.publisher_student_id == sid || o.taker_student_id == sid) && o.type !== 'chat');
+    // v1.58.0：私信对话（type:'chat'）不再混入「我的订单」——它们是会话不是订单，
+    //   统一收敛到新的「💬 消息」入口（openMsgCenter），避免污染订单列表与成交统计
 
     // 自动过期处理：截止时间已过 → 自动取消（后台静默处理，不阻塞渲染）
     const now = new Date();
@@ -10270,23 +10875,110 @@ function toggleRecOnly() {
 
 // 智能派单通知：新出现的 open 跑腿订单匹配"绿灯+喜好"时推送（首刷只记录不推送）
 let _knownRecOrders = {};
+// ===== v1.58.0 ⑥ 新单订阅（不依赖跑腿认证，普通同学也能订阅）=====
+// 为什么放 localStorage：提醒本身是客户端轮询触发的，存本地即可，无需后端写入，
+// 也避免用户资料里多一份需要脱敏的字段。
+var SUBPREFS_KEY = 'hust_subprefs';
+function getSubPrefs() {
+  try {
+    const raw = localStorage.getItem(SUBPREFS_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== 'object') return null;
+    p.cats = Array.isArray(p.cats) ? p.cats : [];
+    p.area = p.area || '';
+    p.minPrice = Number(p.minPrice) || 0;
+    p.on = !!p.on;
+    return p;
+  } catch (e) { return null; }
+}
+function saveSubPrefs(p) {
+  try { localStorage.setItem(SUBPREFS_KEY, JSON.stringify(p)); } catch (e) {}
+  syncSubEntry();
+}
+function matchSubPrefs(o, p) {
+  if (!p || !p.on || !o) return false;
+  if (o.status !== 'open') return false;
+  if (['task', 'errand', 'skill', 'secondhand', 'borrow'].indexOf(o.type) < 0) return false;
+  if (S.user && o.publisher_student_id === S.user.student_id) return false;
+  if (p.cats.length && p.cats.indexOf(o.category) < 0) return false;
+  if (p.area && o.location && String(o.location).indexOf(p.area) < 0) return false;
+  if (p.minPrice > 0 && (Number(o.price) || 0) < p.minPrice) return false;
+  return true;
+}
 function checkRecommendedOrders(issues) {
-  if (!S.user || !S.user.runner_verified || !S.user.available || !S.user.takePrefs) return;
+  if (!S.user) return;
+  const sp = getSubPrefs();
+  const subOn = !!(sp && sp.on);
+  const runnerOn = !!(S.user.runner_verified && S.user.available && S.user.takePrefs);
+  if (!subOn && !runnerOn) return;
   const sid = S.user.student_id;
+  // 首次运行只登记基数、不推送——否则刚订阅就会一次性炸出一堆历史订单提醒
+  const firstRun = Object.keys(_knownRecOrders).length === 0;
   for (const i of (issues || [])) {
     let o = null;
-    try { o = JSON.parse(i.body); } catch(e) { continue; }
-    if (!o || (o.type !== 'task' && o.type !== 'errand' && o.type !== 'skill') || o.status !== 'open') continue;
-    if (o.publisher_student_id === sid) continue;
+    try { o = JSON.parse(i.body); } catch (e) { continue; }
+    if (!o) continue;
     const key = String(i.number);
     const isNew = (_knownRecOrders[key] === undefined);
     _knownRecOrders[key] = true;
-    if (!isNew) continue;
-    if (!matchOrderToPrefs(o)) continue;
+    if (!isNew || firstRun) continue;
+    let hit = false;
+    if (subOn && matchSubPrefs(o, sp)) hit = true;
+    else if (runnerOn && matchOrderToPrefs(o)) hit = true;
+    if (!hit) continue;
     const _dt = (S.user && o.publisher_dorm) ? (' · ' + dormLabel(S.user.dorm, o.publisher_dorm)) : (o.location ? ' · ' + o.location : '');
-    sendNotify('🎯 为你推荐新订单', '「' + (o.title || '新订单') + '」 ¥' + (o.price || 0).toFixed(2) + _dt + '，符合你的接单喜好', { icon: '🎯', link: 'task' });
+    const isGoods = (o.type === 'secondhand' || o.type === 'borrow');
+    sendNotify(isGoods ? '🛒 符合你订阅的新帖子' : '🎯 符合你订阅的新订单',
+      '「' + (o.title || '新帖子') + '」 ' + priceLabel(o) + _dt,
+      { icon: isGoods ? '🛒' : '🎯', link: isGoods ? 'ershou' : 'help' });
   }
 }
+// v1.58.0 ⑥ 论坛帖子被回复提醒（此前完全没有回流提醒）
+var _knownForumComments = {};
+async function checkForumReplyNotifications() {
+  if (!S.user || !S.user.student_id) return;
+  let posts = [];
+  try { posts = await ghIssues('forum'); } catch (e) { return; }
+  const sid = S.user.student_id;
+  const firstRun = Object.keys(_knownForumComments).length === 0;
+  for (const i of (posts || [])) {
+    let p = null;
+    try { p = JSON.parse(i.body); } catch (e) { continue; }
+    if (!p || p.author_sid !== sid) continue;
+    const key = String(i.number);
+    const n = i.comments || 0;
+    const prev = _knownForumComments[key];
+    _knownForumComments[key] = n;
+    if (prev === undefined || firstRun) continue;
+    if (n > prev) sendNotify('💬 你的帖子有新回复', '「' + (p.title || '帖子') + '」新增 ' + (n - prev) + ' 条回复', { icon: '💬', link: 'forumpost:' + i.number });
+  }
+}
+// v1.58.0 ⑧ 评价提醒：互评机制（rateOrder + publisher_rated/taker_rated + 信用分联动 + 主页星标
+// 聚合）在更早版本就已完整存在，缺的只是"没人提醒你去评"——线上因此 0 条评价。
+// 这里只补提醒，不动机制。
+var _ratedPrompted = {};
+function checkRatingReminders(issues) {
+  if (!S.user) return;
+  const uid = S.user._issue_number || S.user.student_id;
+  const sid = S.user.student_id;
+  for (const i of (issues || [])) {
+    let o = null;
+    try { o = JSON.parse(i.body); } catch (e) { continue; }
+    if (!o || o.type === 'chat') continue;
+    if (o.status !== 'completed') continue;
+    const isPub = (o.publisher_id == uid || o.publisher_student_id == sid);
+    const isTaker = (o.taker_id == uid || o.taker_student_id == sid);
+    if (!isPub && !isTaker) continue;
+    if (isPub ? o.publisher_rated : o.taker_rated) continue;   // 已评过
+    const key = String(i.number);
+    if (_ratedPrompted[key]) continue;                          // 同一单只提醒一次
+    _ratedPrompted[key] = true;
+    sendNotify('⭐ 给这笔订单评个价', '「' + (o.title || '订单') + '」已完成，评价会影响对方信用分（5★ +2 / 1★ −5）',
+      { icon: '⭐', link: 'my' });
+  }
+}
+
 
 // ============ 跑腿认证申请 ============
 function showRunnerApply() {
@@ -11134,6 +11826,7 @@ function getUnreadCount() { return _notifications.filter(n => !n.read).length; }
 
 // --- 导航栏铃铛红点 ---
 function updateNavBadge() {
+  try { updateMsgBadge(); } catch (e) {}   // v1.58.0：底栏「消息」角标跟着未读走
   const btns = document.querySelectorAll('.notify-toggle');
   if (!btns.length) return;
   const unread = getUnreadCount();
@@ -11207,10 +11900,16 @@ function openNotifyLink(idx) {
   const n = _notifications[idx];
   if (!n) return;
   n.read = true; saveNotifications(); updateNavBadge(); renderNotifyPanel();
-  if (n.link) {
-    const p = document.getElementById('notifyPanel'); if (p) p.classList.remove('active');
-    navigate(n.link);
+  if (!n.link) return;
+  const p = document.getElementById('notifyPanel'); if (p) p.classList.remove('active');
+  const link = String(n.link);
+  // v1.58.0：forumpost:编号 → 直接定位到具体论坛帖（navigate 只认页面名，这里需要多一步）
+  if (link.indexOf('forumpost:') === 0) {
+    const fnum = parseInt(link.slice(10), 10);
+    if (!isNaN(fnum) && typeof openForumDetail === 'function') openForumDetail(fnum);
+    return;
   }
+  navigate(link);
 }
 function markAllNotificationsRead() {
   _notifications.forEach(n => n.read = true);
@@ -11451,6 +12150,9 @@ async function runNotificationCheck() {
     checkRecommendedOrders(issues);
     checkOverdueOrders(issues);
     checkAwaitingConfirmOrders(issues);   // v1.18.0 交接码 48h 自动确认
+    checkRatingReminders(issues);         // v1.58.0 ⑧ 已完成未评价 → 提醒评价
+    // v1.58.0 ⑥ 论坛帖子被回复提醒（独立请求，失败不影响上面）
+    try { await checkForumReplyNotifications(); } catch (e) {}
     await checkAnnouncementNotifications();
   } catch(e) {}
 }

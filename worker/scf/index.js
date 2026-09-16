@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.47.0';
+const VERSION = '1.48.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -1712,6 +1712,68 @@ const server = http.createServer(async (req, res) => {
         if (upd.status < 200 || upd.status >= 300) return sendJSON(res, 502, { error: 'UPDATE_FAILED' }, headers);
         clearCache();
         return sendJSON(res, 200, { ok: true, credit_score: newScore, student_id: u.student_id }, headers);
+      }
+
+      // ---- v1.58.0 POST /api/track：匿名行为埋点（访问 / 分享 / 搜索 / 下单…）----
+      // 设计取舍：
+      //   ① 不要求登录 —— 匿名访客的"访问了但没注册"恰恰是最关键的一环，必须能记录；
+      //   ② 因此靠限流（60 次/分钟/IP）+ 单批上限 50 条 + 字段白名单控制滥用风险；
+      //   ③ 数据只写进 label=telemetry 的「当日」issue，与业务数据完全隔离，
+      //      单日上限 800 条，超出丢最旧的，防止 issue body 无限膨胀；
+      //   ④ 前端数据看板通过已有 GET /api/issues?label=telemetry 读取并聚合。
+      if (method === 'POST' && path === '/api/track') {
+        if (rateLimited(clientIp(req), 60)) return sendJSON(res, 429, { error: 'RATE_LIMITED' }, headers);
+        const tb = ghBody || {};
+        const raw = Array.isArray(tb.evts) ? tb.evts.slice(0, 50) : [];
+        const slim = raw.map(function (e) {
+          return {
+            e: String((e && e.e) || '').slice(0, 40),
+            t: Number(e && e.t) || Date.now(),
+            m: (e && e.m && typeof e.m === 'object') ? e.m : null,
+          };
+        }).filter(function (e) { return e.e; });
+        if (!slim.length) return sendJSON(res, 200, { ok: true, n: 0 }, headers);
+
+        // 北京时间日切
+        const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+        const tTitle = '[telemetry] ' + today;
+        const q = await ghProxy(`/repos/${REPO}/issues?labels=telemetry&state=all&per_page=100`, 'GET', null);
+        let hit = null;
+        if (q && q.status === 200 && Array.isArray(q.data)) {
+          hit = q.data.find(function (it) { return it && it.title === tTitle; }) || null;
+        }
+        let doc = { d: today, evts: [] };
+        if (hit) {
+          try {
+            const p = JSON.parse(hit.body || '{}');
+            if (p && typeof p === 'object') doc = p;
+          } catch (e) { /* 解析失败就重建 */ }
+        }
+        if (!Array.isArray(doc.evts)) doc.evts = [];
+        doc.d = today;
+        // 匿名访客 id（前端本地随机生成，非身份信息）：只用来数「今天有几个人来过」
+        const aid = String(tb.aid || '').slice(0, 24);
+        if (aid) {
+          if (!doc.aids || typeof doc.aids !== 'object') doc.aids = {};
+          doc.aids[aid] = 1;
+        }
+        doc.evts = doc.evts.concat(slim);
+        if (doc.evts.length > 800) doc.evts = doc.evts.slice(-800);
+
+        let r;
+        if (hit) {
+          r = await ghProxy(`/repos/${REPO}/issues/${hit.number}`, 'PATCH', { body: JSON.stringify(doc) });
+        } else {
+          const labels = await ensureLabelsExist(['telemetry']);
+          const payload = { title: tTitle, body: JSON.stringify(doc) };
+          if (labels && labels.length) payload.labels = labels;
+          r = await ghProxy(`/repos/${REPO}/issues`, 'POST', payload);
+        }
+        if (!r || r.status < 200 || r.status >= 300) {
+          return sendJSON(res, 502, { error: 'TRACK_FAILED' }, headers);
+        }
+        clearCache();
+        return sendJSON(res, 200, { ok: true, n: slim.length }, headers);
       }
 
       // ---- v1.41.4 写操作鉴权 ----
