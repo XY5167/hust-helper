@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.46.0';
+const VERSION = '1.47.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -920,6 +920,15 @@ async function ensureLabelsExist(labels) {
   return wanted.filter(n => names.has(n));
 }
 
+// v1.57.0 发布质量门槛（前端 isJunkTitle 的服务端镜像，两处口径必须一致）
+//   线上出现大量标题=「无」「？」「help」的空帖，会让列表、搜索、推荐整体失效。
+//   这里只做「拒绝写入」，不修改任何既有数据。
+function isJunkTitleSrv(t) {
+  const s = String(t == null ? '' : t).trim();
+  if (!s) return true;
+  return /^(无|没有|未知|暂无|无标题|不知道|测试|help|test|hi|hello|asdf|qwe|aaa+|111+|\?+|\？+|\.+|。+|-{2,}|_+|~+)$/i.test(s);
+}
+
 // ---- 转发到 GitHub（Token 由服务端注入）----
 async function ghProxy(ghPath, method, body) {
   const opts = {
@@ -1727,6 +1736,29 @@ const server = http.createServer(async (req, res) => {
         let ghPath = '';
         if (method === 'POST' && path === '/api/issues') {
           ghPath = `/repos/${REPO}/issues`;
+          // v1.57.0：服务端口径兜底——标题/正文为空或无信息量时直接拒绝（前端可能被绕过）
+          {
+            const rawTitle = String((ghBody && ghBody.title) || '').trim();
+            const cleanTitle = rawTitle.replace(/^\[[^\]]*\]/, '').trim();   // 前端会加「[论坛]」等前缀
+            if (cleanTitle.length < 4 || isJunkTitleSrv(cleanTitle)) {
+              return sendJSON(res, 400, {
+                error: 'BAD_TITLE',
+                hint: '标题太短或没有信息量（至少 4 个字），请写清楚具体需求'
+              }, headers);
+            }
+            // 正文：只在「填了但明显没信息量」时拒绝，避免误伤无正文的历史流程
+            let payloadText = '';
+            try {
+              const p = JSON.parse((ghBody && ghBody.body) || '{}');
+              payloadText = String(p.description || p.content || '').trim();
+            } catch (e) { payloadText = ''; }
+            if (payloadText && payloadText.length < 4) {
+              return sendJSON(res, 400, {
+                error: 'BAD_DESC',
+                hint: '描述太短了（至少 4 个字），补充下具体要求'
+              }, headers);
+            }
+          }
           // v1.56.0：建 issue 前校验/补齐 labels，避免「标签不存在 → 422 Validation Failed」
           if (ghBody && Array.isArray(ghBody.labels)) {
             ghBody = Object.assign({}, ghBody, { labels: await ensureLabelsExist(ghBody.labels) });

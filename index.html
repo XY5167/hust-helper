@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.56.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.57.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -1280,6 +1280,22 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 .draft-bar-label{display:inline-flex;align-items:center;gap:6px;margin:0;cursor:pointer;user-select:none;font-weight:400}
 .draft-bar-cb{width:auto!important;margin:0!important;flex:none}
 .draft-bar-clear{background:none;border:none;padding:0;color:#2563eb;cursor:pointer;font-size:.8rem}
+/* ===== v1.57.0 收藏 ===== */
+.fav-btn{cursor:pointer;user-select:none;display:inline-flex;align-items:center;line-height:1;font-size:1.05rem;color:var(--text-muted);transition:color .15s,transform .12s}
+.fav-btn.on{color:#f59e0b}
+.fav-btn:active{transform:scale(1.22)}
+.fav-btn-card{margin-left:auto;margin-right:8px}
+.fav-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--bg-card);cursor:pointer}
+.fav-row-main{display:flex;flex-direction:column;flex:1;min-width:0}
+.fav-row-title{font-size:.92rem;font-weight:600;color:var(--text-primary)}
+.fav-row-sub{font-size:.75rem;color:var(--text-muted);margin-top:2px}
+.fav-row .fav-btn{margin-left:auto;font-size:1.15rem}
+.my-fav-entry{display:flex;align-items:center;gap:10px;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;cursor:pointer}
+.my-fav-entry:active{background:var(--bg)}
+.my-fav-entry-ic{font-size:1.15rem}
+.my-fav-entry-main{display:flex;flex-direction:column;flex:1;min-width:0}
+.my-fav-entry-title{font-size:.95rem;font-weight:600;color:var(--text-primary)}
+.my-fav-entry-sub{font-size:.75rem;color:var(--text-muted);margin-top:2px}
 </style>
 </head>
 <body data-page-node-id="bfreJjpoF6FdvAS5rpVNIW">
@@ -2102,7 +2118,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       </div>
       <div class="my-credit" id="myVolunteerWrap" style="display:none" data-page-node-id="TQqASJp07KxMsKjRnTiOhr">
         <div class="my-credit-num" id="myVolunteerNum" style="color:#7c3aed" data-page-node-id="y7C9nhD0A6agFgnJkHrHmz">0</div>
-        <div class="my-credit-label" data-page-node-id="DcRWRnD8sefUiSY5ElDL8f">志愿时长(对接中)</div>
+        <div class="my-credit-label" data-page-node-id="DcRWRnD8sefUiSY5ElDL8f">互助贡献</div>
       </div>
       <span class="my-arrow" id="myArrow" data-page-node-id="UaJ3vF7ApBn9lVVZBdRqBC">⌄</span>
     </div>
@@ -2167,6 +2183,15 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     </div>
     <div id="myOrdersList" data-page-node-id="pFaaZOEXXboN4BG42D6Mjp">
       <p style="color:var(--text-secondary)" data-page-node-id="tUwbd2gEeOYn5OaRB2bS3k">请先登录...</p>
+    </div>
+    <!-- v1.57.0 我的收藏（本地存储，点击进入收藏列表） -->
+    <div class="my-fav-entry" onclick="showMyFavs()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMyFavs();}">
+      <span class="my-fav-entry-ic">⭐</span>
+      <span class="my-fav-entry-main">
+        <span class="my-fav-entry-title">我的收藏</span>
+        <span class="my-fav-entry-sub" id="myFavCount">还没有收藏，看到心仪的帖子点 ☆ 收藏</span>
+      </span>
+      <span class="my-arrow">›</span>
     </div>
     <div id="inviteCard" class="my-invite" data-page-node-id="nTf7FFRzVFqBgaVdkvAWpK">
       <div class="my-invite-left" data-page-node-id="xSzzIt72L8eggGQBMwTZXc">
@@ -2238,6 +2263,19 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
     <div id="detailContent" data-page-node-id="fFCnEb2GhPrhPrE4cB9jJT"></div>
     <!-- 评论区 -->
     <div id="detailComments" style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px" data-page-node-id="HjqAnMQEgXoWVGNgIsKgp6"></div>
+  </div>
+</div>
+
+<!-- v1.57.0 我的收藏 Modal -->
+<div class="modal-overlay" id="myFavModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeMyFavs()">&times;</button>
+    <h3 style="margin-bottom:6px">⭐ 我的收藏</h3>
+    <p class="form-hint" style="margin-bottom:14px">收藏保存在本机浏览器，换设备不同步。点标题可回到原帖。</p>
+    <div id="myFavList"></div>
+    <div style="margin-top:14px;text-align:right">
+      <button class="btn btn-outline btn-sm" onclick="clearAllFavs()">清空收藏</button>
+    </div>
   </div>
 </div>
 
@@ -2521,6 +2559,16 @@ function computeVolunteerHours(userData) {
   for (const e of hist) { if (e && e.score > 0) n++; }
   return +(n * VOLUNTEER_HOURS_PER_EVENT).toFixed(1);
 }
+// v1.57.0：对外展示用「互助贡献」= 正向信用事件次数（整数、可解释）。
+// 原展示位挂着"志愿时长(对接中)"但算的是次数×系数，语义不符且长期无法兑现，故拆开：
+//   - 界面展示 → computeContributionCount()（真实可解释，不承诺对接）
+//   - 志愿时对接 → computeVolunteerHours()（保留为将来唯一换算入口，不删）
+function computeContributionCount(userData) {
+  const hist = (userData && userData.credit_history) || [];
+  let n = 0;
+  for (const e of hist) { if (e && e.score > 0) n++; }
+  return n;
+}
 // ============ GITHUB ISSUES DATABASE ============
 // 数据存储在 GitHub Issues 中，所有人共享
 // 腾讯云 SCF 云函数代理（减少 GitHub API 消耗 + 服务端持有密钥 + 密码后端校验）
@@ -2731,7 +2779,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.56.0';
+const APP_VERSION = '1.57.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3169,6 +3217,10 @@ async function ghCreateIssue(title, body, labels) {
     const res = await ghApi('/api/issues', 'POST', { title, body, labels });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
+      // v1.57.0：服务端发布门槛拒绝（BAD_TITLE / BAD_DESC）时优先展示可读中文提示
+      if (data.error === 'BAD_TITLE' || data.error === 'BAD_DESC') {
+        throw new Error(data.hint || '标题或描述信息量不足，请补充后再发');
+      }
       throw new Error(data.error || data.message || 'Create failed ' + res.status);
     }
     return res.json();
@@ -3347,6 +3399,7 @@ async function forumLoadPosts() {
   for (const i of issues) {
     let u; try { u = JSON.parse(i.body); } catch (e) { continue; }
     if (!u || u.type !== 'forum') continue;
+    if (isJunkPost(u)) continue;   // v1.57.0 历史空帖（标题=「无」「？」等）不进列表，避免污染推荐流
     u._issue_number = i.number;
     u._comments = i.comments || 0;
     posts.push(u);
@@ -3638,6 +3691,10 @@ async function submitForumPost() {
   const anon = document.getElementById('forumPublishAnon').checked;
   if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
   if (!content) { err.textContent = '请填写正文'; err.style.display = 'block'; return; }
+  // v1.57.0 发布质量门槛（论坛同样口径）：标题 ≥4 字且不是无意义内容，正文 ≥4 字
+  if (title.length < 4) { err.textContent = '标题太短了（至少 4 个字），让人一眼看懂再点进来'; err.style.display = 'block'; return; }
+  if (isJunkTitle(title)) { err.textContent = '标题不能是「' + title + '」这类没信息量的内容，请具体描述'; err.style.display = 'block'; return; }
+  if (content.length < 4) { err.textContent = '正文太短了（至少 4 个字），多说两句吧'; err.style.display = 'block'; return; }
   // v1.39.0 违禁词硬拦截（此前论坛缺失，与跑腿发布一致）
   const sensitiveWord = checkSensitive(title + ' ' + content);
   if (sensitiveWord) { err.textContent = '内容包含违禁词「' + sensitiveWord + '」，违反平台规范，无法发布'; err.style.display = 'block'; return; }
@@ -4401,7 +4458,8 @@ async function loadOrders(type, cat) {
         }
       }
     }
-    orders = orders.filter(o => o.status === 'open');
+    orders = orders.filter(o => o.status === 'open')
+      .filter(o => !isJunkPost(o));   // v1.57.0 历史空帖（标题=「无」「？」「help」等）不进列表
 
     // 根据类型筛选
     if (type === 'qa') {
@@ -4430,6 +4488,129 @@ async function loadOrders(type, cat) {
     // 如果缓存也用完了，显示错误
     if (!cached) grid.innerHTML = '<div class="empty-state"><p>加载失败：' + esc(e.message) + '</p></div>';
   }
+}
+
+// ============ v1.57.0 发布质量门槛：脏标题识别（发布拦截 + 列表过滤共用）============
+// 仅做「展示/提交」层面的过滤，不删除任何数据，可随时回退。
+function isJunkTitle(t) {
+  const s = String(t == null ? '' : t).trim();
+  if (!s) return true;
+  return /^(无|没有|未知|暂无|无标题|不知道|测试|help|test|hi|hello|asdf|qwe|aaa+|111+|\?+|\？+|\.+|。+|-{2,}|_+|~+)$/i.test(s);
+}
+function isJunkPost(o) {
+  if (!o) return true;
+  return isJunkTitle(o.title);
+}
+
+// ============ v1.57.0 价格展示：0 值按场景降级，不再显示「¥0.00」============
+function priceText(o) {
+  const n = (o && o.price != null) ? Number(o.price) : 0;
+  if (n > 0) {
+    return '<span class="order-card-price">¥' + n.toFixed(2) + '</span>'
+      + (o.original_price > 0 ? '<span class="order-card-original">¥' + Number(o.original_price).toFixed(2) + '</span>' : '');
+  }
+  const label = (o && o.type === 'borrow') ? '免费借'
+    : ((o && o.type === 'secondhand') ? '价格面议' : '免费互助');
+  return '<span style="color:var(--text-muted);font-size:.85rem">' + label + '</span>';
+}
+
+// ============ v1.57.0 收藏（先本地落地：hust_favs = { issueNumber: {t,ty,ti} }）============
+const FAV_KEY = 'hust_favs';
+const FAV_MAX = 200;
+function favAll() {
+  try {
+    const o = JSON.parse(localStorage.getItem(FAV_KEY) || '{}');
+    return (o && typeof o === 'object') ? o : {};
+  } catch (e) { return {}; }
+}
+function favSave(map) { try { localStorage.setItem(FAV_KEY, JSON.stringify(map)); } catch (e) {} }
+function favHas(num) { return !!favAll()[String(num)]; }
+function favCount() { return Object.keys(favAll()).length; }
+function favStar(on) { return on ? '★' : '☆'; }
+function favBtnClass(on) { return 'fav-btn' + (on ? ' on' : ''); }
+// 收藏/取消收藏；满额时淘汰最早收藏的一条
+function favToggle(num, title, type) {
+  const m = favAll();
+  const k = String(num);
+  if (m[k]) { delete m[k]; favSave(m); return false; }
+  const keys = Object.keys(m);
+  if (keys.length >= FAV_MAX) {
+    keys.sort(function (a, b) { return (m[a].t || 0) - (m[b].t || 0); });
+    delete m[keys[0]];
+  }
+  m[k] = { t: Date.now(), ty: type || '', ti: String(title || '').slice(0, 60) };
+  favSave(m);
+  return true;
+}
+function syncFavCount() {
+  const el = document.getElementById('myFavCount');
+  if (!el) return;
+  const n = favCount();
+  el.textContent = n > 0 ? ('已收藏 ' + n + ' 条') : '还没有收藏，看到心仪的帖子点 ☆ 收藏';
+}
+// 卡片上的星标（局部刷新，不重渲染列表）
+function favToggleCard(num, el, title, type) {
+  const on = favToggle(num, title, type);
+  if (el) { el.textContent = favStar(on); el.className = favBtnClass(on) + ' fav-btn-card'; }
+  toast(on ? '已收藏，可在「我的 → 我的收藏」查看' : '已取消收藏', on ? 'success' : 'info');
+  syncFavCount();
+}
+// 详情弹窗里的收藏按钮
+function favToggleDetail(num, el, title, type) {
+  const on = favToggle(num, title, type);
+  if (el) el.textContent = on ? '★ 已收藏' : '☆ 收藏';
+  toast(on ? '已收藏，可在「我的 → 我的收藏」查看' : '已取消收藏', on ? 'success' : 'info');
+  syncFavCount();
+}
+function showMyFavs() {
+  const m = document.getElementById('myFavModal');
+  if (!m) return;
+  m.classList.add('active');
+  renderMyFavList();
+}
+function closeMyFavs() {
+  const m = document.getElementById('myFavModal');
+  if (m) m.classList.remove('active');
+}
+function favRemove(num) {
+  favToggle(num);
+  renderMyFavList();
+  syncFavCount();
+  toast('已取消收藏', 'info');
+}
+function clearAllFavs() {
+  if (!confirm('确定清空全部收藏吗？此操作不可恢复。')) return;
+  favSave({});
+  renderMyFavList();
+  syncFavCount();
+  toast('已清空收藏', 'info');
+}
+function renderMyFavList() {
+  const el = document.getElementById('myFavList');
+  if (!el) return;
+  const m = favAll();
+  const rows = Object.keys(m)
+    .map(function (k) { return { num: k, v: m[k] || {} }; })
+    .sort(function (a, b) { return (b.v.t || 0) - (a.v.t || 0); });
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⭐</div>'
+      + '<p class="empty-state-title">还没有收藏</p>'
+      + '<p class="empty-state-hint">在帖子上点 ☆ 即可收藏，方便回头再找</p></div>';
+    return;
+  }
+  el.innerHTML = rows.map(function (r) {
+    const num = Number(r.num);
+    // v1.57.0：类型 key → 中文（收藏时存的是 o.type 原始值）
+    const FAV_TY = { task: '跑腿', errand: '跑腿', skill: '技能', secondhand: '二手', borrow: '借物', qa: '问答', academic: '问答', find: '找人', chat: '私信', goods: '物品流转', forum: '论坛' };
+    const tyLabel = r.v.ty ? (FAV_TY[r.v.ty] || r.v.ty) : '';
+    return '<div class="fav-row" onclick="closeMyFavs();showDetail(' + num + ')">'
+      + '<div class="fav-row-main">'
+      + '<div class="fav-row-title">' + esc(r.v.ti || ('帖子 #' + r.num)) + '</div>'
+      + '<div class="fav-row-sub">' + (tyLabel ? esc(tyLabel) + ' · ' : '') + timeAgo(new Date(r.v.t || Date.now()).toISOString()) + '</div>'
+      + '</div>'
+      + '<button class="fav-btn on" onclick="event.stopPropagation();favRemove(' + num + ')" title="取消收藏">★</button>'
+      + '</div>';
+  }).join('');
 }
 
 function renderOrders(orders) {
@@ -4478,15 +4659,18 @@ function renderOrders(orders) {
       + '<div class="order-card-body">'
       + '<div class="order-card-header">'
       + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + recTag + dormTag + shTag
+      // v1.57.0 收藏星标：卡片右上角（不冒泡到详情）
+      + (o._issue_number ? '<span class="' + favBtnClass(favHas(o._issue_number)) + ' fav-btn-card" onclick="event.stopPropagation();favToggleCard(' + o._issue_number + ',this,\'' + escAttr(o.title || '') + '\',\'' + escAttr(o.type || '') + '\')" title="收藏">' + favStar(favHas(o._issue_number)) + '</span>' : '')
       + '<span class="order-card-status status-' + o.status + '">' + (o.type === 'qa' || o.type === 'find' || o.type === 'academic' ? (o.solved ? '✅ 已解决' : (o.type === 'find' ? '🔍 寻找中' : '💬 待解答')) : o.type === 'chat' ? '💬 对话中' : sl[o.status]) + '</span>'
       + '</div>'
       // v1.40.1 紧凑化：在 header 后插入头像+byline 行（仿 forum-card-head）
-      + '<div class="order-card-author">'
+      // v1.57.0 发布者整行可点进主页（此前只有昵称小蓝字可点，头像是死的）
+      + '<div class="order-card-author" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="cursor:pointer" title="查看 TA 的主页">'
       + '<div class="order-card-avatar">' + esc((o.publisher_name || '匿').charAt(0)) + '</div>'
       + '<div class="order-card-byline">'
-      + '<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">'
+      + '<span style="color:var(--primary)">'
       + (canSeePrivate(o) ? esc(o.publisher_name || '未知') : maskName(o.publisher_name, o.publisher_student_id))
-      + '</a>'
+      + '</span>'
       + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '')
       + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '')
       + (o.campus ? '<span class="campus-badge">🏫 同校</span>' : '')
@@ -4507,7 +4691,7 @@ function renderOrders(orders) {
       + '<div class="order-card-meta">'
       + (o.type === 'qa' || o.type === 'academic'
           ? (o.bounty > 0 ? '<span class="order-card-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '</span>' : '<span style="color:var(--text-muted);font-size:.85rem">免费互助</span>')
-          : (o.type === 'find' ? '' : '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>' + (o.original_price > 0 ? '<span class="order-card-original">¥' + o.original_price.toFixed(2) + '</span>' : '')))
+          : (o.type === 'find' ? '' : priceText(o)))
       + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '')
       + (o.gender_limit && o.gender_limit !== 'any' ? '<span class="gender-badge">👤 ' + (o.gender_limit === 'male' ? '仅限男生' : '仅限女生') + '</span>' : '')
       + (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : '')
@@ -5526,7 +5710,8 @@ async function showDetail(issueNum) {
       + '<div class="detail-header"><span class="detail-type type-' + (o.category || 'other') + '">' + tl[o.type] + '</span>'
       + '<span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">' + (isQA ? (o.solved ? '✅ 已解决' : '💬 待解答') : sl[o.status]) + '</span></div>'
       + '<h3 class="detail-title">' + esc(o.title) + '</h3>'
-      + (isQA ? (o.bounty > 0 ? '<div class="detail-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '（采纳最佳答案后线下支付）</div>' : '') : '<div class="detail-price">¥' + o.price.toFixed(2) + '</div>')
+      + (isQA ? (o.bounty > 0 ? '<div class="detail-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '（采纳最佳答案后线下支付）</div>' : '')
+              : '<div class="detail-price">' + (Number(o.price) > 0 ? '¥' + Number(o.price).toFixed(2) : (o.type === 'borrow' ? '免费借' : (o.type === 'secondhand' ? '价格面议' : '免费互助'))) + '</div>')
       + '<div class="detail-meta">'
       + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
       + (isQA || !o.gender_limit || o.gender_limit === 'any' ? '' : '<span style="font-size:.78rem;background:#e0e7ff;color:#3730a3;padding:2px 9px;border-radius:99px">👤 性别要求：' + (o.gender_limit === 'male' ? '仅限男生' : '仅限女生') + '</span>')
@@ -5558,7 +5743,10 @@ async function showDetail(issueNum) {
       + (o.type === 'qa' ? '<div style="margin-top:12px"><button type="button" class="btn btn-ai btn-sm" onclick="aiSolve()">🤖 AI 解题思路</button><div id="qaAiSolveBox" style="margin-top:10px;font-size:.88rem;color:var(--text-secondary);white-space:pre-wrap"></div></div>' : '')
       + (isQA ? '' : paymentHTML + takenPayHint + takerPayHTML) + qaBountyHTML
       + ((o.type === 'secondhand' || o.type === 'borrow') ? renderAiSecondhandMatches(o) : '')
-      + '<div class="detail-actions">' + actions + '</div>';
+      // v1.57.0 详情内收藏（收藏是「个人可见」动作，不改任何服务端数据）
+      + '<div class="detail-actions">'
+      + '<button type="button" class="btn btn-outline btn-sm" onclick="favToggleDetail(' + issueNum + ',this,\'' + escAttr(o.title || '') + '\',\'' + escAttr(o.type || '') + '\')">' + (favHas(issueNum) ? '★ 已收藏' : '☆ 收藏') + '</button>'
+      + actions + '</div>';
     // 加载评论区
     await loadComments(issueNum);
     // 启动自动刷新
@@ -9203,6 +9391,11 @@ async function handlePublish(e) {
     : (document.getElementById('publishImage').files || []);
 
   if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
+  // v1.57.0 发布质量门槛：标题至少 4 字、描述至少 4 字，且不能是无意义内容
+  //   （线上大量「无」「？」「help」这类空帖，会让搜索和推荐整体失效）
+  if (title.length < 4) { err.textContent = '标题太短了（至少 4 个字），写清楚要做什么别人才好接单'; err.style.display = 'block'; return; }
+  if (isJunkTitle(title)) { err.textContent = '标题不能是「' + title + '」这类没信息量的内容，请具体描述'; err.style.display = 'block'; return; }
+  if (desc.length < 4) { err.textContent = '描述太短了（至少 4 个字），补充下时间、地点或具体要求'; err.style.display = 'block'; return; }
   const sensitiveWord = checkSensitive(title + ' ' + desc);
   if (sensitiveWord) { err.textContent = '内容包含敏感词「' + sensitiveWord + '」，请修改后重新发布'; err.style.display = 'block'; return; }
   // 联系方式泄露软提醒（不阻断发布，仅提示风险）
@@ -9550,7 +9743,7 @@ function renderMyOrders(orders, tab, subTab) {
       ? '<div class="order-card-meta"><span style="color:var(--text-muted);font-size:.8rem">💬 私信对话</span></div>'
       : '<div class="order-card-meta">' + (o.type === 'qa' || o.type === 'academic'
           ? (o.bounty > 0 ? '<span class="order-card-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '</span>' : '<span style="color:var(--text-muted);font-size:.85rem">免费互助</span>')
-          : '<span class="order-card-price">¥' + o.price.toFixed(2) + '</span>') + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : '') + '</div>';
+          : priceText(o)) + (o.location ? '<span class="order-card-location">📍 ' + esc(o.location) + '</span>' : '') + (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : '') + '</div>';
     // 缩略图
     const imgList2 = o.images && o.images.length > 0 ? o.images : (o.image ? [o.image] : []);
     const thumbHTML2 = imgList2.length > 0
@@ -9566,6 +9759,7 @@ function renderMyOrders(orders, tab, subTab) {
 }
 
 async function loadMyOrders(myTab) {
+  syncFavCount();   // v1.57.0 收藏数同步（未登录也显示本地收藏）
   const profile = document.getElementById('myProfile');
   const tabsEl = document.getElementById('myOrderTabs');
   const listEl = document.getElementById('myOrdersList');
@@ -9792,11 +9986,12 @@ function fillMyUserCard() {
   const credit = (u.credit_score != null) ? u.credit_score : 100;
   const cEl = document.getElementById('myCreditNum');
   if (cEl) cEl.textContent = credit;
-  // 志愿时长（对接中）展示位：数据来自 computeVolunteerHours() 唯一换算入口
+  // v1.57.0 互助贡献展示位：正向互助次数（整数、可解释）；0 次时整块隐藏，避免"空有文案没数据"
   const vEl = document.getElementById('myVolunteerNum');
-  if (vEl) vEl.textContent = computeVolunteerHours(u);
   const vWrap = document.getElementById('myVolunteerWrap');
-  if (vWrap) vWrap.style.display = 'block';
+  const contrib = computeContributionCount(u);
+  if (vEl) vEl.textContent = contrib;
+  if (vWrap) vWrap.style.display = contrib > 0 ? 'block' : 'none';
   const badges = [];
   if (u.status === 'approved' || u.name) badges.push('<span class="ub ub-verified">已实名</span>');
   if (isVIP()) badges.push('<span class="ub ub-vip">⭐ 会员</span>');
