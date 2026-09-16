@@ -3,8 +3,8 @@
 <head data-page-node-id="eYdSsfZZhBRoaWwxYXhf8r">
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.55.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
+<meta name="version" content="1.56.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -1275,6 +1275,11 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 .forum-pub-img button{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,.5);color:#fff;font-size:.7rem;cursor:pointer;line-height:1}
 .forum-detail-loading{color:var(--text-muted);font-size:.85rem}
 
+/* v1.56.0 发布表单草稿开关（跑腿 + 论坛共用） */
+.draft-bar{margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.8rem;color:#6b7280}
+.draft-bar-label{display:inline-flex;align-items:center;gap:6px;margin:0;cursor:pointer;user-select:none;font-weight:400}
+.draft-bar-cb{width:auto!important;margin:0!important;flex:none}
+.draft-bar-clear{background:none;border:none;padding:0;color:#2563eb;cursor:pointer;font-size:.8rem}
 </style>
 </head>
 <body data-page-node-id="bfreJjpoF6FdvAS5rpVNIW">
@@ -2056,6 +2061,14 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <p class="form-hint" id="publishFeeHint" style="display:none" data-page-node-id="IJiKAQ8yujbHhExI8CW3Lc"></p>
       <p class="form-error" id="publishError" data-page-node-id="yfEfgF7f7NxP85f83Ou0iy"></p>
       <button type="submit" class="btn btn-primary btn-block" data-page-node-id="XUlgE5m4QPwX8aGnlUNYEA">发布</button>
+      <!-- v1.56.0 草稿开关：默认保存；关掉则立即清除且不再留痕（发树洞/匿名内容的人可用） -->
+      <div class="draft-bar" data-page-node-id="draftBarPub">
+        <label class="draft-bar-label">
+          <input type="checkbox" id="pubSaveDraft" class="draft-bar-cb" checked onchange="onDraftToggle(this.checked)">
+          <span>💾 保存草稿，下次自动恢复</span>
+        </label>
+        <button type="button" class="draft-bar-clear" onclick="clearMyDrafts()">清除草稿</button>
+      </div>
     </form>
   </div>
 </div>
@@ -2352,6 +2365,14 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       </div>
       <p class="form-error" id="forumPublishError" style="display:none" data-page-node-id="y99g5ydWPlaqJFmEOkTi5y"></p>
       <button type="submit" class="btn btn-primary btn-block" id="forumPublishSubmit" data-page-node-id="ZwylCCt39u0hc8jHAyAq66">发布</button>
+      <!-- v1.56.0 草稿开关（与跑腿发布共用同一偏好） -->
+      <div class="draft-bar" data-page-node-id="draftBarForum">
+        <label class="draft-bar-label">
+          <input type="checkbox" id="forumSaveDraft" class="draft-bar-cb" checked onchange="onDraftToggle(this.checked)">
+          <span>💾 保存草稿，下次自动恢复</span>
+        </label>
+        <button type="button" class="draft-bar-clear" onclick="clearMyDrafts()">清除草稿</button>
+      </div>
     </form>
   </div>
 </div>
@@ -2710,7 +2731,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.55.0';
+const APP_VERSION = '1.56.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -2811,6 +2832,18 @@ function cacheGetStale(key) {
   updateUI();
   // 后台同步最新用户数据，保证多设备昵称/收款信息一致
   if (S.user && S.user._issue_number) syncCurrentUser();
+  // v1.56.0：会话静默核验 + 滑动续签
+  //   ① 核验：token 可能已过期/被服务端拒绝，但本地仍残留用户信息 → 界面"假装已登录"，
+  //      直到点发布才撞 401。此处静默清理，不弹模态（用户可能只是在浏览，不该被打断）。
+  //   ② 续签：会话确认有效后，看剩余寿命是否该换新，避免被动掉登录。
+  if (S.user && getToken()) {
+    setTimeout(function () {
+      ghApi('/api/me', 'GET', null, { timeout: 8000, retries: 0 }).then(function (res) {
+        if (res && res.status === 401) { try { clearToken(); } catch (e) {} }
+        else if (res && res.ok) { maybeRenewToken(); }
+      }).catch(function () {});
+    }, 1500);
+  }
   // 切回页面时再次同步（防止用户在其他设备修改后本设备未刷新）
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && S.user && S.user._issue_number) syncCurrentUser();
@@ -2864,6 +2897,56 @@ function requireAuth() {
   }
   return true;
 }
+
+// v1.56.0：会话有效性前置校验（消除"假登录态"）
+//   背景：S.user 是从 localStorage 恢复的、不校验 token；token 过期/失效后界面仍显示"已登录"，
+//         用户要点到「发布」才撞 401（论坛发帖路径甚至裸显示英文 UNAUTHORIZED，不知道发生了什么）。
+//   做法：写操作前向 /api/me 打一次轻量探针；401 说明 token 已废 → 清干净 + 弹登录框。
+//   网络异常一律 fail-open（返回 true），绝不因为探针失败而阻断用户的正常操作。
+let _sessionCheckedAt = 0;
+async function ensureSessionValid(opts) {
+  const ro = opts || {};
+  if (!S.user) { showAuthModal(); return false; }
+  if (!getToken()) { onAuthRequired('登录态已过期，请重新登录后操作'); return false; }
+  if (!ro.force && Date.now() - _sessionCheckedAt < 30000) return true;  // 30s 内已校验过，跳过
+  try {
+    const res = await ghApi('/api/me', 'GET', null, { timeout: 8000, retries: 0 });
+    if (res.status === 401) {
+      clearToken();
+      onAuthRequired('登录态已过期，请重新登录后操作');
+      return false;
+    }
+    if (res.ok) _sessionCheckedAt = Date.now();
+    return true;
+  } catch (e) {
+    return true; // fail-open
+  }
+}
+window.ensureSessionValid = ensureSessionValid;
+
+// v1.56.0 滑动续签：token 剩余寿命不足 RENEW_AHEAD_MS 时静默换新。
+//   配合后端 TOKEN_TTL=30 天，只要用户在 25 天内来过一次，就永远不会被登出。
+//   续签失败静默忽略（下次启动/操作还会再试），不打扰用户。
+const RENEW_AHEAD_MS = 5 * 24 * 3600 * 1000;
+let _renewing = false;
+function maybeRenewToken() {
+  if (_renewing) return;
+  const tp = tokenPayload();
+  if (!tp || !tp.exp) return;                        // 解析不出或已过期 → 只能走重新登录
+  if (tp.exp - Date.now() > RENEW_AHEAD_MS) return;  // 还很充裕，不打扰服务端
+  _renewing = true;
+  ghApi('/api/auth/renew', 'POST', {}, { timeout: 10000, retries: 0 })
+    .then(function (res) { return (res && res.ok) ? res.json().catch(function () { return null; }) : null; })
+    .then(function (d) {
+      if (d && d.token) {
+        setToken(d.token);
+        try { setCookie('hust_token', d.token, 30); } catch (e) {}
+      }
+    })
+    .catch(function () {})
+    .then(function () { _renewing = false; });
+}
+window.maybeRenewToken = maybeRenewToken;
 
 // v1.42.19：clearToken 同步清 S.user 和 hust_current_user，避免"假登录态"。
 //   之前只清 token，导致 S.user 仍残留（从 hust_current_user 还原）、ghApi 仍认为有用户
@@ -2994,7 +3077,12 @@ function ghFetchWithRetry(url, opts, retriesLeft, timeoutMs) {
     .catch(function (err) {
       clearTimeout(timer);
       if (err && err.name === 'AbortError') {
-        if (retriesLeft > 0) return ghFetchWithRetry(url, opts, retriesLeft - 1, tms);
+        // v1.56.0：写操作（POST/PATCH/PUT/DELETE）超时不再重试。
+        //   历史问题：发布超时后自动重试，若首次其实已在服务端成功，会产生重复帖子。
+        //   写操作宁可明确报「超时」让用户自查，也不冒险重复提交。
+        const _m = String((opts && opts.method) || 'GET').toUpperCase();
+        const _isWrite = (_m === 'POST' || _m === 'PATCH' || _m === 'PUT' || _m === 'DELETE');
+        if (retriesLeft > 0 && !_isWrite) return ghFetchWithRetry(url, opts, retriesLeft - 1, tms);
         return new Response(JSON.stringify({ error: 'timeout' }), { status: 504, headers: { 'Content-Type': 'application/json' } });
       }
       throw err;
@@ -3494,6 +3582,17 @@ function showForumPublishModal() {
   S._forumImages = [];
   const prev = document.getElementById('forumPublishImages'); if (prev) prev.innerHTML = '';
   const err = document.getElementById('forumPublishError'); if (err) { err.style.display = 'none'; err.textContent = ''; }
+  // v1.56.0：草稿自动保存绑定（只绑一次）+ 恢复未发布草稿 + 同步开关显示
+  if (!window._forumDraftBound) {
+    window._forumDraftBound = true;
+    const ff = document.getElementById('forumPublishModal');
+    if (ff) ff.querySelectorAll('#forumPublishTitle,#forumPublishContent,#forumPublishCat,#forumPublishCampus,#forumPublishAnon').forEach(function (el) {
+      el.addEventListener('input', saveForumDraft);
+      el.addEventListener('change', saveForumDraft);
+    });
+  }
+  syncDraftToggleUI();
+  restoreForumDraft();
 }
 function onForumCatChange() {
   const cat = (document.getElementById('forumPublishCat') || {}).value;
@@ -3528,6 +3627,9 @@ function removeForumImage(i) {
 }
 async function submitForumPost() {
   if (!S.user) { showAuthModal(); return; }
+  // v1.56.0：发布前先确认登录态真的还有效——否则 AI 安全检测空跑几秒，
+  //   最后在写入时才撞 401，用户完全不知道发生了什么。
+  if (!(await ensureSessionValid())) return;
   const err = document.getElementById('forumPublishError');
   const cat = document.getElementById('forumPublishCat').value;
   const title = document.getElementById('forumPublishTitle').value.trim();
@@ -3580,6 +3682,7 @@ async function submitForumPost() {
     const labels = ['forum', 'forum-' + cat];
     const created = await ghCreateIssue('[论坛]' + title, JSON.stringify(bodyObj), labels);
     if (err) err.style.display = 'none';
+    clearForumDraft();   // v1.56.0：发布成功才清草稿（失败时保留，方便改了再发）
     closeForumPublishModal();
     toast('发布成功 🎉', 'success');
     document.getElementById('forumPublishTitle').value = '';
@@ -3595,7 +3698,17 @@ async function submitForumPost() {
       aiExtractAndMatchLost(created.number, title, content, campus, lostType).catch(function (e) { try { console.warn('AI 抽取失败:', e); } catch(_){} });
     }
   } catch (e) {
-    err.textContent = '发布失败：' + (e.message || '请重试'); err.style.display = 'block';
+    // v1.56.0：错误提示人性化——此前直接把后端英文错误（UNAUTHORIZED / Validation Failed）甩给用户
+    let _fErr = e.message || '请重试';
+    if (/UNAUTHORIZED|401|登录态/i.test(_fErr)) {
+      _fErr = '登录态已过期，请重新登录后发布';
+      onAuthRequired(_fErr);
+    } else if (/Validation Failed/i.test(_fErr)) {
+      _fErr = '内容被服务端拒绝（多为分类标签异常），请稍后重试或换个分类';
+    } else if (/timeout|aborted/i.test(_fErr)) {
+      _fErr = '网络超时，请先到「校园圈」看看是否已发布成功，再决定是否重发';
+    }
+    err.textContent = '发布失败：' + _fErr; err.style.display = 'block';
   } finally {
     btn.disabled = false; btn.textContent = '发布';
   }
@@ -8721,42 +8834,120 @@ function logout() {
 }
 
 // ============ PUBLISH ============
-// ===== 发布表单草稿持久化（刷新/误触/部署刷新不丢，与验证码同源）=====
-function savePublishDraft() {
+// ===== v1.56.0 发布草稿（跑腿 + 论坛统一，可开关）=====
+//   历史：跑腿草稿无条件存 sessionStorage（关标签页即丢），论坛完全没有草稿。
+//   现在：① 统一存 localStorage，带 7 天有效期，关浏览器也不丢；
+//         ② 表单底部「保存草稿」开关可关闭；关掉即清除已有草稿且不再写入
+//            （发匿名帖/树洞内容的人不想在本地留痕）。
+const DRAFT_TTL_MS = 7 * 24 * 3600 * 1000;
+const DRAFT_KEYS = { pub: 'hust_publish_draft', forum: 'hust_forum_draft' };
+
+function draftsEnabled() {
+  try { return localStorage.getItem('hust_draft_off') !== '1'; } catch (e) { return true; }
+}
+function setDraftsEnabled(on) {
+  try { if (on) localStorage.removeItem('hust_draft_off'); else localStorage.setItem('hust_draft_off', '1'); } catch (e) {}
+}
+function syncDraftToggleUI() {
+  const on = draftsEnabled();
+  ['pubSaveDraft', 'forumSaveDraft'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.checked = on;
+  });
+}
+function onDraftToggle(on) {
+  setDraftsEnabled(!!on);
+  if (!on) clearMyDrafts(true);   // 关闭 → 立即清除本地留痕
+  syncDraftToggleUI();
+  try { if (window.toast) toast(on ? '已开启草稿保存' : '已关闭草稿保存，本地记录已清除'); } catch (e) {}
+}
+function clearMyDrafts(silent) {
+  try { Object.keys(DRAFT_KEYS).forEach(function (k) { localStorage.removeItem(DRAFT_KEYS[k]); }); } catch (e) {}
+  try { sessionStorage.removeItem('hust_publish_draft'); } catch (e) {}  // 清掉旧版本遗留的 session 草稿
+  if (!silent) { try { if (window.toast) toast('草稿已清除'); } catch (e) {} }
+}
+function writeDraft(key, obj) {
+  if (!draftsEnabled()) return;
+  try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), d: obj })); } catch (e) {}
+}
+function readDraft(key) {
+  if (!draftsEnabled()) return null;
   try {
-    const g = id => { const e = document.getElementById(id); return e ? e.value : ''; };
-    const draft = {
-      type: g('publishType'), category: g('publishCategory'),
-      title: g('publishTitle'), desc: g('publishDesc'),
-      location: g('publishLocation'), urgency: g('publishUrgency'),
-      payment: g('publishPayment'), deadline: g('publishDeadline'),
-      genderLimit: g('publishGenderLimit'),
-      bountyEnable: document.getElementById('bountyEnable') ? document.getElementById('bountyEnable').checked : false,
-      bounty: g('publishBounty')
-    };
-    sessionStorage.setItem('hust_publish_draft', JSON.stringify(draft));
-  } catch (_) {}
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const pack = JSON.parse(raw);
+    if (!pack || !pack.d || !pack.t) return null;
+    if (Date.now() - pack.t > DRAFT_TTL_MS) { localStorage.removeItem(key); return null; }  // 过期自动清理
+    return pack.d;
+  } catch (e) { return null; }
+}
+function dropDraft(key) { try { localStorage.removeItem(key); } catch (e) {} }
+window.onDraftToggle = onDraftToggle;
+window.clearMyDrafts = clearMyDrafts;
+window.syncDraftToggleUI = syncDraftToggleUI;
+
+function savePublishDraft() {
+  const g = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+  const draft = {
+    type: g('publishType'), category: g('publishCategory'),
+    title: g('publishTitle'), desc: g('publishDesc'),
+    location: g('publishLocation'), urgency: g('publishUrgency'),
+    payment: g('publishPayment'), deadline: g('publishDeadline'),
+    genderLimit: g('publishGenderLimit'),
+    bountyEnable: document.getElementById('bountyEnable') ? document.getElementById('bountyEnable').checked : false,
+    bounty: g('publishBounty')
+  };
+  // 全空表单不写草稿，避免清空后仍留一条空记录
+  if (!draft.title && !draft.desc && !draft.location && !draft.payment) { dropDraft(DRAFT_KEYS.pub); return; }
+  writeDraft(DRAFT_KEYS.pub, draft);
 }
 function restorePublishDraft() {
-  try {
-    const raw = sessionStorage.getItem('hust_publish_draft');
-    if (!raw) return;
-    const d = JSON.parse(raw);
-    const set = (id, v) => { const e = document.getElementById(id); if (e && v != null) e.value = v; };
-    if (d.type) { const t = document.getElementById('publishType'); if (t) t.value = d.type; updatePublishCategories(); }
-    set('publishCategory', normalizeCat(d.category || ''));
-    set('publishTitle', d.title); set('publishDesc', d.desc);
-    set('publishLocation', d.location); set('publishUrgency', d.urgency);
-    set('publishPayment', d.payment); set('publishDeadline', d.deadline);
-    set('publishGenderLimit', d.genderLimit);
-    const be = document.getElementById('bountyEnable'); if (be && d.bountyEnable) { be.checked = true; toggleBountyInput(); set('publishBounty', d.bounty); }
-    updateCharCount('publishTitle', 'titleCount', 50);
-    updateCharCount('publishDesc', 'descCount', 500);
-  } catch (_) {}
+  const d = readDraft(DRAFT_KEYS.pub);
+  if (!d) return;
+  const set = (id, v) => { const e = document.getElementById(id); if (e && v != null) e.value = v; };
+  if (d.type) { const t = document.getElementById('publishType'); if (t) t.value = d.type; updatePublishCategories(); }
+  set('publishCategory', normalizeCat(d.category || ''));
+  set('publishTitle', d.title); set('publishDesc', d.desc);
+  set('publishLocation', d.location); set('publishUrgency', d.urgency);
+  set('publishPayment', d.payment); set('publishDeadline', d.deadline);
+  set('publishGenderLimit', d.genderLimit);
+  const be = document.getElementById('bountyEnable'); if (be && d.bountyEnable) { be.checked = true; toggleBountyInput(); set('publishBounty', d.bounty); }
+  updateCharCount('publishTitle', 'titleCount', 50);
+  updateCharCount('publishDesc', 'descCount', 500);
+  try { if (window.toast) toast('已恢复上次未发布的草稿'); } catch (e) {}
 }
-function clearPublishDraft() {
-  try { sessionStorage.removeItem('hust_publish_draft'); } catch (_) {}
+function clearPublishDraft() { dropDraft(DRAFT_KEYS.pub); }
+
+// ---- 论坛发帖草稿（v1.56.0 新增；此前论坛刷新即丢）----
+function saveForumDraft() {
+  const g = id => { const e = document.getElementById(id); return e ? (e.value || '') : ''; };
+  const anonEl = document.getElementById('forumPublishAnon');
+  const lostEl = document.querySelector('input[name="forumPublishLostType"]:checked');
+  const draft = {
+    cat: g('forumPublishCat'), title: g('forumPublishTitle'), content: g('forumPublishContent'),
+    campus: g('forumPublishCampus'),
+    anon: anonEl ? !!anonEl.checked : false,
+    lostType: lostEl ? lostEl.value : ''
+  };
+  if (!draft.title && !draft.content) { dropDraft(DRAFT_KEYS.forum); return; }
+  writeDraft(DRAFT_KEYS.forum, draft);
 }
+function restoreForumDraft() {
+  const d = readDraft(DRAFT_KEYS.forum);
+  if (!d) return;
+  const set = (id, v) => { const e = document.getElementById(id); if (e && v != null) e.value = v; };
+  if (d.cat) { set('forumPublishCat', d.cat); try { onForumCatChange(); } catch (e) {} }
+  set('forumPublishTitle', d.title);
+  set('forumPublishContent', d.content);
+  set('forumPublishCampus', d.campus);
+  const an = document.getElementById('forumPublishAnon'); if (an && typeof d.anon === 'boolean') an.checked = d.anon;
+  if (d.lostType) {
+    const r = document.querySelector('input[name="forumPublishLostType"][value="' + d.lostType + '"]');
+    if (r) r.checked = true;
+  }
+  try { if (window.toast) toast('已恢复上次未发布的草稿'); } catch (e) {}
+}
+function clearForumDraft() { dropDraft(DRAFT_KEYS.forum); }
 
 // ---- v1.18.0 安全须知条 ----
 function dismissSafetyTip() {
@@ -8784,6 +8975,7 @@ function showPublishModal(preType) {
       el.addEventListener('change', savePublishDraft);
     });
   }
+  syncDraftToggleUI();
   restorePublishDraft();
   if (preType) {
     const _ps = document.getElementById('publishType');
@@ -8947,6 +9139,8 @@ async function handlePublish(e) {
   e.preventDefault();
   const err = document.getElementById('publishError');
   if (!requireAuth()) return;
+  // v1.56.0：再确认一次登录态真的还有效（token 可能已被服务端拒绝但本地仍残留）
+  if (!(await ensureSessionValid())) return;
   // 信用分检查：低于25禁止发单
   if (!isAdminUser()) {
     const cs = S.user.credit_score != null ? S.user.credit_score : 100;
@@ -9206,9 +9400,14 @@ async function handlePublish(e) {
     const _pb = document.querySelector('#publishForm button[type=submit]');
     if (_pb) { _pb.disabled = false; _pb.textContent = '发布'; }
     let _pubErr = ex.message || '未知错误';
-    if (/UNAUTHORIZED|401|登录态/.test(_pubErr)) {
+    if (/UNAUTHORIZED|401|登录态/i.test(_pubErr)) {
       _pubErr = '登录态已过期，请重新登录后发布';
       onAuthRequired(_pubErr);
+    } else if (/Validation Failed/i.test(_pubErr)) {
+      // v1.56.0：GitHub 因分类标签异常拒绝写入时的兜底提示
+      _pubErr = '内容被服务端拒绝（多为分类标签异常），请稍后重试或换个分类';
+    } else if (/timeout|aborted/i.test(_pubErr)) {
+      _pubErr = '网络超时，请先到列表看看是否已发布成功，再决定是否重发';
     }
     err.textContent = '发布失败：' + _pubErr; err.style.display = 'block';
   }

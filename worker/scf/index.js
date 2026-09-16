@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.45.0';
+const VERSION = '1.46.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -91,7 +91,8 @@ function checkSensitiveServer(text) {
 // 白名单：仅放行本仓库的 issues（含子路径 /comments），拒绝其它仓库/敏感路径
 const REPO_ESC = REPO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const GH_WHITELIST = new RegExp('^/repos/' + REPO_ESC + '/issues(/|\\?|$)');
-const TOKEN_TTL = 7 * 24 * 3600 * 1000; // 7 天（v1.41.5 延长：4h 太短，微信浏览器会话常驻、过期易掉登录，改为 7 天；签名为 HMAC-SHA256 安全无虞）
+const TOKEN_TTL = 30 * 24 * 3600 * 1000; // v1.56.0：7 天 → 30 天。配合前端「滑动续签」（剩余不足 5 天自动换新），
+                                         //   只要用户 25 天内来过一次就不会被登出；签名为 HMAC-SHA256，无状态且安全。
 const RATE_LIMIT = 10;               // 每 IP 每分钟最多 10 次登录/查重
 const RATE_WINDOW = 60 * 1000;
 
@@ -867,6 +868,58 @@ function clientIp(req) {
   return (xff.split(',')[0] || req.socket.remoteAddress || 'unknown').trim();
 }
 
+// ---- v1.56.0：GitHub label 自动补齐 ----
+// 背景：前端把「发布类型 + 二级分类」直接当 label 传给 GitHub（如 qa / borrow / find / queue / buy …），
+//   但仓库里并不都存在这些 label。GitHub 建 issue 时只要有一个 label 不存在，整个请求就
+//   422 Validation Failed —— 导致「有问必答 / 借物 / 找搭子 / 大部分二手分类」根本发不出去
+//   （线上 69 条帖子里真实存在的 label 只有 order/task/secondhand/express/food/repair/book 等寥寥几个）。
+// 做法：建 issue 前比对仓库现有 label（内存缓存 10 分钟，正常情况零额外开销），缺失的自动创建；
+//   若创建失败（权限/网络）则把该 label 从数组里剔除降级 —— 宁可少个标签，也不能让用户发不出去。
+const LABEL_CACHE_TTL = 10 * 60 * 1000;
+const LABEL_COLORS = ['1d76db', '0e8a16', 'd93f0b', '5319e7', 'fbca04', '006b75', 'b60205', 'c2e0c6', 'bfd4f2', 'e99695'];
+let _labelCache = { at: 0, names: null };
+
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < String(s).length; i++) h = (h * 31 + String(s).charCodeAt(i)) | 0;
+  return h;
+}
+
+async function fetchLabelNames() {
+  if (_labelCache.names && (Date.now() - _labelCache.at) < LABEL_CACHE_TTL) return _labelCache.names;
+  const names = new Set();
+  try {
+    for (let page = 1; page <= 3; page++) {
+      const { status, data } = await ghProxy(`/repos/${REPO}/labels?per_page=100&page=${page}`, 'GET', null);
+      if (status !== 200 || !Array.isArray(data)) break;
+      data.forEach(l => { if (l && l.name) names.add(String(l.name)); });
+      if (data.length < 100) break;
+    }
+  } catch (e) {
+    return null;   // 查询失败 → 返回 null，调用方跳过校验（绝不因校验而阻断发布）
+  }
+  _labelCache = { at: Date.now(), names };
+  return names;
+}
+
+async function ensureLabelsExist(labels) {
+  if (!Array.isArray(labels) || !labels.length) return labels;
+  const wanted = labels.filter(l => l && typeof l === 'string');
+  if (!wanted.length) return labels;
+  const names = await fetchLabelNames();
+  if (!names) return labels;
+  const missing = wanted.filter(n => !names.has(n));
+  for (const n of missing) {
+    const color = LABEL_COLORS[Math.abs(hashStr(n)) % LABEL_COLORS.length];
+    try {
+      const r = await ghProxy(`/repos/${REPO}/labels`, 'POST', { name: n, color, description: '自动创建' });
+      // 201/200 = 建成功；422 = 已存在（并发创建）→ 都视为可用
+      if (r && (r.status === 201 || r.status === 200 || r.status === 422)) names.add(n);
+    } catch (e) { /* 单个失败无所谓，下面统一剔除 */ }
+  }
+  return wanted.filter(n => names.has(n));
+}
+
 // ---- 转发到 GitHub（Token 由服务端注入）----
 async function ghProxy(ghPath, method, body) {
   const opts = {
@@ -1165,6 +1218,29 @@ const server = http.createServer(async (req, res) => {
           safe._issue_number = issue.number;
           const token = signToken({ sid: u.student_id, role: roleOf(u.student_id), num: issue.number, iat: Date.now(), exp: Date.now() + TOKEN_TTL, pv: 1 });
           return sendJSON(res, 200, { token, exp: Date.now() + TOKEN_TTL, user: safe }, headers);
+        }
+
+        // ---- v1.56.0 会话滑动续签：用未过期的旧 token 换一张 30 天新票 ----
+        //   前端在 token 剩余寿命不足 5 天时静默调用，实现「只要 25 天内来过一次就永不掉登录」。
+        //   续签前复核账号仍然有效（用户 issue 存在、未封禁），避免已处置账号靠续签长期滞留。
+        if (method === 'POST' && path === '/api/auth/renew') {
+          const tk = bearerPayload(req);
+          if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED', hint: '登录态已失效' }, headers);
+          if (rateLimited(clientIp(req), AI_RATE_LIMIT)) return sendJSON(res, 429, { error: 'RATE_LIMITED' }, headers);
+          let u = {};
+          try {
+            const { status, data } = await ghProxy(`/repos/${REPO}/issues/${tk.num}`, 'GET', null);
+            if (status !== 200 || !data) return sendJSON(res, 401, { error: 'UNAUTHORIZED', hint: '账号不存在' }, headers);
+            try { u = JSON.parse(data.body || '{}'); } catch (e) { u = {}; }
+          } catch (e) {
+            return sendJSON(res, 502, { error: 'RENEW_CHECK_FAILED' }, headers);
+          }
+          if (u.status === 'banned' || u.banned === true) {
+            return sendJSON(res, 403, { error: 'BANNED', hint: '账号已被封禁' }, headers);
+          }
+          const exp = Date.now() + TOKEN_TTL;
+          const token = signToken({ sid: tk.sid, role: tk.role, num: tk.num, iat: Date.now(), exp, pv: 1 });
+          return sendJSON(res, 200, { ok: true, token, exp }, headers);
         }
 
         // ---- ImgBB 图床：服务端注入 key ----
@@ -1651,6 +1727,10 @@ const server = http.createServer(async (req, res) => {
         let ghPath = '';
         if (method === 'POST' && path === '/api/issues') {
           ghPath = `/repos/${REPO}/issues`;
+          // v1.56.0：建 issue 前校验/补齐 labels，避免「标签不存在 → 422 Validation Failed」
+          if (ghBody && Array.isArray(ghBody.labels)) {
+            ghBody = Object.assign({}, ghBody, { labels: await ensureLabelsExist(ghBody.labels) });
+          }
         } else if (method === 'POST' && /^\/api\/comments\/\d+$/.test(path)) {
           const num = path.split('/api/comments/')[1];
           ghPath = `/repos/${REPO}/issues/${num}/comments`;
