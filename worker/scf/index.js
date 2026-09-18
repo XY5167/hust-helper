@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.48.0';
+const VERSION = '1.49.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -1798,28 +1798,18 @@ const server = http.createServer(async (req, res) => {
         let ghPath = '';
         if (method === 'POST' && path === '/api/issues') {
           ghPath = `/repos/${REPO}/issues`;
-          // v1.57.0：服务端口径兜底——标题/正文为空或无信息量时直接拒绝（前端可能被绕过）
+          // v1.57.0 / v1.59.2：服务端口径兜底——标题过短或无信息量时拒绝（前端可能被绕过）；描述已改为选填
           {
+            // v1.59.2：与前端同步放宽（标题下限 4→2 字；描述改为选填、不再校验长度）
             const rawTitle = String((ghBody && ghBody.title) || '').trim();
             const cleanTitle = rawTitle.replace(/^\[[^\]]*\]/, '').trim();   // 前端会加「[论坛]」等前缀
-            if (cleanTitle.length < 4 || isJunkTitleSrv(cleanTitle)) {
+            if (cleanTitle.length < 2 || isJunkTitleSrv(cleanTitle)) {
               return sendJSON(res, 400, {
                 error: 'BAD_TITLE',
-                hint: '标题太短或没有信息量（至少 4 个字），请写清楚具体需求'
+                hint: '标题太短或没有信息量（至少 2 个字），请写清楚具体需求'
               }, headers);
             }
-            // 正文：只在「填了但明显没信息量」时拒绝，避免误伤无正文的历史流程
-            let payloadText = '';
-            try {
-              const p = JSON.parse((ghBody && ghBody.body) || '{}');
-              payloadText = String(p.description || p.content || '').trim();
-            } catch (e) { payloadText = ''; }
-            if (payloadText && payloadText.length < 4) {
-              return sendJSON(res, 400, {
-                error: 'BAD_DESC',
-                hint: '描述太短了（至少 4 个字），补充下具体要求'
-              }, headers);
-            }
+            // 正文/详细描述：v1.59.2 起为选填，不再做长度拦截（保留敏感词等其它校验）
           }
           // v1.56.0：建 issue 前校验/补齐 labels，避免「标签不存在 → 422 Validation Failed」
           if (ghBody && Array.isArray(ghBody.labels)) {

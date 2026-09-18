@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.59.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.59.3" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -132,6 +132,13 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .want-badge{font-size:.68rem;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;padding:1px 7px;border-radius:99px;margin-left:4px;font-weight:600}
 /* v1.59.0 冷启动：无库存时展示的预设热门科目（虚线底 = 预设值、仍走正常筛选逻辑） */
 .filter-btn-preset{border-style:dashed;color:var(--text-secondary)}
+/* v1.59.3 科目筛选条默认收起为一行，点开才展开 chips */
+.filter-bar-toggle{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border:1.5px dashed var(--border);border-radius:99px;background:var(--bg-card);font-size:.83rem;font-weight:600;color:var(--text-secondary);cursor:pointer;font-family:inherit;transition:all .15s}
+.filter-bar-toggle:hover{border-color:var(--brand);color:var(--brand)}
+.filter-bar-toggle-hint{font-size:.75rem;font-weight:400;color:var(--text-muted);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filter-bar-toggle-caret{font-size:.7rem;color:var(--text-muted)}
+.filter-label-toggle{font-size:.78rem;font-weight:600;color:var(--text-muted);align-self:center;margin-right:4px;white-space:nowrap;background:transparent;border:none;padding:7px 2px;cursor:pointer;font-family:inherit;flex-shrink:0}
+.filter-label-toggle:hover{color:var(--brand)}
 /* v1.59.0 首屏一句话定位条（告诉陌生人这里是干什么的） */
 .forum-position{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin:10px 0}
 .forum-position-title{font-size:1rem;font-weight:700;color:var(--text)}
@@ -2715,7 +2722,7 @@ const EMAILJS_SERVICE_ID = 'service_2ngckrm';
 const EMAILJS_TEMPLATE_ID = 'template_qfwrpts';
 const EMAILJS_PUBLIC_KEY = 'Qi_-O5OdtoznNnzjw';
 
-const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all', find: 'all' }, taskTab: 'task', myTab: 'all', myPublishedSubTab: 'order', goodsSubTab: 'all', goodsCategory: 'all', bookSubject: '' };  // v1.41.0 bookSubject=选中的教材科目
+const S = { user: null, page: 'home', authTab: 'login', filter: { task: 'all', goods: 'all', qa: 'all', find: 'all' }, taskTab: 'task', myTab: 'all', myPublishedSubTab: 'order', goodsSubTab: 'all', goodsCategory: 'all', bookSubject: '', subjectBarOpen: false };  // v1.41.0 bookSubject=选中的教材科目；v1.59.3 subjectBarOpen=科目筛选条是否展开（默认收起）
 
 // ============ 敏感词过滤 ============
 const SENSITIVE_WORDS = new Set([
@@ -2907,7 +2914,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.59.1';
+const APP_VERSION = '1.59.3';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -5257,11 +5264,14 @@ function renderOrders(orders) {
     const act = actMap[_cachedType] || actMap.task;
     // v1.59.1：科目筛选把列表筛空了 → 不给「发布闲置」这种无关 CTA，改成「发求购」承接需求
     if (S.listingMode === 'ershou' && S.bookSubject) {
-      grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📚</div>'
-        + '<p class="empty-state-title">「' + esc(S.bookSubject) + '」暂时没有在售的书</p>'
-        + '<p class="empty-state-hint">发个求购，有书的同学看到会主动找你</p>'
-        + '<button class="btn btn-brand" onclick="wantBookSubject(\'' + escAttr(S.bookSubject) + '\')">🙋 发求购</button>'
-        + '<button class="btn btn-outline" onclick="filterBookSubject(\'\')">看全部科目</button></div>';
+      const _isOther = (S.bookSubject === OTHER_SUBJECT);
+      grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + (_isOther ? '📦' : '📚') + '</div>'
+        + '<p class="empty-state-title">' + (_isOther ? '暂时没有其他类物品' : '「' + esc(subjectDisplayName(S.bookSubject)) + '」暂时没有在售的书') + '</p>'
+        + '<p class="empty-state-hint">' + (_isOther ? '日用品、电子产品、服饰… 闲置都能挂上来' : '发个求购，有书的同学看到会主动找你') + '</p>'
+        + (_isOther
+            ? '<button class="btn btn-brand" onclick="showPublishModal(\'secondhand\')">📦 发布闲置</button>'
+            : '<button class="btn btn-brand" onclick="wantBookSubject(\'' + escAttr(S.bookSubject) + '\')">🙋 发求购</button>')
+        + '<button class="btn btn-outline" onclick="filterBookSubject(\'\')">看全部分类</button></div>';
       if (pager) pager.innerHTML = '';
       return;
     }
@@ -5363,6 +5373,11 @@ function renderOrders(orders) {
 // ============ v1.41.0 二手教材科目筛选（AI 分类动态聚合）============
 // v1.59.0 冷启动修复：零库存时不再隐藏筛选条，改用「预设热门科目」把空状态变成需求收集入口
 const HOT_BOOK_SUBJECTS = ['微积分', '线性代数', '大学物理', '大学英语', '概率论', '数据结构', 'C 语言', '马克思主义基本原理'];
+// v1.59.3：「其他」= 非教材类（电子产品/生活用品/服饰…）+ 教材但没填科目的帖子。
+//   纯科目维度对「出个台灯」「卖辆自行车」是死胡同——它们本来就不属于任何科目。
+const OTHER_SUBJECT = '__other__';
+function subjectDisplayName(sub) { return sub === OTHER_SUBJECT ? '其他' : String(sub || ''); }
+
 function renderBookSubjectFilters() {
   const bar = document.getElementById('bookSubjectFilters');
   if (!bar) return;
@@ -5370,41 +5385,73 @@ function renderBookSubjectFilters() {
   if (S.listingMode !== 'ershou') { bar.innerHTML = ''; bar.style.display = 'none'; S.bookSubject = ''; return; }
   const list = _cachedOrders || [];
   const counts = {};
+  let otherCount = 0;
   list.forEach(o => {
-    if ((o.category === 'book' || o.category === 'textbook') && o.ai_book_meta && o.ai_book_meta.subject) {
-      counts[o.ai_book_meta.subject] = (counts[o.ai_book_meta.subject] || 0) + 1;
+    const subj = (o.ai_book_meta && o.ai_book_meta.subject) || '';
+    if ((o.category === 'book' || o.category === 'textbook') && subj) {
+      counts[subj] = (counts[subj] || 0) + 1;
+    } else {
+      otherCount++;
     }
   });
   const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  // v1.59.0：零库存时不再整条隐藏 —— 那会让「AI 科目分类」这个核心卖点在没书时完全不可见。
-  // v1.59.1 修正：预设科目 chips 必须和正常态一样「只做筛选」，不能点一下就把用户甩进发布页。
-  //   求购入口改到「列表空状态」里给显式按钮 —— chip 行在移动端横向滚动，塞在尾部的按钮根本看不见。
-  if (top.length === 0) {
-    let h0 = '<span class="filter-label">📚 科目：</span>'
-      + '<button class="filter-btn' + (S.bookSubject ? '' : ' active') + '" onclick="filterBookSubject(\'\')">全部</button>';
-    HOT_BOOK_SUBJECTS.slice(0, 6).forEach(function (s) {
-      h0 += '<button class="filter-btn filter-btn-preset' + (S.bookSubject === s ? ' active' : '') + '" data-book-subject="' + esc(s) + '"'
-        + ' onclick="filterBookSubject(this.getAttribute(\'data-book-subject\'))">' + esc(s) + '</button>';
-    });
-    bar.innerHTML = h0;
+
+  // v1.59.3：默认收起成一行，点了才展开 —— 平时不占首屏，但「按科目找书」这个卖点仍有可见入口。
+  //   已选科目时强制展开：否则用户看不见「自己正被筛着」，只会觉得列表怎么空了。
+  const expanded = !!S.subjectBarOpen || !!S.bookSubject;
+  if (!expanded) {
+    const preview = top.length
+      ? top.slice(0, 3).map(kv => kv[0]).join(' · ')
+      : HOT_BOOK_SUBJECTS.slice(0, 3).join(' · ');
+    bar.innerHTML = '<button type="button" class="filter-bar-toggle" onclick="toggleSubjectBar()">'
+      + '📚 按科目找书'
+      + '<span class="filter-bar-toggle-hint">' + esc(preview) + '…</span>'
+      + '<span class="filter-bar-toggle-caret">▾</span>'
+      + '</button>';
     bar.style.display = 'flex';
     return;
   }
-  let html = '<span class="filter-label">📚 科目：</span>'
+
+  // v1.59.3：行首「📚 科目 ▴」本身就是收起按钮 —— 移动端 chip 行是横向滚动区，
+  //   把「收起」放在末尾等于永远看不见（上一版就踩过这个坑）。
+  let html = '<button type="button" class="filter-label-toggle" onclick="toggleSubjectBar()">📚 科目 ▴</button>'
     + '<button class="filter-btn' + (S.bookSubject ? '' : ' active') + '" onclick="filterBookSubject(\'\')">全部</button>';
-  top.forEach(function (kv) {
-    html += '<button class="filter-btn' + (S.bookSubject === kv[0] ? ' active' : '') + '" data-book-subject="' + esc(kv[0]) + '"'
-      + ' onclick="filterBookSubject(this.getAttribute(\'data-book-subject\'))">' + esc(kv[0]) + ' (' + kv[1] + ')</button>';
-  });
+  if (top.length === 0) {
+    HOT_BOOK_SUBJECTS.slice(0, 6).forEach(function (s) {
+      html += '<button class="filter-btn filter-btn-preset' + (S.bookSubject === s ? ' active' : '') + '" data-book-subject="' + esc(s) + '"'
+        + ' onclick="filterBookSubject(this.getAttribute(\'data-book-subject\'))">' + esc(s) + '</button>';
+    });
+  } else {
+    top.forEach(function (kv) {
+      html += '<button class="filter-btn' + (S.bookSubject === kv[0] ? ' active' : '') + '" data-book-subject="' + esc(kv[0]) + '"'
+        + ' onclick="filterBookSubject(this.getAttribute(\'data-book-subject\'))">' + esc(kv[0]) + ' (' + kv[1] + ')</button>';
+    });
+  }
+  // 「其他」兜底：电子产品 / 生活用品 / 服饰… 以及没填科目的教材
+  html += '<button class="filter-btn' + (S.bookSubject === OTHER_SUBJECT ? ' active' : '') + '" data-book-subject="' + OTHER_SUBJECT + '"'
+    + ' onclick="filterBookSubject(this.getAttribute(\'data-book-subject\'))">其他' + (otherCount ? ' (' + otherCount + ')' : '') + '</button>';
   bar.innerHTML = html;
   bar.style.display = 'flex';
 }
 
+// v1.59.3：展开/收起科目筛选条；收起时顺手清掉筛选条件（等同「看全部」）
+function toggleSubjectBar() {
+  const wasOpen = !!S.subjectBarOpen || !!S.bookSubject;
+  if (wasOpen) { S.subjectBarOpen = false; S.bookSubject = ''; }
+  else { S.subjectBarOpen = true; }
+  renderBookSubjectFilters();
+  if (wasOpen) { _taskCurrentPage = 1; applySearchAndSort(); }
+}
+
 function filterBookSubject(sub) {
   S.bookSubject = (S.bookSubject === sub) ? '' : sub;   // 再点同一个 = 取消筛选
+  if (S.bookSubject) S.subjectBarOpen = true;           // 选中后保持展开，让用户看得见自己正被筛着
   _taskCurrentPage = 1;
   applySearchAndSort();
-  if (window.toast) toast(sub && S.bookSubject ? '📚 已筛选：' + sub : '📚 已显示全部科目');
+  if (!window.toast) return;
+  if (!S.bookSubject) { toast('📚 已显示全部科目'); return; }
+  if (S.bookSubject === OTHER_SUBJECT) { toast('📚 已筛选：其他（非教材类 / 未填科目的物品）'); return; }
+  toast('📚 已筛选：' + S.bookSubject);
 }
 
 // v1.59.0：把用户带进「求购」发布，把需求留在平台上
@@ -5919,8 +5966,13 @@ function applySearchAndSort() {
   }
 
   // v1.41.0 教材科目筛选（与关键词、宿舍筛选是 AND 关系）
+  // v1.59.3：新增「其他」兜底分类 —— 非教材类物品（电子产品/生活用品/服饰…）与未填科目的教材
   if (S.bookSubject) {
-    orders = orders.filter(o => o.ai_book_meta && o.ai_book_meta.subject === S.bookSubject);
+    if (S.bookSubject === OTHER_SUBJECT) {
+      orders = orders.filter(o => !((o.category === 'book' || o.category === 'textbook') && o.ai_book_meta && o.ai_book_meta.subject));
+    } else {
+      orders = orders.filter(o => o.ai_book_meta && o.ai_book_meta.subject === S.bookSubject);
+    }
   }
 
   // 宿舍区域筛选（模糊匹配）
@@ -10118,11 +10170,11 @@ async function handlePublish(e) {
     : (document.getElementById('publishImage').files || []);
 
   if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
-  // v1.57.0 发布质量门槛：标题至少 4 字、描述至少 4 字，且不能是无意义内容
-  //   （线上大量「无」「？」「help」这类空帖，会让搜索和推荐整体失效）
-  if (title.length < 4) { err.textContent = '标题太短了（至少 4 个字），写清楚要做什么别人才好接单'; err.style.display = 'block'; return; }
+  // v1.59.2 放宽发布门槛：标题下限 4 → 2 字；详细描述改为选填（不再卡长度）
+  //   原来「标题≥4字 + 描述≥4字」两道硬卡，冷启动阶段把「出一本高数」这类真实短内容也拦了。
+  //   现在只保留「无信息量标题」拦截（无/？/help 这类），仍能挡住污染搜索的空帖。
+  if (title.length < 2) { err.textContent = '标题太短了（至少 2 个字），写清楚要做什么别人才好接单'; err.style.display = 'block'; return; }
   if (isJunkTitle(title)) { err.textContent = '标题不能是「' + title + '」这类没信息量的内容，请具体描述'; err.style.display = 'block'; return; }
-  if (desc.length < 4) { err.textContent = '描述太短了（至少 4 个字），补充下时间、地点或具体要求'; err.style.display = 'block'; return; }
   const sensitiveWord = checkSensitive(title + ' ' + desc);
   if (sensitiveWord) { err.textContent = '内容包含敏感词「' + sensitiveWord + '」，请修改后重新发布'; err.style.display = 'block'; return; }
   // 联系方式泄露软提醒（不阻断发布，仅提示风险）
