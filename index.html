@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.59.3" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.59.4" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2914,7 +2914,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.59.3';
+const APP_VERSION = '1.59.4';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3461,12 +3461,21 @@ function homeGo(type, cat) {
     if (cat) filterOrders(type, cat);
   }, 60);
 }
+// v1.59.4：二手/互助页有两个搜索框 —— 用户**看得见**的 #marketSearchInput（市场 header 里的）
+//   和真正驱动筛选的 #taskSearchInput。任何「程序化设置关键词」的地方都必须同时写这两处，
+//   否则会出现「搜索框是空的、列表却已经被筛过」的错乱感（首页搜索跳转后就踩了这个坑）。
+function setSearchKeyword(v) {
+  const a = document.getElementById('taskSearchInput');
+  const b = document.getElementById('marketSearchInput');
+  if (a) a.value = v;
+  if (b) b.value = v;
+  resetTaskPageAndApply();
+}
 // 首页搜索框：复用任务页既有搜索逻辑（#taskSearchInput + resetTaskPageAndApply）
 function homeSearchSubmit() {
   var v = (document.getElementById('homeSearchInput').value || '').trim();
   navigate('ershou');               // 搜索默认进入二手交易列表（共享搜索框）
-  var inp = document.getElementById('taskSearchInput');
-  if (inp) { inp.value = v; resetTaskPageAndApply(); }
+  setSearchKeyword(v);              // 两个搜索框同步 + 触发筛选（v1.59.4）
 }
 
 // 骨架屏占位（列表加载时使用）
@@ -4525,6 +4534,14 @@ function refreshCurrentTab() {
   loadOrders(tab, cat);
 }
 
+// v1.59.4：异步数据（缓存命中 / 网络返回）落地时必须走「按当前搜索与筛选状态重渲染」。
+//   历史 bug：loadOrders 里直接 renderOrders(全量 orders)，会把用户刚输入的关键词、
+//   刚选的科目、刚设的排序全部冲掉 —— 表现为「首页搜索框搜「大学物理」，先出了筛选结果，
+//   半秒后全量二手订单又把结果盖回去」（在二手页内搜索不触发 loadOrders，所以看不出问题）。
+function renderCurrentOrders() {
+  if (_cachedOrders) applySearchAndSort();
+}
+
 // v1.48.0 P1-9：归一化旧版二级分类 key，兼容历史数据（textbook/device/tool→新 9 类）
 function normalizeCat(c) {
   if (c === 'textbook') return 'book';
@@ -4539,10 +4556,13 @@ async function loadOrders(type, cat) {
   updateRecOnlyBtn();
 
   // 仅在切换 tab（type 变化）时清空搜索/排序；同 tab 内刷新保留用户输入
+  // v1.59.4：两个搜索框一起清（否则可见框里留着上次的词，但列表已按空关键词重排）
   if (_cachedType !== type) {
     const searchInput = document.getElementById('taskSearchInput');
+    const marketInput = document.getElementById('marketSearchInput');
     const sortSelect = document.getElementById('taskSortSelect');
     if (searchInput) searchInput.value = '';
+    if (marketInput) marketInput.value = '';
     if (sortSelect) sortSelect.value = 'newest';
   }
 
@@ -4552,7 +4572,8 @@ async function loadOrders(type, cat) {
   if (cached) {
     _cachedOrders = cached;
     _cachedType = type;
-    renderOrders(cached);
+    // v1.59.4：必须走「按当前搜索/筛选状态渲染」，不能直接 renderOrders(全量)
+    renderCurrentOrders();
   }
 
   // 2. 始终后台静默拉取最新数据（缓存命中时也不return，继续拉新数据）
@@ -4625,7 +4646,8 @@ async function loadOrders(type, cat) {
     _cachedOrders = orders;
     _cachedType = type;
     cacheSet(cacheKey, orders);
-    renderOrders(orders);
+    // v1.59.4：同上 —— 网络数据回来也要经过搜索/筛选/排序，否则会覆盖用户当前的搜索状态
+    renderCurrentOrders();
     // v1.55.0：发现缺向量的帖子就在后台静默补齐（不阻塞界面，也不打断浏览）
     try { maybeBackfillVectors(orders); } catch (e) {}
   } catch(e) {
@@ -5906,13 +5928,9 @@ function pickSearchSug(i) {
   applySearchSuggestion(it.term);
 }
 function applySearchSuggestion(kw) {
-  const inp = document.getElementById('taskSearchInput');
-  if (inp) inp.value = kw;
-  const mkt = document.getElementById('marketSearchInput');
-  if (mkt) mkt.value = kw;
   pushSearchHistory(kw);
   hideSearchSuggest();
-  resetTaskPageAndApply();
+  setSearchKeyword(kw);   // v1.59.4：两个搜索框同步 + 触发筛选（原来手写两处，容易漏）
 }
 // 校园圈（含失物招领）搜索：带 220ms 防抖，避免逐字重渲染
 let _forumSearchTimer = null;
@@ -8720,7 +8738,7 @@ async function confirmTakeOrder() {
     // 乐观更新：直接从缓存中更新该订单状态
     if (_cachedOrders) {
       const idx = _cachedOrders.findIndex(x => x._issue_number === inum);
-      if (idx !== -1) { _cachedOrders[idx].status = 'taken'; _cachedOrders[idx].taker_name = S.user.name; _cachedOrders[idx].taker_student_id = S.user.student_id; _cachedOrders[idx].estimate_finish_label = est.label; renderOrders(_cachedOrders); }
+      if (idx !== -1) { _cachedOrders[idx].status = 'taken'; _cachedOrders[idx].taker_name = S.user.name; _cachedOrders[idx].taker_student_id = S.user.student_id; _cachedOrders[idx].estimate_finish_label = est.label; renderCurrentOrders(); }
     }
     if (S.page === 'my') loadMyOrders();
     else if (S.page === 'task') { /* 已通过缓存更新，但异步再拉一次确保数据一致 */ setTimeout(() => refreshCurrentTab(), 1500); }
@@ -8752,10 +8770,10 @@ function optimisticUpdateMyOrder(inum, newStatus) {
   if (_cachedOrders) {
     if (newStatus) {
       const i2 = _cachedOrders.findIndex(x => x._issue_number === inum);
-      if (i2 >= 0) { _cachedOrders[i2].status = newStatus; renderOrders(_cachedOrders); }
+      if (i2 >= 0) { _cachedOrders[i2].status = newStatus; renderCurrentOrders(); }
     } else {
       _cachedOrders = _cachedOrders.filter(x => x._issue_number !== inum);
-      renderOrders(_cachedOrders);
+      renderCurrentOrders();
     }
   }
 }
