@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.59.6" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.60.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2923,7 +2923,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.59.6';
+const APP_VERSION = '1.60.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3158,6 +3158,52 @@ function clearToken() {
     if (window.S) { S.user = null; }
   } catch (e) {}
   try { if (typeof updateUI === 'function') updateUI(); } catch (e) {}
+}
+
+// v1.60.0：切换账号时清理「用户态」本地数据。
+//   背景：以前退出/换号只清了 hust_token 和 hust_current_user，通知历史(hust_notifications)、
+//   私信已读(hust_chat_seen)、点赞/推荐反馈、hust_c_* 缓存等仍留在本地
+//   → 新账号一登录就看见上一个账号的消息和铃铛红点（用户实测：注册新号后旧号消息还在）。
+//   注意：主题/折叠偏好等「设备级」设置**不清**，避免换个号连界面习惯都被重置。
+const USER_SCOPED_LS = ['hust_notifications', 'hust_chat_seen', 'hust_rec_feedback', 'hust_forum_liked', 'hust_last_publish', 'hust_forum_draft', 'hust_publish_draft'];
+const USER_SCOPED_SS = ['hust_publish_draft'];   // 草稿历史上有存 sessionStorage 的版本
+function _purgeByPrefix(store, prefixes) {
+  const kill = [];
+  try {
+    for (let i = 0; i < store.length; i++) {
+      const k = store.key(i);
+      if (!k) continue;
+      for (let j = 0; j < prefixes.length; j++) {
+        if (k.indexOf(prefixes[j]) === 0) { kill.push(k); break; }
+      }
+    }
+    kill.forEach(function (k) { try { store.removeItem(k); } catch (e) {} });
+  } catch (e) {}
+}
+function clearUserScopedData() {
+  try { USER_SCOPED_LS.forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} }); } catch (e) {}
+  try { _purgeByPrefix(localStorage, ['hust_c_']); } catch (e) {}
+  try { USER_SCOPED_SS.forEach(function (k) { try { sessionStorage.removeItem(k); } catch (e) {} }); } catch (e) {}
+  try { _purgeByPrefix(sessionStorage, ['hust_cmt_', 'hust_reg_', 'hust_home_section_']); } catch (e) {}
+  // 内存镜像一起清，否则不刷新页面时铃铛红点/通知面板仍是上一个账号的
+  try { if (typeof _notifications !== 'undefined') _notifications = []; } catch (e) {}
+  try { if (typeof _knownOrders !== 'undefined') _knownOrders = {}; } catch (e) {}
+  try { if (typeof _knownReports !== 'undefined') _knownReports = {}; } catch (e) {}
+  try { if (typeof updateNavBadge === 'function') updateNavBadge(); } catch (e) {}
+}
+
+// v1.60.0：判断订单是否该显示「待核验」。
+//   publisher_pending_review 是**发布当时的快照**，发布者事后完成跑腿认证时它不会自己变
+//   （v1.59.0 注释写了"认证后自然消失"，但实际从来没有回刷逻辑 → 用户实测：认证通过了标记还在）。
+//   这里对「自己看自己」做实时兜底：以当前登录用户的实时认证状态为准，
+//   别人看到的则由 approveRunner 里的 backfillPublisherVerify 回刷解决。
+function pubPending(o) {
+  if (!o || !o.publisher_pending_review) return false;
+  try {
+    if (S.user && S.user.runner_verified && o.publisher_student_id
+        && String(o.publisher_student_id) === String(S.user.student_id)) return false;
+  } catch (e) {}
+  return true;
 }
 function tokenPayload() {
   const t = getToken();
@@ -3407,7 +3453,14 @@ async function ghUpdateIssue(number, body, expect) {
         err.conflicts = detail.conflicts || {};
         throw err;
       }
-      throw new Error('写操作需要登录态（401），请重新登录后重试');
+      // v1.60.0：以前无论什么错误都报「写操作需要登录态（401）」，把 403/400/404 全说成 401，
+      //   掩盖了真因（实测：换号后 token 与订单当事人不一致，后端返回 403 无权修改，界面却提示"请重新登录"）。
+      const detail = await res.json().catch(function () { return {}; });
+      const detailHint = (detail && (detail.hint || detail.error)) || '';
+      if (res.status === 401) throw new Error('登录态已失效，请重新登录后重试');
+      if (res.status === 403) throw new Error('没有权限修改这条数据' + (detailHint ? '（' + detailHint + '）' : '') + ' —— 请确认当前登录的账号与订单当事人一致');
+      if (res.status === 404) throw new Error('数据不存在或已被删除（HTTP 404）');
+      throw new Error('操作失败（HTTP ' + res.status + '）' + (detailHint ? '：' + detailHint : ''));
     }
     return res.json();
   }
@@ -5365,7 +5418,7 @@ function renderOrders(orders) {
       + (canSeePrivate(o) ? esc(o.publisher_name || '未知') : maskName(o.publisher_name, o.publisher_student_id))
       + '</span>'
       + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '')
-      + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (o.publisher_pending_review ? '<span class="user-pending-badge">待核验</span>' : ''))
+      + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (pubPending(o) ? '<span class="user-pending-badge">待核验</span>' : ''))
       + (o.campus ? '<span class="campus-badge">🏫 同校</span>' : '')
       + (o.location ? ' · 📍' + esc(o.location) : '')
       + '</div></div>'
@@ -5390,7 +5443,7 @@ function renderOrders(orders) {
       + (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : '')
       + '</div>'
       + '<div class="order-card-footer">'
-      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_name || '未知') : maskName(o.publisher_name, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (o.publisher_pending_review ? '<span class="user-pending-badge">待核验</span>' : '')) + '</span>'
+      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_name || '未知') : maskName(o.publisher_name, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (pubPending(o) ? '<span class="user-pending-badge">待核验</span>' : '')) + '</span>'
       + '<span>' + timeAgo(o.created_at) + '</span>'
       + (o.taker_credit_score != null && (o.status === 'taken' || o.status === 'awaiting_confirm') ? ' <span class="taker-credit">接单人信用 ' + o.taker_credit_score + '</span>' : '')
       + '</div>'
@@ -6324,7 +6377,7 @@ async function showDetail(issueNum) {
         actions += '<button class="btn btn-success" disabled style="opacity:.75">✅ 已完成，等待发布者确认</button>';
       }
       if (S.user && o.status === 'awaiting_confirm' && o.publisher_id === currentUid) {
-        actions += '<button class="btn btn-success" onclick="finalizeOrder(' + issueNum + ')">✅ 确认收到</button>';
+        actions += '<button class="btn btn-success" onclick="finalizeOrder(' + issueNum + ')">' + (o.type === 'secondhand' ? '✅ 确认收款并完成' : '✅ 确认收到') + '</button>';
         actions += '<button class="btn btn-danger" onclick="disputeAwaitingOrder(' + issueNum + ')">❌ 拒绝确认</button>';
       }
       if (S.user && (o.publisher_id === currentUid || o.taker_id === currentUid)) {
@@ -6380,38 +6433,82 @@ async function showDetail(issueNum) {
       const sid = S.user.student_id;
       const isPublisher = (o.publisher_id == uid) || (o.publisher_id == sid) || (o.publisher_student_id == uid) || (o.publisher_student_id == sid);
       if (isPublisher) {
-        takenPayHint = '<div style="margin-top:12px;padding:12px;background:#eff6ff;border-radius:8px;font-size:.83rem;color:#1d4ed8">🔒 接单人正在为你服务，完成后会请你确认。收款信息将在「待确认」阶段才显示，请务必当面/确认付款后再点「确认收到」。</div>';
+        // v1.60.0：二手是「买家付款给卖家」，不能照搬跑腿的「你去付款给接单人」
+        takenPayHint = (o.type === 'secondhand')
+          ? '<div style="margin-top:12px;padding:12px;background:#eff6ff;border-radius:8px;font-size:.83rem;color:#1d4ed8">👤 买家已接单。请与买家约定当面/线上交易，<b>由买家向你付款</b>。收款方式将在「待确认」阶段展示给买家；双方交易完成后请点「确认完成」。</div>'
+          : '<div style="margin-top:12px;padding:12px;background:#eff6ff;border-radius:8px;font-size:.83rem;color:#1d4ed8">🔒 接单人正在为你服务，完成后会请你确认。收款信息将在「待确认」阶段才显示，请务必当面/确认付款后再点「确认收到」。</div>';
       }
     }
     // v1.28.0 担保交易：收款信息延迟到「待确认」阶段才解锁，避免接单即暴露收款码（诈骗入口）
+    // v1.60.0【重要】二手交易的钱流方向与跑腿**相反**：跑腿是「发布者付钱给接单人」，
+    //   二手是「买家(接单人)付钱给卖家(发布者)」。此前二手直接复用了跑腿面板，
+    //   导致卖家看到「接单人收款信息（请向对方付款）」——等于让卖书的给买书的打钱（用户实测反馈）。
     if ((o.status === 'awaiting_confirm' || o.status === 'completed') && S.user) {
       const uid = S.user._issue_number || S.user.student_id;
       const sid = S.user.student_id;
       const isPublisher = (o.publisher_id == uid) || (o.publisher_id == sid) || (o.publisher_student_id == uid) || (o.publisher_student_id == sid);
-      if (isPublisher) {
+      const isSecondhand = (o.type === 'secondhand');
+      // 按 id 取某用户资料里的收款信息（二手查卖家，跑腿查接单人）
+      const _findUserPay = async function (refId) {
+        if (!refId) return null;
+        try {
+          const allUsers = await ghIssues('user', 'all');
+          const hit = allUsers.find(i => {
+            try {
+              const u = JSON.parse(i.body);
+              return (u._issue_number && u._issue_number == refId) || u.student_id == refId;
+            } catch(e) { return false; }
+          });
+          return hit ? JSON.parse(hit.body) : null;
+        } catch(e) { return null; }
+      };
+      if (isSecondhand) {
+        // ---- 二手：买家(接单人) → 卖家(发布者) ----
+        if (!isPublisher) {
+          // 买家视角：展示**卖家**的收款信息
+          let payInfo = o.publisher_payment_info || '';
+          let payImage = o.publisher_payment_image || '';
+          if (!payInfo && !payImage && o.publisher_id) {
+            const pu = await _findUserPay(o.publisher_id);
+            if (pu) {
+              payInfo = pu.payment_info || '';
+              payImage = pu.payment_image || '';
+              if (payInfo || payImage) {
+                o.publisher_payment_info = payInfo;
+                o.publisher_payment_image = payImage;
+                try { await ghUpdateIssue(issueNum, JSON.stringify(o)); } catch(e) {}
+              }
+            }
+          }
+          if (payInfo || payImage) {
+            takerPayHTML = '<div style="margin-top:12px;padding:16px;background:#dcfce7;border-radius:8px;border:2px solid #16a34a"><strong>✅ 卖家收款信息（请向对方付款）</strong><div style="margin-top:8px;font-size:.9rem">' + esc(payInfo) + '</div>';
+            if (payImage) takerPayHTML += '<img src="' + safeImgSrc(payImage) + '" style="max-width:200px;border-radius:8px;margin-top:8px;display:block">';
+            takerPayHTML += '<div style="margin-top:8px;font-size:.8rem;color:#15803d">👉 你是买家，请联系卖家当面/线上交易并付款，付款后由卖家确认完成。</div></div>';
+          } else {
+            takerPayHTML = '<div style="margin-top:12px;padding:12px;background:#fee2e2;border-radius:8px;border:1.5px solid #dc2626"><strong>⚠️ 卖家未设置收款信息</strong><div style="margin-top:4px;font-size:.85rem">你是买家，请直接联系卖家交易付款：' + esc(o.publisher_name || '未知') + '（' + esc(o.publisher_student_id || '') + '）</div></div>';
+          }
+        } else {
+          // 卖家视角：**你是收款方** —— 这里绝不能再显示"接单人收款信息"
+          const myPay = o.publisher_payment_info || (S.user && S.user.payment_info) || '';
+          takerPayHTML = '<div style="margin-top:12px;padding:12px;background:#eff6ff;border-radius:8px;font-size:.85rem;color:#1d4ed8"><strong>💰 你是卖家（收款方）</strong><div style="margin-top:4px">买家 <b>' + esc(o.taker_name || '对方') + '</b> 应向<b>你</b>付款 ¥' + (Number(o.price) > 0 ? Number(o.price).toFixed(2) : '面议') + '。交易完成后请点「确认完成」。'
+            + (myPay ? '<div style="margin-top:4px">你的收款方式已展示给买家 ✅</div>' : '<div style="margin-top:4px;color:#b45309">⚠️ 你还没有设置收款信息，建议到「我的」补充微信/支付宝收款码，方便买家付款。</div>')
+            + '</div></div>';
+        }
+      } else if (isPublisher) {
         let payInfo = o.taker_payment_info || '';
         let payImage = o.taker_payment_image || '';
 
         if (!payInfo && !payImage && o.taker_id) {
-          try {
-            const allUsers = await ghIssues('user', 'all');
-            const takerUser = allUsers.find(i => {
-              try {
-                const u = JSON.parse(i.body);
-                return (u._issue_number && u._issue_number == o.taker_id) || u.student_id == o.taker_id;
-              } catch(e) { return false; }
-            });
-            if (takerUser) {
-              const tu = JSON.parse(takerUser.body);
-              payInfo = tu.payment_info || '';
-              payImage = tu.payment_image || '';
-              if (payInfo || payImage) {
-                o.taker_payment_info = payInfo;
-                o.taker_payment_image = payImage;
-                try { await ghUpdateIssue(issueNum, JSON.stringify(o)); } catch(e) {}
-              }
+          const tu = await _findUserPay(o.taker_id);
+          if (tu) {
+            payInfo = tu.payment_info || '';
+            payImage = tu.payment_image || '';
+            if (payInfo || payImage) {
+              o.taker_payment_info = payInfo;
+              o.taker_payment_image = payImage;
+              try { await ghUpdateIssue(issueNum, JSON.stringify(o)); } catch(e) {}
             }
-          } catch(e) {}
+          }
         }
 
         if (payInfo || payImage) {
@@ -6485,7 +6582,7 @@ async function showDetail(issueNum) {
       + '<div class="detail-meta">'
       + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
       + (isQA || !o.gender_limit || o.gender_limit === 'any' ? '' : '<span style="font-size:.78rem;background:#e0e7ff;color:#3730a3;padding:2px 9px;border-radius:99px">👤 性别要求：' + (o.gender_limit === 'male' ? '仅限男生' : '仅限女生') + '</span>')
-      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_real_name || o.publisher_name || maskName(o.publisher_name, o.publisher_student_id) || maskName(o.publisher_student_id, '') || '未知') : maskName(o.publisher_real_name || o.publisher_name || o.publisher_student_id, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (o.publisher_pending_review ? '<span class="user-pending-badge">待核验</span>' : '')) + '</span>'
+      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_real_name || o.publisher_name || maskName(o.publisher_name, o.publisher_student_id) || maskName(o.publisher_student_id, '') || '未知') : maskName(o.publisher_real_name || o.publisher_name || o.publisher_student_id, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (pubPending(o) ? '<span class="user-pending-badge">待核验</span>' : '')) + '</span>'
       + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.taker_real_name || o.taker_name || '未知') : maskName(o.taker_real_name || o.taker_name, o.taker_student_id)) + '</a>' + (o.taker_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + (o.taker_credit_score != null ? ' <span class="taker-credit">信用 ' + o.taker_credit_score + '</span>' : '') + '</span>' : ''))
       + (isQA ? '' : (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期，原预计 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : ''))
       + (isQA ? '' : (o.status === 'taken' && o.overdue ? '<span style="font-size:.75rem;color:#dc2626;margin-left:6px">已超时，可联系对方或投诉</span>' : ''))
@@ -6495,8 +6592,13 @@ async function showDetail(issueNum) {
       + (o.status === 'awaiting_confirm'
         ? '<div style="margin-top:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:.83rem;color:#92400e">'
           + (o.publisher_id === currentUid
-            ? '📦 接单人已完成服务，请先付款给对方，再点「确认收到」完成订单（48h 内未确认将自动完成）。若未收到或有纠纷，请点「拒绝确认」并投诉。'
-            : '⏳ 已通知发布者确认收到，确认后订单完成。若长时间未确认，系统将自动完成。')
+            // v1.60.0：二手是「买家付钱给卖家」，不能沿用跑腿的「你先付款给对方」
+            ? (o.type === 'secondhand'
+                ? '📦 买家已接单，请与买家完成交易（<b>买家向你付款</b>）。收到款项并交付物品后，点「确认收款并完成」结束订单（48h 内未确认将自动完成）。若有纠纷，请点「拒绝确认」并投诉。'
+                : '📦 接单人已完成服务，请先付款给对方，再点「确认收到」完成订单（48h 内未确认将自动完成）。若未收到或有纠纷，请点「拒绝确认」并投诉。')
+            : (o.type === 'secondhand'
+                ? '⏳ 已通知卖家确认收款与交付，卖家确认后订单完成。若长时间未确认，系统将自动完成。'
+                : '⏳ 已通知发布者确认收到，确认后订单完成。若长时间未确认，系统将自动完成。'))
           + '</div>'
         : '')
       + imageHTML
@@ -7986,6 +8088,28 @@ async function loadRunnerReviews() {
   }
 }
 
+// v1.60.0：跑腿认证通过/撤销后，回刷该用户历史订单上的认证快照。
+//   否则「待核验」会一直挂在他此前发布的帖子上（用户实测：已通过认证，标记不消失）。
+//   认证通过 → publisher_pending_review 清掉 + publisher_runner_verified 置真（卡片改显「认证跑腿」）。
+async function backfillPublisherVerify(sid, verified) {
+  if (!sid) return 0;
+  let n = 0;
+  try {
+    const list = await ghIssues('order', 'all');
+    for (const it of list) {
+      let o = null;
+      try { o = JSON.parse(it.body); } catch (e) { continue; }
+      if (!o || String(o.publisher_student_id || '') !== String(sid)) continue;
+      let changed = false;
+      if (!!o.publisher_runner_verified !== !!verified) { o.publisher_runner_verified = !!verified; changed = true; }
+      if (verified && o.publisher_pending_review) { o.publisher_pending_review = false; changed = true; }
+      if (!changed) continue;
+      try { await ghUpdateIssue(it.number, JSON.stringify(o)); n++; } catch (e) {}
+    }
+  } catch (e) {}
+  return n;
+}
+
 async function approveRunner(anum, sid) {
   try {
     // 1. 更新跑腿申请状态
@@ -8022,6 +8146,8 @@ async function approveRunner(anum, sid) {
       }
     }
 
+    // v1.60.0：回刷该用户此前发布的订单，清掉它们身上的「待核验」快照
+    await backfillPublisherVerify(sid, true);
     toast('✅ 已通过 ' + sid + ' 的跑腿认证，已赠送 7 天会员试用', 'success');
     await loadRunnerReviews();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
@@ -8055,6 +8181,8 @@ async function rejectRunner(anum, sid) {
       }
     }
 
+    // v1.60.0：撤销认证时同步回刷，避免旧帖仍显示「认证跑腿」徽章
+    await backfillPublisherVerify(sid, false);
     toast('已拒绝 ' + sid + ' 的跑腿认证', 'info');
     await loadRunnerReviews();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
@@ -9712,6 +9840,7 @@ async function handleAuth(e) {
       const u = regData.user;
       if (regData.token) {
         // 邮箱验证 / 管理员注册：直接签发会话并登录
+        clearUserScopedData();   // v1.60.0 换号：清掉上一个账号残留的通知/缓存
         setToken(regData.token);
         S.user = u;
         localStorage.setItem('hust_current_user', JSON.stringify(S.user));
@@ -9763,6 +9892,7 @@ async function handleAuth(e) {
         return;
       }
       const data = await res.json();
+      clearUserScopedData();   // v1.60.0 换号：先清掉上一个账号的本地用户态数据（通知/私信已读/缓存）
       setToken(data.token);
       S.user = data.user;
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
@@ -9792,6 +9922,7 @@ function logout() {
   clearToken();
   clearAuthCookies();
   localStorage.removeItem('hust_current_user');
+  clearUserScopedData();   // v1.60.0：退出即清用户态本地数据，避免下个账号看到上一个账号的消息
   updateUI();
   // 切到二手交易主页
   navigate('ershou');
