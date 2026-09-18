@@ -2,7 +2,7 @@
 // 策略：静态外壳预缓存；页面导航 network-first（保证每次部署拿到最新）；
 // 跨域 API（腾讯云 SCF）不缓存，直接走网络，保证订单/问答/消息实时。
 const APP_PREFIX = 'husthelper_';
-const CACHE_VERSION = 'v27';
+const CACHE_VERSION = 'v28';
 const CACHE_NAME = APP_PREFIX + CACHE_VERSION;
 
 const PRECACHE_ASSETS = [
@@ -13,8 +13,9 @@ const PRECACHE_ASSETS = [
   '/hust-helper/icons/icon-512.png',
   '/hust-helper/icons/ai-avatar.png',
   '/hust-helper/assets/hero-campus.v1.webp',
-  '/hust-helper/favicon.png',
-  '/hust-helper/version.txt'
+  '/hust-helper/favicon.png'
+  // v1.65.0：version.txt 移出预缓存 —— 它是「是否有新版本」的信号源，
+  // 一旦被预缓存，未带 cache-busting 的读取会永远命中旧值
 ];
 
 self.addEventListener('install', function (event) {
@@ -45,6 +46,12 @@ self.addEventListener('fetch', function (event) {
 
   // 跨域 API（腾讯云 SCF）：不缓存，直接走网络，保证实时数据
   if (url.origin !== self.location.origin) {
+    event.respondWith(fetch(req));
+    return;
+  }
+
+  // v1.65.0：version.txt 永远走网络（新版本检测信号源，绝不读缓存）
+  if (url.pathname === '/hust-helper/version.txt') {
     event.respondWith(fetch(req));
     return;
   }
