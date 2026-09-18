@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.66.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.66.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2529,8 +2529,8 @@ img[loading="lazy"]{background:var(--surface-2)}
         <input type="text" id="forumPublishTitle" class="form-control" placeholder="一句话标题" maxlength="60" required data-page-node-id="FvsUxrOfgcJ7hExJBeLihR">
       </div>
       <div class="form-group" data-page-node-id="zAXWo97NbfJc3b3EQEDy92">
-        <label data-page-node-id="rA2thQN04InltNczHvytdD">正文</label>
-        <textarea id="forumPublishContent" class="form-control" rows="5" placeholder="分享你的校园生活…" required></textarea>
+        <label data-page-node-id="rA2thQN04InltNczHvytdD">正文 <span class="form-hint" style="display:inline">（选填，一句话也能发）</span></label>
+        <textarea id="forumPublishContent" class="form-control" rows="5" placeholder="分享你的校园生活…（选填）"></textarea>
       </div>
       <div class="form-group" data-page-node-id="ZOfBiUxZmtFG5b38IDAWDx">
         <label data-page-node-id="hBMGISkcGBKo5F5AqpbQk0">校区</label>
@@ -2922,7 +2922,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.66.0';
+const APP_VERSION = '1.66.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3976,10 +3976,14 @@ async function renderForumComments(num) {
 }
 async function submitForumComment() {
   if (!S.user) { showAuthModal(); return; }
+  // v1.66.1：补齐防重复锁（订单评论早有 _commentLock，论坛评论漏了）——
+  //   弱网下连点会并发提交多条相同评论，与用户反馈的「重复发布内容」同源。
+  if (window._forumCommentLock) return;
   const inp = document.getElementById('forumCommentInput');
   if (!inp) return;
   const text = (inp.value || '').trim();
   if (!text) { toast('评论不能为空', 'error'); return; }
+  window._forumCommentLock = true;
   const num = S._forumDetailNum;
   try {
     const bodyJson = JSON.stringify({
@@ -4001,6 +4005,7 @@ async function submitForumComment() {
     await renderForumComments(num);
     toast('评论成功', 'success');
   } catch (e) { toast('评论失败，请重试', 'error'); }
+  finally { window._forumCommentLock = false; }
 }
 async function toggleForumLike(num) {
   if (!S.user) { showAuthModal(); return; }
@@ -4084,11 +4089,11 @@ async function submitForumPost() {
   const campus = document.getElementById('forumPublishCampus').value;
   const anon = document.getElementById('forumPublishAnon').checked;
   if (!title) { err.textContent = '请填写标题'; err.style.display = 'block'; return; }
-  if (!content) { err.textContent = '请填写正文'; err.style.display = 'block'; return; }
-  // v1.57.0 发布质量门槛（论坛同样口径）：标题 ≥4 字且不是无意义内容，正文 ≥4 字
-  if (title.length < 4) { err.textContent = '标题太短了（至少 4 个字），让人一眼看懂再点进来'; err.style.display = 'block'; return; }
+  // v1.66.1：论坛发帖门槛与「发布订单」对齐（v1.59.2 只改到了订单那条路径，论坛漏改，
+  //   导致「可怜」这种 2 字标题被「至少 4 个字」拦下）。现为：标题 ≥2 字 + 无信息量标题拦截，
+  //   正文改为选填（与订单的描述选填同口径）。后端 /api/issues 早已是同一口径（标题 ≥2、无正文长度校验）。
+  if (title.length < 2) { err.textContent = '标题太短了（至少 2 个字），写清楚想说什么'; err.style.display = 'block'; return; }
   if (isJunkTitle(title)) { err.textContent = '标题不能是「' + title + '」这类没信息量的内容，请具体描述'; err.style.display = 'block'; return; }
-  if (content.length < 4) { err.textContent = '正文太短了（至少 4 个字），多说两句吧'; err.style.display = 'block'; return; }
   // v1.39.0 违禁词硬拦截（此前论坛缺失，与跑腿发布一致）
   const sensitiveWord = checkSensitive(title + ' ' + content);
   if (sensitiveWord) { err.textContent = '内容包含违禁词「' + sensitiveWord + '」，违反平台规范，无法发布'; err.style.display = 'block'; return; }
