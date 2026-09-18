@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.59.5" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.59.6" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -803,6 +803,10 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .form-group label{display:block;font-size:.83rem;font-weight:500;margin-bottom:5px;color:var(--text-secondary)}
 .form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 13px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg);transition:all .15s}
 .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+/* v1.59.6：通用 input 样式会污染复选框 —— width:100% 把它拉成扁长条、border/background 覆盖原生勾选外观，导致「看着点不动/勾了没反应」。这里显式复位。 */
+.form-group input[type=checkbox]{width:16px;height:16px;min-width:16px;max-width:none;padding:0;margin:0;border:none;border-radius:0;background:none;box-shadow:none;flex:0 0 auto;accent-color:var(--primary);cursor:pointer;appearance:auto;-webkit-appearance:auto}
+.form-group input[type=checkbox]:focus{border:none;box-shadow:none;outline:none}
+.form-group input[type=checkbox]:disabled{cursor:not-allowed;opacity:.6}
 .form-input{width:100%;padding:9px 13px;border:1.5px solid var(--border);border-radius:var(--radius-xs);font-size:.88rem;background:var(--bg);color:var(--text);transition:all .15s}
 .form-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -1933,7 +1937,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
             <input type="checkbox" id="authSetDefaultAddr" data-page-node-id="DaAddrChk03">
             <span data-page-node-id="DaAddrChk04">设为我的默认收货地址</span>
           </label>
-          <small id="authSetDefaultAddrHint" style="display:block;color:var(--text-muted);font-size:.72rem;margin-top:2px" data-page-node-id="DaAddrChk05">需先填写手机号（11位）并选择宿舍楼栋，发布跑腿时可一键带出</small>
+          <small id="authSetDefaultAddrHint" style="display:block;color:var(--text-muted);font-size:.72rem;margin-top:2px" data-page-node-id="DaAddrChk05">请先选择宿舍楼栋，即可勾选（手机号选填）</small>
         </div>
         <!-- 验证方式选择 -->
         <div class="form-group" data-page-node-id="DMDzsDynJpE1RNJaB95nkV">
@@ -2919,7 +2923,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.59.5';
+const APP_VERSION = '1.59.6';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -9126,21 +9130,27 @@ async function clearDefaultAddress() {
 async function saveDefaultAddressFromProfile(dorm) {
   const name = S.user && S.user.name;
   const phone = S.user && S.user.phone;
-  if (!name || !phone) { toast('已发布。想保存默认地址，请先到「我的」补全手机号', 'info'); return; }
-  try { await persistDefaultAddress({ name, phone, dorm }); toast('已保存为默认收货地址：' + dorm, 'success'); }
+  if (!name) { toast('已发布。想保存默认地址，请先到「我的」补全姓名', 'info'); return; }
+  try { await persistDefaultAddress({ name: name, phone: phone || '', dorm: dorm }); toast('已保存为默认收货地址：' + dorm, 'success'); }
   catch (e) { console.warn('saveDefaultAddressFromProfile failed', e); }
 }
-// 注册页勾选框联动：手机号 11 位 + 已选宿舍才可勾选
+// 注册页勾选框联动：v1.59.6 起只要选了宿舍楼栋即可勾选（手机号为选填，跑腿一键带出只用楼栋）
 function syncDefaultAddrChk() {
   const chk = document.getElementById('authSetDefaultAddr');
   if (!chk) return;
-  const phone = ((document.getElementById('authPhone') || {}).value || '').trim();
   const dorm = ((document.getElementById('authDorm') || {}).value || '').trim();
-  const ok = /^\d{11}$/.test(phone) && !!dorm;
+  const ok = !!dorm;
   chk.disabled = !ok;
   if (!ok) chk.checked = false;
+  const lab = chk.closest('label');
+  if (lab) lab.style.opacity = ok ? '1' : '.55';
   const hint = document.getElementById('authSetDefaultAddrHint');
-  if (hint) hint.style.color = ok ? 'var(--text-muted)' : '#f59e0b';
+  if (hint) {
+    hint.style.color = ok ? 'var(--text-muted)' : '#f59e0b';
+    hint.textContent = ok
+      ? '发布跑腿时可一键带出该地址（手机号选填）'
+      : '请先选择宿舍楼栋，即可勾选（手机号选填）';
+  }
 }
 (function bindDefaultAddrChk() {
   const bind = () => {
@@ -9669,7 +9679,7 @@ async function handleAuth(e) {
       const userData = { student_id: sid, name, nickname: nicknameInput || name, name_nonstandard: nameValid.nonstandard, phone, dorm, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
       // v1.52.0：注册时勾了「设为默认收货地址」→ 随注册一次性写入用户资料
       const _daChk = document.getElementById('authSetDefaultAddr');
-      if (_daChk && _daChk.checked && phone && dorm) userData.default_address = { name: name, phone: phone, dorm: dorm };
+      if (_daChk && _daChk.checked && dorm) userData.default_address = { name: name, phone: phone || '', dorm: dorm };
       if (verifyMethod === 'email') { userData.email = (document.getElementById('authEmail').value || '').trim().toLowerCase(); userData.email_verified = true; }
       else { userData.email_verified = false; }
       // 7天会员试用改为在「跑腿认证通过」时赠送（见 approveRunner），注册/审核通过不再赠送
