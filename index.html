@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.59.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.59.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -130,9 +130,8 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .deal-opt input{margin:0}
 /* v1.59.0 求购标记（列表卡片 / 详情页） */
 .want-badge{font-size:.68rem;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;padding:1px 7px;border-radius:99px;margin-left:4px;font-weight:600}
-/* v1.59.0 冷启动：无库存时展示的预设热门科目（虚线底 = 可点、非真实筛选结果） */
+/* v1.59.0 冷启动：无库存时展示的预设热门科目（虚线底 = 预设值、仍走正常筛选逻辑） */
 .filter-btn-preset{border-style:dashed;color:var(--text-secondary)}
-.filter-preset-hint{font-size:.72rem;color:#0369a1;background:#e0f2fe;padding:2px 8px;border-radius:99px;margin-left:2px;white-space:nowrap}
 /* v1.59.0 首屏一句话定位条（告诉陌生人这里是干什么的） */
 .forum-position{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin:10px 0}
 .forum-position-title{font-size:1rem;font-weight:700;color:var(--text)}
@@ -2908,7 +2907,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.59.0';
+const APP_VERSION = '1.59.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -5256,6 +5255,26 @@ function renderOrders(orders) {
     const hintMap = { task: '点击右下角发布第一个需求', goods: '点击右下角发布闲置物品', qa: '点击右下角去提问', find: '点击右下角发布组队/拼车/招募' };
     const actMap = { task: { label: '发布需求', fn: 'showPublishModal()' }, goods: { label: '发布物品', fn: "showPublishModal('secondhand')" }, qa: { label: '去提问', fn: "showPublishModal('qa')" }, find: { label: '发布找人', fn: "showPublishModal('find')" } };
     const act = actMap[_cachedType] || actMap.task;
+    // v1.59.1：科目筛选把列表筛空了 → 不给「发布闲置」这种无关 CTA，改成「发求购」承接需求
+    if (S.listingMode === 'ershou' && S.bookSubject) {
+      grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📚</div>'
+        + '<p class="empty-state-title">「' + esc(S.bookSubject) + '」暂时没有在售的书</p>'
+        + '<p class="empty-state-hint">发个求购，有书的同学看到会主动找你</p>'
+        + '<button class="btn btn-brand" onclick="wantBookSubject(\'' + escAttr(S.bookSubject) + '\')">🙋 发求购</button>'
+        + '<button class="btn btn-outline" onclick="filterBookSubject(\'\')">看全部科目</button></div>';
+      if (pager) pager.innerHTML = '';
+      return;
+    }
+    // v1.59.1：二手模式空状态 → 买卖双向入口（只说「发布闲置」= 需求侧永远没入口）
+    if (S.listingMode === 'ershou') {
+      grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📚</div>'
+        + '<p class="empty-state-title">还没有人在卖二手教材</p>'
+        + '<p class="empty-state-hint">有闲置就挂上来；想买的书没有就发求购</p>'
+        + '<button class="btn btn-brand" onclick="showPublishModal(\'secondhand\')">📚 我卖书</button>'
+        + '<button class="btn btn-outline" onclick="wantBookSubject(\'\')">🙋 我求书</button></div>';
+      if (pager) pager.innerHTML = '';
+      return;
+    }
     // v1.42.2 空状态原型风格：简洁图标 + 主色 CTA
     grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p class="empty-state-title">' + (emptyMap[_cachedType] || '暂无匹配内容') + '</p>'
       + '<p class="empty-state-hint">' + (hintMap[_cachedType] || '点击按钮立即发布') + '</p>'
@@ -5358,14 +5377,15 @@ function renderBookSubjectFilters() {
   });
   const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 8);
   // v1.59.0：零库存时不再整条隐藏 —— 那会让「AI 科目分类」这个核心卖点在没书时完全不可见。
-  // 改为展示预设热门科目，点一下直接引导发起「求购」，把空状态变成需求收集入口。
+  // v1.59.1 修正：预设科目 chips 必须和正常态一样「只做筛选」，不能点一下就把用户甩进发布页。
+  //   求购入口改到「列表空状态」里给显式按钮 —— chip 行在移动端横向滚动，塞在尾部的按钮根本看不见。
   if (top.length === 0) {
-    let h0 = '<span class="filter-label">📚 科目：</span>';
+    let h0 = '<span class="filter-label">📚 科目：</span>'
+      + '<button class="filter-btn' + (S.bookSubject ? '' : ' active') + '" onclick="filterBookSubject(\'\')">全部</button>';
     HOT_BOOK_SUBJECTS.slice(0, 6).forEach(function (s) {
-      h0 += '<button class="filter-btn filter-btn-preset" data-book-subject="' + esc(s) + '"'
-        + ' onclick="wantBookSubject(this.getAttribute(\'data-book-subject\'))">' + esc(s) + '</button>';
+      h0 += '<button class="filter-btn filter-btn-preset' + (S.bookSubject === s ? ' active' : '') + '" data-book-subject="' + esc(s) + '"'
+        + ' onclick="filterBookSubject(this.getAttribute(\'data-book-subject\'))">' + esc(s) + '</button>';
     });
-    h0 += '<span class="filter-preset-hint">暂无在售 · 点科目发求购 →</span>';
     bar.innerHTML = h0;
     bar.style.display = 'flex';
     return;
@@ -5387,7 +5407,8 @@ function filterBookSubject(sub) {
   if (window.toast) toast(sub && S.bookSubject ? '📚 已筛选：' + sub : '📚 已显示全部科目');
 }
 
-// v1.59.0：点预设科目时站内没有库存 → 直接把用户带进「求购」发布，把需求留在平台上
+// v1.59.0：把用户带进「求购」发布，把需求留在平台上
+// v1.59.1：sub 为空时不再硬凑标题（此前会生成「求一本「」的教材」）
 function wantBookSubject(sub) {
   const s = String(sub || '');
   showPublishModal('secondhand');
@@ -5400,8 +5421,8 @@ function wantBookSubject(sub) {
     const subj = document.getElementById('publishBookSubject');
     if (subj) subj.value = s;
     const ti = document.getElementById('publishTitle');
-    if (ti && !ti.value) ti.value = '求一本「' + s + '」的教材';
-    if (window.toast) toast('🙋 已切到「求购」：书名写清楚，有书的同学会主动找你', 'info');
+    if (ti && !ti.value && s) ti.value = '求一本「' + s + '」的教材';
+    if (window.toast) toast(s ? '🙋 已切到「求购」：书名写清楚，有书的同学会主动找你' : '🙋 已切到「求购」：写清书名和课程，有书的同学会主动找你', 'info');
   }, 150);
 }
 
