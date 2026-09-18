@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.50.0';
+const VERSION = '1.51.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -182,6 +182,28 @@ function desensitizeUser(u) {
   delete c.password_hash;
   return c;
 }
+// v1.51.0 隐私修复：原判断写成正则 `/[?&]labels=(user|admin)\b/`，**只认复数 `labels=`**，
+//   而 GitHub Issues API 同时接受单数 `label=` —— 未登录请求 `/api/issues?label=user`
+//   即可绕过整段鉴权，拿到含手机号/收款码的用户列表（且这份数据还会被写进公共缓存）。
+//   现在改为解析式判断：同时认 label/labels（含 `labels[]` 数组形式、大小写、逗号分隔多值），
+//   只要标签里出现 user 或 admin 就判定为「用户列表」，必须登录。
+function pathIsUserList(ghPath) {
+  const q = String(ghPath || '').split('?')[1] || '';
+  const parts = q.split('&');
+  for (let i = 0; i < parts.length; i++) {
+    const idx = parts[i].indexOf('=');
+    if (idx < 0) continue;
+    let key = parts[i].slice(0, idx).toLowerCase();
+    try { key = decodeURIComponent(key).toLowerCase(); } catch (e) {}
+    key = key.replace(/\[\]$/, '');            // labels[]= / labels%5B%5D= 数组形式
+    if (key !== 'label' && key !== 'labels') continue;
+    let raw = parts[i].slice(idx + 1);
+    try { raw = decodeURIComponent(raw.replace(/\+/g, ' ')); } catch (e) {}
+    const vals = raw.split(',').map(s => s.trim().toLowerCase());
+    if (vals.indexOf('user') >= 0 || vals.indexOf('admin') >= 0) return true;
+  }
+  return false;
+}
 function issueHasUserLabel(data) {
   return data && data.labels && Array.isArray(data.labels) &&
     data.labels.some(l => (l && (l.name || l)) === 'user');
@@ -209,7 +231,11 @@ function desensitizeIssue(data) {
   return data;
 }
 // 强脱敏：user 类 issue 剥离真实身份字段（学号/姓名/手机号/宿舍/邮箱等），纵深防御
-const PRIVATE_FIELDS = ['student_id', 'name', 'phone', 'dorm', 'email', 'real_name', 'wechat', 'qq', 'default_address'];
+// v1.51.0：补 payment_*（收款方式 / 收款码）。此前强脱敏只剥身份字段，收款码仍留在响应里 →
+//   任意登录者拉一次 `labels=user` 就能批量拿到全体用户的收款码（可用于社工/诈骗）。
+//   代价：前端「买家读卖家收款码」的旧兜底（从用户资料读）会失效 —— 已同步改为
+//   发布时把收款信息快照进订单（publisher_payment_info/_image），交易闭环不受影响。
+const PRIVATE_FIELDS = ['student_id', 'name', 'phone', 'dorm', 'email', 'real_name', 'wechat', 'qq', 'default_address', 'payment_info', 'payment_image'];
 function desensitizeIssuePrivate(data) {
   if (Array.isArray(data)) return data.map(desensitizeIssuePrivate);
   if (issueHasUserLabel(data)) {
@@ -1967,7 +1993,9 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, status, desensitizeIssue(data), headers);
       }
       // ---- GET：隐私约束 ----
-      const isUserList = /[?&]labels=(user|admin)\b/.test(ghPath);
+      // v1.51.0：改用 pathIsUserList()（解析 label/labels 单复数与多值），
+      //   此前正则只认 `labels=`，单数 `label=user` 可绕过鉴权 + 污染公共缓存。
+      const isUserList = pathIsUserList(ghPath);
       const singleMatch = ghPath.match(/\/issues\/\d+(?:\?.*)?$/);
       if (isUserList || singleMatch) {
         // 敏感用户数据不进公共缓存，避免越权缓存侧信道

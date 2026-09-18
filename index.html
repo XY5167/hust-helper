@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.64.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.64.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2913,7 +2913,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.64.0';
+const APP_VERSION = '1.64.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -10098,6 +10098,18 @@ async function handleAuth(e) {
       //   任一项取自旧会话都会出问题（本人反被订单判无权修改 / 额度被上个账号顶掉）。
       S.user = reconcileIdentity(data.user).user;
       persistCurrentUser();
+      // v1.64.0 一次性补发：v1.63.0 之前注册的账号「注册时没送 7 天会员」，
+      //   登录时若确认从未送过试用（既无 vip_trial 标记也无到期时间），补发 7 天并异步写回云端。
+      //   管理员账号不参与；已送过/已开过会员的账号不会重复触发。
+      if (S.user && S.user._issue_number && !S.user.vip_trial && !S.user.vip_expire && !isAdminUser()) {
+        try {
+          const _u2 = JSON.parse(JSON.stringify(S.user));
+          grantTrialVip(_u2);
+          await ghUpdateIssue(S.user._issue_number, JSON.stringify(identitySafeUser(_u2)));
+          S.user = _u2;
+          persistCurrentUser();
+        } catch (e) { /* 补发失败不影响登录 */ }
+      }
       setAuthCookies();
       updateUI();
       closeAuthModal();
@@ -10714,6 +10726,11 @@ async function handlePublishInner(e) {
     publisher_student_id: selfSid(),
     publisher_real_name: S.user.name || S.user.nickname || '',
     publisher_dorm: S.user.dorm || '',
+    // v1.64.0：把发布者的收款方式快照进订单（仅交易类：二手/借物/跑腿）。
+    //   原因：后端已把 payment_info/payment_image 加入用户资料强脱敏清单（防批量爬收款码），
+    //   买家不能再从卖家用户资料兜底读取 → 改由订单自带快照，交易闭环不受影响。
+    publisher_payment_info: (type === 'secondhand' || type === 'borrow' || type === 'task') ? (S.user.payment_info || '') : '',
+    publisher_payment_image: (type === 'secondhand' || type === 'borrow' || type === 'task') ? (S.user.payment_image || '') : '',
     publisher_runner_verified: S.user.runner_verified || false,
     publisher_pending_review: _pendingReview,   // v1.59.0 先发后审：未认证卖家发布时为 true，认证后自然消失
     publisher_vip: isVIP(),
