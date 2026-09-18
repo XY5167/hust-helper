@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.59.4" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.59.5" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -1085,6 +1085,10 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 .ai-tag-chips{display:flex;gap:6px;flex-wrap:wrap}
 .ocr-thumb{width:64px;height:64px;border-radius:var(--radius-sm,8px);object-fit:cover;border:1px solid var(--border);display:block}
 .ocr-badge{position:absolute;right:-6px;top:-6px;font-size:.6rem;background:var(--primary);color:#fff;border-radius:999px;padding:1px 5px;white-space:nowrap;line-height:1.4}
+/* v1.59.5 发布页缩略图支持删除（选错图能撤掉，不用整单重发） */
+.publish-thumb-wrap{position:relative;display:inline-block}
+.publish-thumb-del{position:absolute;left:2px;top:2px;width:18px;height:18px;border-radius:50%;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:.66rem;line-height:1;padding:0;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;z-index:2}
+.publish-thumb-del:hover{background:rgba(220,38,38,.92)}
 .est-opt{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-xs);cursor:pointer;font-size:.9rem;color:var(--text);transition:border-color .15s,background .15s}
 .est-opt:hover{border-color:var(--primary)}
 .est-opt:has(input:checked){border-color:var(--primary);background:rgba(99,102,241,.08)}
@@ -2119,6 +2123,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <label data-page-node-id="ch5ebGLVEYaunAc5KkvP95">图片（选填，最多6张，二手交易建议上传）</label>
         <input type="file" id="publishImage" accept="image/*" multiple data-page-node-id="O3oYvbjmqllCLMruJgaGIq">
         <div id="publishImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px" data-page-node-id="btDsDCE1fglOlqX9jxO4ek"></div>
+        <p class="form-hint" id="publishImageHint" style="display:none;margin-top:4px" data-page-node-id="pvh1n0tz3kQm7Xe2bRwYdL">点缩略图左上角的 × 可删除这张图；对应的识别关键词会一起撤回</p>
         <div id="publishOcrBox" style="display:none;margin-top:10px" data-page-node-id="OIkhhDMsSMBj2BBAErbMVC">
           <label style="font-size:.82rem;color:var(--text-secondary);display:block;margin-bottom:6px" data-page-node-id="OTBux6QCEcX0jUWWmym1T9">🔍 照片识别关键词（自动进入搜索，可删除/手动补充）</label>
           <div id="publishOcrChips" style="display:flex;gap:6px;flex-wrap:wrap" data-page-node-id="Fi3ABC3HS39MprrjiRF9t4"></div>
@@ -2914,7 +2919,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.59.4';
+const APP_VERSION = '1.59.5';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -11428,9 +11433,11 @@ function addOcrChip(word) {
   word = (word || '').trim().slice(0, 10);
   if (!word || word.length < 2) return false;
   const o = window._publishOcr;
+  if (checkContactLeak(word)) { if (window.toast) toast('⚠️ 关键词疑似联系方式，已过滤'); return false; }
+  // v1.59.5：OCR 期间记录「这张图提出了哪些词」（含被全局去重掉的），删图时据此精确撤回
+  if (o && o._captureKw && o._captureKw.indexOf(word) === -1) o._captureKw.push(word);
   if (o.chips.length >= 10) return false;
   if (o.chips.some(c => c.toLowerCase() === word.toLowerCase())) return false;
-  if (checkContactLeak(word)) { if (window.toast) toast('⚠️ 关键词疑似联系方式，已过滤'); return false; }
   o.chips.push(word); renderOcrChips(); return true;
 }
 function removeOcrChip(i) { window._publishOcr.chips.splice(i, 1); renderOcrChips(); }
@@ -11441,26 +11448,80 @@ function addOcrChipFromInput() {
 window.removeOcrChip = removeOcrChip; window.addOcrChipFromInput = addOcrChipFromInput;
 
 // 渲染预览缩略图（file input 每次重选全部重建）
+// v1.59.5：每张缩略图左上角带 × 可单独删除（选错图不用整单重来）
+function _publishImgKey(f) {
+  return (f && f.name || '') + '|' + (f && f.size || 0) + '|' + (f && f.lastModified || 0);
+}
 function renderImagePreviews(files) {
   const prev = document.getElementById('publishImagePreview'); if (!prev) return;
   prev.innerHTML = '';
+  const list = Array.prototype.slice.call(files).slice(0, 6);
   const ocrDone = (window._publishOcr && window._publishOcr.ocrDone) || [];
-  Array.prototype.slice.call(files).slice(0, 6).forEach(function(f, i) {
+  list.forEach(function(f, i) {
     const img = document.createElement('img');
     img.className = 'ocr-thumb'; img.alt = f.name || '图片';
     img.src = URL.createObjectURL(f);
     const wrap = document.createElement('span');
-    wrap.style.position = 'relative'; wrap.style.display = 'inline-block';
+    wrap.className = 'publish-thumb-wrap';
     wrap.appendChild(img);
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'publish-thumb-del';
+    del.title = '删除这张图'; del.setAttribute('aria-label', '删除这张图');
+    del.textContent = '×';
+    del.setAttribute('onclick', 'removePublishImage(' + i + ')');
+    wrap.appendChild(del);
     if (i < 3) {   // 只有前 3 张会做 OCR，角标提示状态
       const b = document.createElement('span'); b.className = 'ocr-badge'; b.id = 'ocrBadge' + i;
-      const done = ocrDone.some(k => k.name === f.name && k.size === f.size && k.lastModified === f.lastModified);
+      const done = ocrDone.some(k => _publishImgKey(k) === _publishImgKey(f));
       b.textContent = done ? '✓' : '⏳';
       wrap.appendChild(b);
     }
     prev.appendChild(wrap);
   });
+  const hint = document.getElementById('publishImageHint');
+  if (hint) hint.style.display = list.length ? 'block' : 'none';
 }
+
+// v1.59.5：撤回某张图「贡献」的识别关键词与识别原文。
+//   没有这一步 = 删了错图但错的搜索词还挂在新帖上（等于没删）。
+//   某个词若其他保留的图也识别出来了，则保留。
+function _revokeImageOcr(key) {
+  const o = window._publishOcr; if (!o) return [];
+  const own = (o.chipsByKey && o.chipsByKey[key]) || [];
+  if (o.chipsByKey) delete o.chipsByKey[key];
+  if (own.length) {
+    const keep = {};
+    (o.files || []).forEach(function (x) {
+      ((o.chipsByKey && o.chipsByKey[_publishImgKey(x)]) || []).forEach(function (w) { keep[w] = 1; });
+    });
+    o.chips = (o.chips || []).filter(w => own.indexOf(w) === -1 || keep[w]);
+  }
+  // 识别原文按剩余图片重算（原逻辑逐张顺序追加，等价于用 \n 连接各张的片段）
+  if (o.textByKey) {
+    delete o.textByKey[key];
+    o.text = (o.files || []).map(x => o.textByKey[_publishImgKey(x)] || '').filter(Boolean).join('\n');
+  }
+  return own;
+}
+
+// v1.59.5：删除一张图（缩略图左上角 ×）
+function removePublishImage(i) {
+  const o = window._publishOcr; if (!o || !o.files || !o.files[i]) return;
+  const f = o.files[i];
+  const key = _publishImgKey(f);
+  o.files.splice(i, 1);
+  o.ocrDone = (o.ocrDone || []).filter(k => _publishImgKey(k) !== key);
+  const own = _revokeImageOcr(key);
+  if (o.files.length === 0) {
+    const st = document.getElementById('publishOcrStatus');
+    if (st) st.textContent = '';   // 图都删光了，别再留着「第 N 张识别中」的残响
+  }
+  renderImagePreviews(o.files);
+  renderOcrChips();
+  updateFullTextView();
+  if (window.toast) toast(own.length ? '已删除这张图，并撤回它识别的 ' + own.length + ' 个关键词' : '已删除这张图');
+}
+window.removePublishImage = removePublishImage;
 
 // v1.21.2：把识别全文同步到折叠面板，让用户能看到 OCR 实际识出了什么（方便自己挑书名/商品名）
 function updateFullTextView() {
@@ -11758,12 +11819,19 @@ async function handlePublishImageChange() {
   renderImagePreviews(window._publishOcr.files);
   const box = document.getElementById('publishOcrBox'); if (box) box.style.display = '';
   // OCR：只对未识别过的文件做（前 3 张）
-  const list = window._publishOcr.files;
-  window._publishOcr.busy = true;
+  // v1.59.5：list 改成快照 —— 识别过程中用户可能点 × 删图，直接遍历实时数组会错位/漏识
+  const o = window._publishOcr;
+  if (!o.chipsByKey) o.chipsByKey = {};
+  if (!o.textByKey) o.textByKey = {};
+  const list = o.files.slice();
+  o.busy = true;
   for (let i = 0; i < list.length && i < 3; i++) {
     const f = list[i];
-    const done = window._publishOcr.ocrDone.some(k => k.name === f.name && k.size === f.size && k.lastModified === f.lastModified);
+    if (o.files.indexOf(f) === -1) continue;                    // 已被删除，跳过
+    const done = o.ocrDone.some(k => _publishImgKey(k) === _publishImgKey(f));
     if (done) continue;
+    const beforeTextLen = o.text.length;
+    o._captureKw = [];                                          // 收集这张图提出的原始关键词（含被去重掉的）
     if (window.aiQuotaLeft && aiQuotaLeft() <= 0) {
       const st = document.getElementById('publishOcrStatus');
       if (st) st.textContent = '今日 AI 次数已用完，尝试本地识别（不耗额度）…';
@@ -11772,9 +11840,17 @@ async function handlePublishImageChange() {
     } else {
       await ocrImageFile(f, i);
     }
-    window._publishOcr.ocrDone.push(f);
+    // 记录这张图贡献了哪些关键词/哪段识别原文，删图时要能精确撤回
+    const imgKey = _publishImgKey(f);
+    const rawWords = o._captureKw || [];
+    o._captureKw = null;
+    const addedText = o.text.slice(beforeTextLen).replace(/^\n/, '');   // 去掉与上一张之间的分隔换行，便于按 \n 重组
+    if (rawWords.length) o.chipsByKey[imgKey] = rawWords;
+    if (addedText) o.textByKey[imgKey] = addedText;
+    if (o.files.indexOf(f) === -1) { _revokeImageOcr(imgKey); continue; }   // 识别期间被删 → 撤回
+    o.ocrDone.push(f);
   }
-  window._publishOcr.busy = false;
+  o.busy = false;
   renderOcrChips();
   updateFullTextView();
   if (added > 0 && window._publishOcr.chips.length && window.toast) toast('🔍 已识别关键词，这些词将进入搜索范围');
