@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.62.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.63.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2923,7 +2923,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.62.0';
+const APP_VERSION = '1.63.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3010,7 +3010,32 @@ function cacheGetStale(key) {
   // 恢复会话 Token（过期则清掉，强制重新登录）
   if (getToken() && !tokenPayload()) { clearToken(); }
   const saved = localStorage.getItem('hust_current_user');
-  if (saved) try { S.user = JSON.parse(saved); } catch(e) {}
+  if (saved) {
+    try {
+      const _snap = JSON.parse(saved);
+      const _id = sessionIdentity();
+      const _diff = function (a, b) { return !!a && !!b && String(a) !== String(b); };
+      // 三选一的「不是本人」证据：归属标记 / 学号 / 用户编号，任一与当前 token 不符即判定为他人快照。
+      //   只做字段级校准不够 —— 昵称、姓名这些展示字段会留在本地，出现「名字是 A、身份是 B」的观感。
+      const _alien = !!_id.sid && !!_snap && (
+        _diff(_snap._owner_sid, _id.sid) ||
+        _diff(_snap.student_id, _id.sid) ||
+        (_id.num && _snap._issue_number && String(_snap._issue_number) !== String(_id.num))
+      );
+      if (_alien) {
+        // 整份丢弃，按 token 重建（昵称等资料随后由 syncCurrentUser / healSelfProfile 补回）
+        try { localStorage.removeItem('hust_current_user'); } catch (e) {}
+        S.user = { student_id: _id.sid };
+        if (_id.num) S.user._issue_number = _id.num;
+        persistCurrentUser();   // 立刻以正确归属重写快照，避免下次启动又走一遍兜底
+      } else {
+        // 同一账号：把学号/编号与 token 对齐（历史快照可能缺字段或被脱敏过）
+        const _r = reconcileIdentity(_snap);
+        S.user = _r.user;
+        if (_r.changed) persistCurrentUser();
+      }
+    } catch(e) {}
+  }
   else {
     // 前端加固：localStorage 被手机端清空时，从 cookie 兜底恢复（随后 syncCurrentUser 补全资料）
     const ct = getCookieToken(), cuid = getCookieUid();
@@ -3107,6 +3132,34 @@ function mergeUserProfile(remote) {
   return S.user;
 }
 // ============================================================
+// v1.63.0 会话身份校准：本地用户态必须与「当前会话 token」绑定
+//   背景：localStorage 里的 hust_current_user 是上一次会话的快照。换号时（旧版本残留、
+//   或 token 已更换而快照没同步）会出现「界面是 A、身份是 B」的混合体 ——
+//   实测症状：新账号发单被上一个账号当天的记录顶掉每日额度（说明额度判定用了旧编号）。
+//   token 里的 sid/num 由服务端签名，不可伪造，是唯一权威身份来源。
+function sessionIdentity() {
+  const tp = tokenPayload();
+  return { sid: (tp && tp.sid) ? String(tp.sid) : '', num: (tp && tp.num) ? tp.num : null };
+}
+// 统一写入口：写入时盖上归属标记，下次启动凭它判断这份快照还属不属于当前会话
+function persistCurrentUser() {
+  try {
+    if (!S.user) { localStorage.removeItem('hust_current_user'); return; }
+    const id = sessionIdentity();
+    const u = Object.assign({}, S.user, { _owner_sid: id.sid || selfSid() || '' });
+    localStorage.setItem('hust_current_user', JSON.stringify(u));
+  } catch (e) {}
+}
+// 把本地快照与当前 token 对齐：学号 / 用户编号一律以 token 为准
+function reconcileIdentity(snapshot) {
+  const id = sessionIdentity();
+  const u = Object.assign({}, snapshot || {});
+  let changed = false;
+  if (id.sid && String(u.student_id || '') !== id.sid) { u.student_id = id.sid; changed = true; }
+  if (id.num && String(u._issue_number || '') !== String(id.num)) { u._issue_number = id.num; changed = true; }
+  return { user: u, changed: changed, owner: String(u._owner_sid || '') };
+}
+// ============================================================
 // v1.62.0 统一「我是订单哪一方」的判定（根治「空值互等」）
 // 背景：S.user.student_id 可能取不到（资料曾被后端脱敏），而订单里 taker_student_id 也可能为空。
 //   写成 `isOrderTaker(o)` 时，两侧同为 undefined，
@@ -3177,7 +3230,7 @@ async function healSelfProfile() {
     if (!remote) return;
     mergeUserProfile(remote);
     S.user._issue_number = num;
-    try { localStorage.setItem('hust_current_user', JSON.stringify(S.user)); } catch (e) {}
+    try { persistCurrentUser(); } catch (e) {}
     if (typeof updateUI === 'function') updateUI();
   } catch (e) { /* 自愈失败不阻断主流程 */ }
 }
@@ -5470,6 +5523,19 @@ function renderOrders(orders) {
     }
     // v1.59.1：二手模式空状态 → 买卖双向入口（只说「发布闲置」= 需求侧永远没入口）
     if (S.listingMode === 'ershou') {
+      // v1.63.0：空状态文案要跟着当前品类走 —— 在「电子产品」分类下说「还没有人在卖二手教材」
+      //   属于答非所问（用户实测反馈）。教材相关分类（全部/教材书籍）才用卖书/求书文案。
+      const _cat = S.goodsCategory || 'all';
+      const _CAT_LABEL = { electronic: '电子产品', digital: '数码配件', daily: '生活用品', tools: '生活工具', sports: '运动器材', clothes: '服饰鞋包', furniture: '宿舍家具', other: '其他物品' };
+      if (_cat !== 'all' && _CAT_LABEL[_cat]) {
+        grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div>'
+          + '<p class="empty-state-title">还没有人在卖' + _CAT_LABEL[_cat] + '</p>'
+          + '<p class="empty-state-hint">闲置放手里是浪费，挂上来让它找到新主人</p>'
+          + '<button class="btn btn-brand" onclick="showPublishModal(\'secondhand\')">📦 发布闲置</button>'
+          + '<button class="btn btn-outline" onclick="filterGoodsCat(\'all\')">看全部品类</button></div>';
+        if (pager) pager.innerHTML = '';
+        return;
+      }
       grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📚</div>'
         + '<p class="empty-state-title">还没有人在卖二手教材</p>'
         + '<p class="empty-state-hint">有闲置就挂上来；想买的书没有就发求购</p>'
@@ -5576,6 +5642,11 @@ function renderBookSubjectFilters() {
   if (!bar) return;
   // v1.45.1：科目筛选条只在二手（教材）场景显示，避免在互助/跑腿/问答里残留
   if (S.listingMode !== 'ershou') { bar.innerHTML = ''; bar.style.display = 'none'; S.bookSubject = ''; return; }
+  // v1.63.0：科目是「教材」专属维度。用户选了「电子产品 / 生活用品 / 服饰鞋包」这类非教材分类时，
+  //   再挂一条「📚 按科目找书」就是纯噪音（实测反馈：都不是书却显示按科目找书）。
+  if (S.goodsCategory && S.goodsCategory !== 'all' && S.goodsCategory !== 'book') {
+    bar.innerHTML = ''; bar.style.display = 'none'; S.bookSubject = ''; return;
+  }
   const list = _cachedOrders || [];
   const counts = {};
   let otherCount = 0;
@@ -7483,7 +7554,7 @@ async function updateCreditScore(userIssueNum, delta, reason) {
     // 若当前登录用户即被变更者，同步本地状态 + 阈值通知
     if (S.user && (S.user._issue_number == userIssueNum || selfSid() == (r.student_id))) {
       S.user.credit_score = newScore;
-      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      persistCurrentUser();
       updateUI();
       // 信用分跌破阈值时通知（仅在跨越阈值那一刻，避免重复）
       if (delta < 0) {
@@ -7645,7 +7716,7 @@ async function toggleBlockUser(targetSid) {
   const idx = S.user.blocked.indexOf(targetSid);
   if (idx >= 0) S.user.blocked.splice(idx, 1);
   else S.user.blocked.push(targetSid);
-  localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+  persistCurrentUser();
   try {
     await ghUpdateIssue(S.user._issue_number, JSON.stringify(identitySafeUser()));
     try { cacheBust('orders_task'); } catch(e) {}
@@ -8017,12 +8088,24 @@ async function loadAdminPanel(force) {
 }
 
 // ============ 赠送 7 天免费会员试用 ============
+// v1.63.0：会员顺延（现有有效期 +days 天；无会员或已过期则从此刻起算）。
+//   ⚠️ 命名避坑：本文件已存在 `async function extendVip(inum, name)`（管理员手动延长会员，
+//   见 activateVip 调用处）。同名函数声明会被后者覆盖 → 这里的纯计算会被静默替换成
+//   「发网络请求」，表现为页面卡死。故取名 addVipDays，勿改回 extendVip。
+//   与 grantTrialVip 的分工：认证奖励要「叠加」而非「已有就跳过」——
+//   否则注册已送 7 天时，「认证通过再赠 7 天」这句承诺会静默失效。
+function addVipDays(userData, days) {
+  if (!userData) return null;
+  const cur = userData.vip_expire ? new Date(userData.vip_expire).getTime() : 0;
+  const base = (cur && cur > Date.now()) ? cur : Date.now();
+  userData.vip_expire = new Date(base + days * 24 * 60 * 60 * 1000).toISOString();
+  userData.vip_trial = true;
+  return userData.vip_expire;
+}
+
 function grantTrialVip(userData) {
   if (userData.vip_expire && new Date(userData.vip_expire) > new Date()) return userData.vip_expire; // 已有效则跳过，避免重复赠送
-  const trialExpire = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  userData.vip_expire = trialExpire;
-  userData.vip_trial = true;
-  return trialExpire;
+  return addVipDays(userData, 7);
 }
 
 async function approveUser(inum) {
@@ -8033,11 +8116,13 @@ async function approveUser(inum) {
     const issue = await res.json();
     const u = JSON.parse(issue.body);
     u.status = 'approved';
+    // v1.63.0：人工审核通过时补齐 7 天试用（对「注册时未送会员」的历史账号兜底；已有有效会员则跳过）
+    grantTrialVip(u);
     await ghUpdateIssue(inum, JSON.stringify(u));
     // 如果当前登录用户就是被审核人，更新本地状态
     if (S.user && (S.user._issue_number === inum || selfSid() === u.student_id)) {
       S.user.status = 'approved';
-      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      persistCurrentUser();
       updateUI();
     }
     toast('已通过审核。完成跑腿认证（上传学生证）后即可发布/接单，认证通过可获赠 7 天会员试用。', 'success');
@@ -8056,7 +8141,7 @@ async function rejectUser(inum) {
     await ghUpdateIssue(inum, JSON.stringify(u));
     if (S.user && (S.user._issue_number === inum || selfSid() === u.student_id)) {
       S.user.status = 'rejected';
-      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      persistCurrentUser();
       updateUI();
     }
     toast('已拒绝该用户', 'info');
@@ -8241,8 +8326,10 @@ async function approveRunner(anum, sid) {
       const u = JSON.parse(userIssue.body);
       u.runner_verified = true;
       u.runner_apply_num = anum;
-      // 跑腿认证通过即赠送 7 天免费会员试用（限免从认证成功开始计时）
-      const trialExpire = grantTrialVip(u);
+      // v1.63.0：跑腿认证通过再顺延 7 天（叠加在注册赠送的 7 天之上，最多 14 天）。
+      //   这里必须用 addVipDays 而非 grantTrialVip —— 后者「已有会员就跳过」，
+      //   会让「认证通过可获赠 7 天会员试用」这句承诺静默失效。
+      const trialExpire = addVipDays(u, 7);
       await ghUpdateIssue(userIssue.number, JSON.stringify(u));
       // 如果当前登录用户就是被审核人，更新本地状态
       if (S.user && selfSid() === sid) {
@@ -8250,7 +8337,7 @@ async function approveRunner(anum, sid) {
         S.user.runner_apply_num = anum;
         S.user.vip_expire = trialExpire;
         S.user.vip_trial = true;
-        localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+        persistCurrentUser();
         updateUI();
       }
     }
@@ -8285,7 +8372,7 @@ async function rejectRunner(anum, sid) {
       await ghUpdateIssue(userIssue.number, JSON.stringify(u));
       if (S.user && selfSid() === sid) {
         S.user.runner_verified = false;
-        localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+        persistCurrentUser();
         updateUI();
       }
     }
@@ -8491,7 +8578,7 @@ async function activateVip(inum, name) {
     // 如果当前登录用户就是被操作人，更新本地状态
     if (S.user && (S.user._issue_number === inum || selfSid() === u.student_id)) {
       S.user.vip_expire = u.vip_expire;
-      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      persistCurrentUser();
       updateUI();
     }
     toast('⭐ 已为「' + name + '」开通会员，到期：' + startFrom.toLocaleDateString('zh-CN'), 'success');
@@ -8524,7 +8611,7 @@ async function cancelVip(inum, name) {
     await ghUpdateIssue(inum, JSON.stringify(u));
     if (S.user && (S.user._issue_number === inum || selfSid() === u.student_id)) {
       S.user.vip_expire = null;
-      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      persistCurrentUser();
       updateUI();
     }
     toast('已取消「' + name + '」的会员', 'info');
@@ -8559,7 +8646,7 @@ async function approveVipApply(applyNum, studentId, name) {
     // 更新本地状态
     if (S.user && selfSid() === studentId) {
       S.user.vip_expire = u.vip_expire;
-      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      persistCurrentUser();
       updateUI();
     }
     toast('⭐ 已为「' + name + '」开通会员，到期：' + startFrom.toLocaleDateString('zh-CN'), 'success');
@@ -8839,8 +8926,6 @@ async function submitVipApply() {
 // 获取今天我发布的订单数 / 接的订单数
 async function getTodayMyOrders(type) {
   // type: 'published' 发布的 | 'taken' 接的
-  const myId = S.user._issue_number || selfSid();
-  const mySid = selfSid();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   try {
@@ -8848,11 +8933,18 @@ async function getTodayMyOrders(type) {
     return issues.filter(i => {
       try {
         const o = JSON.parse(i.body);
-        if (type === 'published') {
-          return (o.publisher_id == myId || o.publisher_student_id === mySid) && new Date(o.created_at) >= today;
-        } else {
-          return (o.taker_id == myId || o.taker_student_id === mySid) && new Date(o.created_at) >= today;
-        }
+        // v1.63.0：改走统一身份判定（isOrderPublisher / isOrderTaker）。
+        //   原来是裸比较 `o.publisher_id == myId || o.publisher_student_id === mySid`：
+        //   两侧同为 undefined / 空串时会「空值互等」→ 把别人的单算成自己的，
+        //   换号后表现为「新账号被上一个账号今天的发单额度顶掉」。
+        const hit = (type === 'published') ? isOrderPublisher(o) : isOrderTaker(o);
+        if (!hit) return false;
+        // 时间兜底：body.created_at 优先，回落 issue 顶层 created_at；两者都缺 → 不计入。
+        //   宁可放过也不能误拦（误拦表现为「明明没发过却说今天发过了」）。
+        const ts = o.created_at || i.created_at;
+        if (!ts) return false;
+        const d = new Date(ts);
+        return !isNaN(d.getTime()) && d >= today;
       } catch(e) { return false; }
     }).length;
   } catch(e) { return 0; }
@@ -9334,7 +9426,7 @@ async function persistDefaultAddress(addr) {
     throw e;
   }
   if (localRole) S.user.role = localRole;   // 内存里恢复 role（不落库，与 saveMyPayment 行为一致）
-  try { localStorage.setItem('hust_current_user', JSON.stringify(S.user)); } catch (e) {}
+  try { persistCurrentUser(); } catch (e) {}
 }
 async function saveDefaultAddress() {
   const errEl = document.getElementById('daError');
@@ -9429,7 +9521,7 @@ async function setChatCleanup(days) {
     S.user.chat_cleanup_days = d;
     await ghUpdateIssue(S.user._issue_number, JSON.stringify(identitySafeUser()));
     if (localRole) S.user.role = localRole;
-    try { localStorage.setItem('hust_current_user', JSON.stringify(S.user)); } catch (e) {}
+    try { persistCurrentUser(); } catch (e) {}
     renderChatCleanupChips();
     toast(d > 0 ? '已设为 ' + d + ' 天后自动清理' : '已关闭自动清理', 'success');
   } catch (e) { toast('保存失败：' + e.message, 'error'); }
@@ -9842,7 +9934,7 @@ async function saveMyNickname() {
     }
     S.user.nickname = nn || ''; // 留空即不设置昵称，展示时自动回落真实姓名
     S.user.nickname_updated_at = new Date().toISOString();
-    localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+    persistCurrentUser();
     await ghUpdateIssue(S.user._issue_number, JSON.stringify(identitySafeUser()));
     toast('昵称已保存', 'success');
     updateUI();
@@ -9914,12 +10006,18 @@ async function handleAuth(e) {
       if (verifyMethod === 'email') initialStatus = 'approved'; // 邮箱验证通过即放行
       // 注意：密码不在前端存储，单独传给 /api/register，由服务端哈希后写入 Issue
       const userData = { student_id: sid, name, nickname: nicknameInput || name, name_nonstandard: nameValid.nonstandard, phone, dorm, status: initialStatus, vip_expire: null, credit_score: 100, credit_history: [], created_at: new Date().toISOString() };
+      // v1.63.0：新用户注册即赠 7 天会员（恢复「新手 7 天」的既定预期）。
+      //   v1.15.3 曾把试用改成「跑腿认证通过才送」，结果是新人一进来就被「每天最多发 1 单」卡住，
+      //   与「降低发布门槛、先让新人试水」的冷启动方向正好相反（用户实测反馈：
+      //   新账号发单被拦、且提示「开通会员即可无限发单」，体验上等于劝退）。
+      //   认证通过仍会再顺延 7 天（见 approveRunner），激励不变。
+      grantTrialVip(userData);
       // v1.52.0：注册时勾了「设为默认收货地址」→ 随注册一次性写入用户资料
       const _daChk = document.getElementById('authSetDefaultAddr');
       if (_daChk && _daChk.checked && dorm) userData.default_address = { name: name, phone: phone || '', dorm: dorm };
       if (verifyMethod === 'email') { userData.email = (document.getElementById('authEmail').value || '').trim().toLowerCase(); userData.email_verified = true; }
       else { userData.email_verified = false; }
-      // 7天会员试用改为在「跑腿认证通过」时赠送（见 approveRunner），注册/审核通过不再赠送
+      // v1.63.0：注册即赠 7 天（见上方 grantTrialVip）；跑腿认证通过再顺延 7 天（approveRunner）
       btn.textContent = '创建中...';
       let regRes;
       try {
@@ -9951,10 +10049,9 @@ async function handleAuth(e) {
         // 邮箱验证 / 管理员注册：直接签发会话并登录
         clearUserScopedData();   // v1.60.0 换号：清掉上一个账号残留的通知/缓存
         setToken(regData.token);
-        S.user = u;
-        // v1.61.0：注册响应若缺学号，用刚签发的 token 兜底（否则新账号发的帖子都会缺 publisher_student_id）
-        if (S.user && !S.user.student_id) { const _p = tokenPayload(); if (_p && _p.sid) S.user.student_id = _p.sid; }
-        localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+        // v1.63.0：注册成功后与 token 对齐身份（学号 / 用户编号），且清掉可能残留的上一个账号字段
+        S.user = reconcileIdentity(u).user;
+        persistCurrentUser();
         setAuthCookies();
         updateUI();
         closeAuthModal();
@@ -10005,11 +10102,11 @@ async function handleAuth(e) {
       const data = await res.json();
       clearUserScopedData();   // v1.60.0 换号：先清掉上一个账号的本地用户态数据（通知/私信已读/缓存）
       setToken(data.token);
-      S.user = data.user;
-      // v1.61.0：学号以服务端签名的 token 为准兜底——发布帖子时要用它写 publisher_student_id，
-      //   缺失会导致帖子发布者本人被订单鉴权判「无权修改」（评价/确认收货全部失败）
-      if (S.user && !S.user.student_id) { const _p = tokenPayload(); if (_p && _p.sid) S.user.student_id = _p.sid; }
-      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      // v1.63.0：登录后立刻与 token 对齐身份（学号 + 用户编号）——
+      //   发布帖子要用学号写 publisher_student_id，额度判定要用用户编号，
+      //   任一项取自旧会话都会出问题（本人反被订单判无权修改 / 额度被上个账号顶掉）。
+      S.user = reconcileIdentity(data.user).user;
+      persistCurrentUser();
       setAuthCookies();
       updateUI();
       closeAuthModal();
@@ -10497,6 +10594,10 @@ async function handlePublish(e) {
     if (todayPublished >= 1) {
       err.textContent = '每天可发布 1 单（防刷屏）。开通会员（¥1/月）即可无限发单！';
       err.style.display = 'block';
+      // v1.63.0：上面的 AI 预检把提交按钮置灰并改成「AI 安全检测中…」，这里 return 前必须恢复，
+      //   否则用户看到的是一颗永久卡死的按钮（实测截图即为此状态）。
+      const _pb3 = document.querySelector('#publishForm button[type=submit]');
+      if (_pb3) { _pb3.disabled = false; _pb3.textContent = '发布'; }
       return;
     }
   }
@@ -10742,7 +10843,7 @@ async function syncCurrentUser() {
     const issueNumber = S.user._issue_number;
     mergeUserProfile(remoteUser);
     if (!S.user.role && localRole) S.user.role = localRole;
-    localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+    persistCurrentUser();
     setAuthCookies();
     updateUI();
     // 已填楼栋的用户默认按同楼栋优先排序（v1.20.0）；用户若已手动切换过其他排序则不覆盖
@@ -10755,6 +10856,16 @@ async function syncCurrentUser() {
 async function ensureUserIssueNumber() {
   // 确保 S.user 包含有效的 _issue_number
   if (!S.user) return false;
+  const _id = sessionIdentity();
+  // v1.63.0：token 带用户编号时以它为准（服务端签名，不可伪造）。
+  //   本地若残留上一个账号的编号，会导致每日额度、订单归属判定全部串到别人身上。
+  if (_id.num) {
+    if (String(S.user._issue_number || '') !== String(_id.num)) {
+      S.user._issue_number = _id.num;
+      persistCurrentUser();
+    }
+    return true;
+  }
   if (S.user._issue_number) return true;
   // 本地缓存缺少 _issue_number，尝试从 GitHub 匹配并修复
   try {
@@ -10772,7 +10883,7 @@ async function ensureUserIssueNumber() {
         S.user.payment_image = remote.payment_image || S.user.payment_image || '';
         S.user.nickname = remote.nickname || S.user.nickname || '';
       } catch(e) {}
-      localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+      persistCurrentUser();
       return true;
     }
   } catch(e) { reportError('用户初始化失败，请刷新页面', e, 'ensure'); }
@@ -11135,7 +11246,8 @@ async function saveMyPayment() {
   if (!S.user) {
     const saved = localStorage.getItem('hust_current_user');
     if (saved) {
-      try { S.user = JSON.parse(saved); } catch(e) { S.user = null; }
+      // v1.63.0：同样走身份校准，避免在「上一个账号的快照」上写收款信息
+      try { S.user = reconcileIdentity(JSON.parse(saved)).user; } catch(e) { S.user = null; }
     }
   }
   if (!S.user) { toast('请先登录', 'error'); return; }
@@ -11194,7 +11306,7 @@ async function saveMyPayment() {
   }
 
   // 5. 先存本地
-  localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+  persistCurrentUser();
 
   // 6. 推送到 GitHub（v1.52.1 乐观锁：断言收款码旧值，防双窗口互相覆盖）
   try {
@@ -11251,7 +11363,7 @@ async function toggleRunnerAvailable(on) {
     if (!hasIssue) throw new Error('用户信息不完整');
     await pullRemoteUser();
     S.user.available = !!on;
-    localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+    persistCurrentUser();
     await ghUpdateIssue(S.user._issue_number, JSON.stringify(identitySafeUser()));
     toast(on ? '🟢 已亮绿灯，系统将按你的接单喜好推送新订单' : '已切换为忙碌，暂停智能派单提醒', 'success');
   } catch(e) {
@@ -11288,7 +11400,7 @@ async function saveTakePrefs() {
   };
   await pullRemoteUser();
   S.user.takePrefs = prefs;
-  localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+  persistCurrentUser();
   try {
     await ghUpdateIssue(S.user._issue_number, JSON.stringify(identitySafeUser()));
     toast('接单喜好已保存，任务大厅将按偏好为你标记推荐订单', 'success');
@@ -11554,7 +11666,7 @@ async function submitRunnerApply() {
     const newIssue = await ghCreateIssue('[跑腿认证] ' + S.user.name + ' - ' + selfSid(), JSON.stringify(applyData), ['runner_apply']);
     // 更新本地用户状态
     S.user.runner_apply_num = newIssue.number;
-    localStorage.setItem('hust_current_user', JSON.stringify(S.user));
+    persistCurrentUser();
     toast('✅ 申请已提交！请等待管理员审核。', 'success');
     closeRunnerApply();
   } catch(e) {
