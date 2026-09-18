@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.51.0';
+const VERSION = '1.52.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -187,26 +187,113 @@ function desensitizeUser(u) {
 //   即可绕过整段鉴权，拿到含手机号/收款码的用户列表（且这份数据还会被写进公共缓存）。
 //   现在改为解析式判断：同时认 label/labels（含 `labels[]` 数组形式、大小写、逗号分隔多值），
 //   只要标签里出现 user 或 admin 就判定为「用户列表」，必须登录。
+// v1.52.0：本函数已由 pathSensitiveTags() 取代（判定范围从 user/admin 扩展到 runner_apply/chat），
+//   保留为薄封装，避免其它调用点失效。新代码请直接用 pathSensitiveTags()。
 function pathIsUserList(ghPath) {
+  return pathSensitiveTags(ghPath).length > 0;
+}
+// v1.52.0：把「敏感列表」判定从 user/admin 扩展到全部敏感域标签（含 runner_apply / chat）。
+//   runner_apply 里带姓名/学号/宿舍/学生证照片，chat 是私信会话 —— 都属于不该公开的域。
+function pathSensitiveTags(ghPath) {
   const q = String(ghPath || '').split('?')[1] || '';
   const parts = q.split('&');
+  const out = [];
   for (let i = 0; i < parts.length; i++) {
     const idx = parts[i].indexOf('=');
     if (idx < 0) continue;
     let key = parts[i].slice(0, idx).toLowerCase();
     try { key = decodeURIComponent(key).toLowerCase(); } catch (e) {}
-    key = key.replace(/\[\]$/, '');            // labels[]= / labels%5B%5D= 数组形式
+    key = key.replace(/\[\]$/, '');
     if (key !== 'label' && key !== 'labels') continue;
     let raw = parts[i].slice(idx + 1);
     try { raw = decodeURIComponent(raw.replace(/\+/g, ' ')); } catch (e) {}
-    const vals = raw.split(',').map(s => s.trim().toLowerCase());
-    if (vals.indexOf('user') >= 0 || vals.indexOf('admin') >= 0) return true;
+    raw.split(',').forEach(v => {
+      const t = v.trim().toLowerCase();
+      if (t && out.indexOf(t) < 0) out.push(t);
+    });
   }
-  return false;
+  return out.filter(isSensitiveLabel);
 }
 function issueHasUserLabel(data) {
   return data && data.labels && Array.isArray(data.labels) &&
     data.labels.some(l => (l && (l.name || l)) === 'user');
+}
+// v1.52.0 敏感数据域：这些标签的「列表 / 单条」一律要求登录态，且非管理员只返回公开投影。
+//   实测漏洞（v1.51.0 只堵了 /gh/ 透传，漏了 /api/ 语义路由，且数据会进公共缓存）：
+//     未登录 GET /api/issues?label=user  → 200，返回 21 条用户记录，含 student_id / name / phone / dorm；
+//     未登录 GET /api/issue/<用户 issue> → 200，同样拿到完整用户资料；
+//     任意登录用户 GET /api/issues?label=chat → 全部私信会话（含他人对话）。
+const SENSITIVE_LABELS = ['user', 'admin', 'runner_apply', 'chat'];
+// 其中「必须登录才能读」的标签：私信会话、跑腿认证申请（含学生证照片）、管理员。
+//   user 列表刻意不要求登录 —— 首页排行榜/信任墙对游客可见，改成 401 会直接白屏；
+//   改为「未登录/非管理员一律只拿公开投影」，同样能堵住手机号批量泄露。
+const AUTH_REQUIRED_LABELS = ['chat', 'runner_apply', 'admin'];
+function labelNeedsAuth(name) {
+  return AUTH_REQUIRED_LABELS.indexOf(String(name || '').trim().toLowerCase()) >= 0;
+}
+function isSensitiveLabel(name) {
+  return SENSITIVE_LABELS.indexOf(String(name || '').trim().toLowerCase()) >= 0;
+}
+function issueHasLabelName(data, name) {
+  return !!(data && data.labels && Array.isArray(data.labels) &&
+    data.labels.some(l => (l && (l.name || l)) === name));
+}
+function issueSensitiveLabels(data) {
+  return SENSITIVE_LABELS.filter(n => issueHasLabelName(data, n));
+}
+// 非管理员可见的用户资料「公开投影」：剥离可被批量采集、用于骚扰/诈骗的字段。
+//   刻意保留 student_id（全站公开标识，订单体里本来就带，前端多处逻辑按它匹配）、
+//   nickname、信用分、认证/VIP 标记 —— 剥离它们会打断「查看用户名片」「找自己的用户编号」等既有功能。
+const USER_SENSITIVE_FIELDS = [
+  'phone', 'name', 'real_name', 'dorm', 'email', 'default_address',
+  'payment_info', 'payment_image', 'wechat', 'qq',
+  'student_card_image', 'password', 'password_hash'
+];
+function desensitizeUserIssue(data) {
+  if (Array.isArray(data)) return data.map(desensitizeUserIssue);
+  if (!data || !data.body) return desensitizeIssue(data);
+  try {
+    const b = JSON.parse(data.body);
+    if (!b || typeof b !== 'object' || Array.isArray(b)) return desensitizeIssue(data);
+    const c = Object.assign({}, b);
+    USER_SENSITIVE_FIELDS.forEach(f => { delete c[f]; });
+    return Object.assign({}, desensitizeIssue(data), { body: JSON.stringify(c) });
+  } catch (e) { return desensitizeIssue(data); }
+}
+// 会话（私信）是否属于该 token 的本人：发布方或接单方任一匹配学号/用户编号即可见
+function chatBelongsTo(body, tk) {
+  if (!body || !tk) return false;
+  const mine = [String(tk.sid || ''), String(tk.num || '')].filter(Boolean);
+  const ids = [body.publisher_student_id, body.taker_student_id, body.publisher_id, body.taker_id,
+    body.author_id, body.creator_id, body.from, body.to]
+    .filter(v => v !== undefined && v !== null && v !== '')
+    .map(String);
+  return ids.some(v => mine.indexOf(v) >= 0);
+}
+// v1.52.0 服务端权威字段保护：非管理员写自己的用户记录时，
+//   ① 本地旧快照不能再把「已开通的会员 / 已通过的认证」抹掉
+//      （实测：管理员开通会员后，客户端一次资料写回就把 vip_expire 清空 → 表现为「有会员却发不了单」）；
+//   ② 顺带堵掉「普通用户自改 role / status 提权、自我审核通过」。
+//   管理员不受限（后台需要开/关会员、改信用分、封号）。
+const SERVER_AUTHORITY_FIELDS = ['role', 'status', 'banned', 'credit_score', 'credit_history',
+  'runner_verified', 'runner_apply_num', 'vip_trial', 'nickname_updated_at'];
+function protectServerFields(newBodyStr, curBodyStr) {
+  try {
+    const cur = JSON.parse(curBodyStr || '{}');
+    const neu = JSON.parse(newBodyStr || '{}');
+    if (!neu || typeof neu !== 'object' || !cur || typeof cur !== 'object') return newBodyStr;
+    SERVER_AUTHORITY_FIELDS.forEach(f => {
+      const nv = neu[f];
+      if (nv === undefined || nv === null || nv === '') {
+        if (cur[f] !== undefined) neu[f] = cur[f];
+      }
+    });
+    // vip_expire 只允许「往后延」，不允许被客户端写短或清空
+    const curVip = cur.vip_expire ? new Date(cur.vip_expire).getTime() : 0;
+    const newVip = neu.vip_expire ? new Date(neu.vip_expire).getTime() : 0;
+    if (curVip && (!newVip || newVip < curVip)) neu.vip_expire = cur.vip_expire;
+    return JSON.stringify(neu);
+  } catch (e) { return newBodyStr; }
 }
 // v1.42.0：从 issue body 提取「有权修改此 issue 的学号集合」，用于写操作所有权断言。
 // 订单类：创建者(student_id) / 发布者(publisher_*) / 接单者(taker_*)；用户类：student_id 即本人。
@@ -235,18 +322,11 @@ function desensitizeIssue(data) {
 //   任意登录者拉一次 `labels=user` 就能批量拿到全体用户的收款码（可用于社工/诈骗）。
 //   代价：前端「买家读卖家收款码」的旧兜底（从用户资料读）会失效 —— 已同步改为
 //   发布时把收款信息快照进订单（publisher_payment_info/_image），交易闭环不受影响。
+// v1.52.0：已由 desensitizeUserIssue() 取代（多了 student_card_image 等字段，并保留 student_id
+//   作为公开标识）。保留为薄封装，新代码请直接用 desensitizeUserIssue()。
 const PRIVATE_FIELDS = ['student_id', 'name', 'phone', 'dorm', 'email', 'real_name', 'wechat', 'qq', 'default_address', 'payment_info', 'payment_image'];
 function desensitizeIssuePrivate(data) {
-  if (Array.isArray(data)) return data.map(desensitizeIssuePrivate);
-  if (issueHasUserLabel(data)) {
-    try {
-      const body = JSON.parse(data.body);
-      const c = Object.assign({}, body);
-      PRIVATE_FIELDS.forEach(f => delete c[f]);
-      return Object.assign({}, data, { body: JSON.stringify(c) });
-    } catch (e) { /* 解析失败原样返回 */ }
-  }
-  return data;
+  return desensitizeUserIssue(data);
 }
 // 写用户 Issue 时合并保留服务端的 password_hash（防整对象写回锁号）
 function protectPasswordField(newBodyStr, curBodyStr) {
@@ -1185,22 +1265,68 @@ const server = http.createServer(async (req, res) => {
         if (issuesMatch) {
           const label = url.searchParams.get('label') || 'order';
           const state = url.searchParams.get('state') || 'open';
+          const labelLc = String(label).trim().toLowerCase();
           const ck = `issues:${label}:${state}`;
-          const cached = getCache(ck);
-          if (cached) return sendJSON(res, 200, cached, Object.assign({}, headers, { 'x-cache': 'HIT' }));
+          const sensitive = isSensitiveLabel(labelLc);
+          // 敏感域不进公共缓存：一是防「一次越权读取 → 长期对所有人可见」的缓存侧信道，
+          //   二是缓存键不区分请求者身份，管理员的全量数据可能被非管理员命中。
+          if (!sensitive) {
+            const cached = getCache(ck);
+            if (cached) return sendJSON(res, 200, cached, Object.assign({}, headers, { 'x-cache': 'HIT' }));
+          }
+          const needsAuth = labelNeedsAuth(labelLc);
+          let tk = null;
+          if (needsAuth) {
+            tk = bearerPayload(req);
+            if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED', hint: '该列表需要登录后查看' }, headers);
+          }
           const data = await ghIssuesAll(label, state);
-          const safe = (label === 'user') ? data.map(desensitizeIssue) : data;
-          setCache(ck, safe);
-          return sendJSON(res, 200, safe, Object.assign({}, headers, { 'x-cache': 'MISS' }));
+          if (sensitive) {
+            // 私信列表：只返回本人参与的会话（原来任何登录用户都能拉到全部对话）
+            if (labelLc === 'chat') {
+              const mine = data.filter(i => { try { return chatBelongsTo(JSON.parse(i.body), tk); } catch (e) { return false; } });
+              return sendJSON(res, 200, mine.map(desensitizeIssue), headers);
+            }
+            // 管理员拿完整数据（后台必须能看手机号/收款码/学生证），其他人只拿公开投影
+            const isAdmin = !!(tk && tk.role === 'admin');
+            if (!isAdmin) return sendJSON(res, 200, data.map(desensitizeUserIssue), headers);
+            return sendJSON(res, 200, data.map(desensitizeIssue), headers);
+          }
+          const safeList = data;
+          setCache(ck, safeList);
+          return sendJSON(res, 200, safeList, Object.assign({}, headers, { 'x-cache': 'MISS' }));
         }
         if (issueMatch) {
           const num = issueMatch[1];
           const ck = `issue:${num}`;
-          const cached = getCache(ck);
+          const cached = getCache(ck);   // 只缓存「公开数据」，敏感数据从不入缓存
           if (cached) return sendJSON(res, 200, cached, Object.assign({}, headers, { 'x-cache': 'HIT' }));
           const { status, data } = await ghProxy(`/repos/${REPO}/issues/${num}`, 'GET', null);
-          if (status === 200) setCache(ck, desensitizeIssue(data));
-          return sendJSON(res, status, desensitizeIssue(data), headers);
+          if (status !== 200 || !data || !data.number) return sendJSON(res, status, desensitizeIssue(data), headers);
+          // v1.52.0：用户/私信/认证申请等敏感单条数据 —— 本人或管理员拿完整数据，
+          //   其他人只拿脱敏投影（原来任何未登录访客都能 GET /api/issue/<用户编号> 拿到完整资料）。
+          //   私信额外要求「必须是会话当事人」。
+          const sens = issueSensitiveLabels(data);
+          if (sens.length) {
+            const tk = bearerPayload(req);
+            const isSelf = !!(tk && tk.num && String(data.number) === String(tk.num));
+            const isAdmin = !!(tk && tk.role === 'admin');
+            if (sens.indexOf('chat') >= 0 && !isSelf && !isAdmin) {
+              if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED', hint: '该数据需要登录后查看' }, headers);
+              let o = null;
+              try { o = JSON.parse(data.body); } catch (e) { o = null; }
+              if (!o || !chatBelongsTo(o, tk)) {
+                return sendJSON(res, 403, { error: 'FORBIDDEN', hint: '无权查看该会话' }, headers);
+              }
+            }
+            if (isAdmin || isSelf) return sendJSON(res, status, desensitizeIssue(data), headers);
+            const proj = (sens.indexOf('user') >= 0 || sens.indexOf('runner_apply') >= 0)
+              ? desensitizeUserIssue(data) : desensitizeIssue(data);
+            return sendJSON(res, status, proj, headers);
+          }
+          const safe = desensitizeIssue(data);
+          setCache(ck, safe);
+          return sendJSON(res, status, safe, headers);
         }
         if (commentsMatch) {
           const num = commentsMatch[1];
@@ -1888,6 +2014,11 @@ const server = http.createServer(async (req, res) => {
           ghBody = Object.assign({}, ghBody, { body: protectPasswordField(ghBody.body, cur.data.body) });
           // v1.50.0：身份字段保护，防止残缺对象写回后账号无法登录
           ghBody = Object.assign({}, ghBody, { body: protectUserIdentity(ghBody.body, cur.data.body) });
+          // v1.52.0：服务端权威字段保护（非管理员）——防止本地旧快照抹掉会员/认证状态，
+          //   并堵掉普通用户自改 role/status 提权或自我审核通过。管理员不受限。
+          if (!(tk && tk.role === 'admin')) {
+            ghBody = Object.assign({}, ghBody, { body: protectServerFields(ghBody.body, cur.data.body) });
+          }
         }
         // v1.41.4 乐观锁 CAS：_expect 字段断言，消除「读-改-写」竞态
         if (ghBody && ghBody._expect && typeof ghBody._expect === 'object') {
@@ -1982,6 +2113,11 @@ const server = http.createServer(async (req, res) => {
       if (cur.status === 200 && issueHasUserLabel(cur.data)) {
         body = Object.assign({}, body, { body: protectPasswordField(body.body, cur.data.body) });
         body = Object.assign({}, body, { body: protectUserIdentity(body.body, cur.data.body) });
+        // v1.52.0：服务端权威字段保护（非管理员），见 protectServerFields 注释
+        const _ptk = bearerPayload(req);
+        if (!(_ptk && _ptk.role === 'admin')) {
+          body = Object.assign({}, body, { body: protectServerFields(body.body, cur.data.body) });
+        }
       }
     }
 
@@ -1995,28 +2131,50 @@ const server = http.createServer(async (req, res) => {
       // ---- GET：隐私约束 ----
       // v1.51.0：改用 pathIsUserList()（解析 label/labels 单复数与多值），
       //   此前正则只认 `labels=`，单数 `label=user` 可绕过鉴权 + 污染公共缓存。
-      const isUserList = pathIsUserList(ghPath);
+      // v1.52.0：扩展为 pathSensitiveTags()，覆盖 user/admin/runner_apply/chat 四个敏感域。
+      const sensTags = pathSensitiveTags(ghPath);
+      const needsAuth = sensTags.some(labelNeedsAuth);
       const singleMatch = ghPath.match(/\/issues\/\d+(?:\?.*)?$/);
-      if (isUserList || singleMatch) {
+      if (sensTags.length > 0 || singleMatch) {
         // 敏感用户数据不进公共缓存，避免越权缓存侧信道
         const tk = bearerPayload(req);
-        if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED' }, headers);
+        // 维持 v1.49.0 起的行为：单条 issue 读取必须带登录态；
+        // 另外「必须登录」的敏感域（私信/认证申请/管理员）列表同样要求登录。
+        // user 列表刻意不要求登录 —— 改为返回公开投影（首页排行榜/信任墙对游客可见）。
+        if (!tk && (needsAuth || singleMatch)) return sendJSON(res, 401, { error: 'UNAUTHORIZED' }, headers);
         if (singleMatch) {
-          // 单条 issue：user/admin 类且非本人/非管理员则强脱敏，杜绝泄露他人手机/姓名
+          // 单条 issue：敏感域且非本人/非管理员则脱敏，杜绝泄露他人手机/姓名/私信
           // v1.50.0 事故修复：此前对「本人读取自己的资料」也做同样的强脱敏，
           //   前端把这份缺 student_id/name/dorm 的对象整体覆盖本地用户态，导致
           //   ① 发布出的帖子缺 publisher_student_id → 本人反被订单判无权修改；
           //   ② 该残缺对象被原样 PATCH 回云端 → 抹掉自己的学号姓名、账号无法登录。
           //  自己读自己（token.num === issue.number）与管理员一样返回完整资料。
-          if (issueHasUserLabel(data)) {
+          const sens = issueSensitiveLabels(data);
+          if (sens.length) {
             const isSelf = !!(tk && tk.num && data && String(data.number) === String(tk.num));
-            if (tk.role === 'admin' || isSelf) return sendJSON(res, status, desensitizeIssue(data), headers);
-            return sendJSON(res, status, desensitizeIssuePrivate(data), headers);
+            const isAdmin = !!(tk && tk.role === 'admin');
+            if (sens.indexOf('chat') >= 0 && !isSelf && !isAdmin) {
+              let o = null;
+              try { o = JSON.parse(data.body); } catch (e) { o = null; }
+              if (!o || !chatBelongsTo(o, tk)) {
+                return sendJSON(res, 403, { error: 'FORBIDDEN', hint: '无权查看该会话' }, headers);
+              }
+            }
+            if (isAdmin || isSelf) return sendJSON(res, status, desensitizeIssue(data), headers);
+            return sendJSON(res, status, (sens.indexOf('user') >= 0 || sens.indexOf('runner_apply') >= 0)
+              ? desensitizeUserIssue(data) : desensitizeIssue(data), headers);
           }
           return sendJSON(res, status, desensitizeIssue(data), headers);
         }
-        // user/admin 列表：一律强脱敏（管理员查全量请走 /api/admin/users）
-        return sendJSON(res, status, desensitizeIssuePrivate(data), headers);
+        // 列表：chat 只返回本人参与的会话；其余敏感域管理员看全量、其他人看公开投影
+        const arr = Array.isArray(data) ? data : [];
+        if (sensTags.indexOf('chat') >= 0) {
+          const mine = arr.filter(i => { try { return chatBelongsTo(JSON.parse(i.body), tk); } catch (e) { return false; } });
+          return sendJSON(res, status, mine.map(desensitizeIssue), headers);
+        }
+        const isAdminList = !!(tk && tk.role === 'admin');
+        if (isAdminList) return sendJSON(res, status, arr.map(desensitizeIssue), headers);
+        return sendJSON(res, status, desensitizeUserIssue(arr), headers);
       }
       // 公开数据（订单/问答/二手等）：仅剥离 password*，可安全缓存
       const safe = desensitizeIssue(data);

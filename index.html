@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.66.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.67.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2922,7 +2922,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.66.1';
+const APP_VERSION = '1.67.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -4053,6 +4053,9 @@ function onForumCatChange() {
 }
 function closeForumPublishModal() {
   const m = document.getElementById('forumPublishModal'); if (m) m.style.display = 'none';
+  // v1.67.0：退出编辑 → 释放焦点并应用可能被延后的新版本
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+  setTimeout(function () { try { _applyPendingSwReload(); } catch (e) {} }, 300);
 }
 function onForumPublishImageChange(input) {
   const files = Array.from(input.files || []);
@@ -7956,11 +7959,10 @@ async function createChatOrder(targetSid, targetName, targetIssueNum, sourceOrde
 // 查找当前用户与目标用户之间未关闭的私信对话
 async function findExistingChat(mySid, targetSid) {
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues?state=open&labels=chat&per_page=100', {
-      headers: {}
-    });
-    if (!res.ok) return null;
-    const issues = await res.json();
+    // v1.67.0：改走 ghIssues('chat')（带登录态 + 后端只返回本人参与的会话），
+    //   原来直接拉 /gh/ 的全量 chat 列表且不带登录态，既慢又可能静默 401。
+    const issues = await ghIssues('chat', 'open');
+    if (!issues) return null;
     for (const issue of issues) {
       try {
         const o = JSON.parse(issue.body);
@@ -8065,8 +8067,8 @@ function renderAdminPanel(users, ct) {
         + (u.dorm ? ' <span style="font-size:.8rem;color:var(--text-secondary)">📍 ' + esc(u.dorm) + '</span>' : '')
         + '<br><span style="font-size:.75rem;color:var(--text-muted)">' + timeAgo(u.created_at) + ' 注册</span></div>'
         + '<div style="display:flex;gap:6px;flex-shrink:0">'
-        + '<button class="btn btn-sm btn-success" onclick="approveUser(' + u._issue_number + ')">通过</button>'
-        + '<button class="btn btn-sm btn-danger" onclick="rejectUser(' + u._issue_number + ')">拒绝</button>'
+        + '<button class="btn btn-sm btn-success" onclick="approveUser(' + u._issue_number + ',this)">通过</button>'
+        + '<button class="btn btn-sm btn-danger" onclick="rejectUser(' + u._issue_number + ',this)">拒绝</button>'
         + '</div></div>';
     }
     html += '</div>';
@@ -8124,13 +8126,13 @@ function grantTrialVip(userData) {
   return addVipDays(userData, 7);
 }
 
-async function approveUser(inum) {
+async function approveUser(inum, btnEl) {
+  if (_adminActing) return;                       // v1.67.0：连点只处理一次
+  _adminActing = true;
+  _adminBtnsBusy(btnEl, '⏳ 处理中…');
+  _markReviewCard(btnEl, '✅ 已通过');
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
-      headers: {}
-    });
-    const issue = await res.json();
-    const u = JSON.parse(issue.body);
+    const u = await _getIssueBody(inum);
     u.status = 'approved';
     // v1.63.0：人工审核通过时补齐 7 天试用（对「注册时未送会员」的历史账号兜底；已有有效会员则跳过）
     grantTrialVip(u);
@@ -8138,21 +8140,28 @@ async function approveUser(inum) {
     // 如果当前登录用户就是被审核人，更新本地状态
     if (S.user && (S.user._issue_number === inum || selfSid() === u.student_id)) {
       S.user.status = 'approved';
+      if (u.vip_expire) { S.user.vip_expire = u.vip_expire; S.user.vip_trial = true; }
       persistCurrentUser();
       updateUI();
     }
     toast('已通过审核。完成跑腿认证（上传学生证）后即可发布/接单，认证通过可获赠 7 天会员试用。', 'success');
-    await loadAdminPanel(true);
-  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+    _bgTask(function () { return loadAdminPanel(true); });   // v1.67.0：列表重载放后台，不拖着界面等
+  } catch(e) {
+    _adminBtnsIdle();
+    toast('操作失败：' + e.message, 'error');
+    _bgTask(function () { return loadAdminPanel(true); });
+  } finally {
+    _adminActing = false;
+  }
 }
 
-async function rejectUser(inum) {
+async function rejectUser(inum, btnEl) {
+  if (_adminActing) return;
+  _adminActing = true;
+  _adminBtnsBusy(btnEl, '⏳ 处理中…');
+  _markReviewCard(btnEl, '❌ 已拒绝', '#dc2626');
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + inum, {
-      headers: {}
-    });
-    const issue = await res.json();
-    const u = JSON.parse(issue.body);
+    const u = await _getIssueBody(inum);
     u.status = 'rejected';
     await ghUpdateIssue(inum, JSON.stringify(u));
     if (S.user && (S.user._issue_number === inum || selfSid() === u.student_id)) {
@@ -8161,8 +8170,14 @@ async function rejectUser(inum) {
       updateUI();
     }
     toast('已拒绝该用户', 'info');
-    await loadAdminPanel(true);
-  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+    _bgTask(function () { return loadAdminPanel(true); });
+  } catch(e) {
+    _adminBtnsIdle();
+    toast('操作失败：' + e.message, 'error');
+    _bgTask(function () { return loadAdminPanel(true); });
+  } finally {
+    _adminActing = false;
+  }
 }
 
 // ============ 管理员公告管理 ============
@@ -8283,8 +8298,8 @@ async function loadRunnerReviews() {
           + (a.note ? '<div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:8px">💬 ' + esc(a.note) + '</div>' : '')
           + (a.student_card_image ? '<div style="margin-bottom:8px"><img src="' + safeImgSrc(a.student_card_image) + '" loading="lazy" decoding="async" style="max-width:260px;max-height:200px;border-radius:8px;border:1px solid var(--border);cursor:pointer" data-src="' + escAttr(a.student_card_image) + '" onclick="previewImage(this)" title="点击查看大图"></div>' : '<div style="color:var(--danger);font-size:.8rem;margin-bottom:8px">⚠️ 未上传学生证照片</div>')
           + '<div style="display:flex;gap:6px">'
-          + '<button class="btn btn-sm btn-success" onclick="approveRunner(' + a._num + ',\'' + esc(a.student_id) + '\')">✅ 通过认证</button>'
-          + '<button class="btn btn-sm btn-danger" onclick="rejectRunner(' + a._num + ',\'' + esc(a.student_id) + '\')">❌ 拒绝</button>'
+          + '<button class="btn btn-sm btn-success" onclick="approveRunner(' + a._num + ',\'' + esc(a.student_id) + '\',this)">✅ 通过认证</button>'
+          + '<button class="btn btn-sm btn-danger" onclick="rejectRunner(' + a._num + ',\'' + esc(a.student_id) + '\',this)">❌ 拒绝</button>'
           + '</div></div>';
       }
       html += '</div>';
@@ -8320,84 +8335,145 @@ async function backfillPublisherVerify(sid, verified) {
   return n;
 }
 
-async function approveRunner(anum, sid) {
+// ============ v1.67.0 管理员操作：一次点击只处理一次 + 立刻给反馈 + 慢活放后台 ============
+//   背景（用户实测）：点「✅ 通过认证」后界面长时间无任何变化（原来要串行跑 5 个网络步骤，
+//   其中「回刷历史订单」会拉全量订单并逐条改写，弱网下动辄十几秒），用户以为没点上就又点几下，
+//   于是并发重复提交、越点越慢。
+//   现在：点击瞬间锁住按钮并改文案 → 网络步骤并行化 → 慢活（回刷/重载列表）丢到后台，不阻塞。
+let _adminActing = false;
+function _adminBtnsBusy(btn, busyText) {
   try {
-    // 1. 更新跑腿申请状态
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + anum, {
-      headers: {}
+    document.querySelectorAll('#adminContent button').forEach(function (b) {
+      const t = b.textContent || '';
+      if (/通过|拒绝|认证|延长|开通会员/.test(t)) { b.disabled = true; b.style.opacity = '.55'; }
     });
-    const issue = await res.json();
-    const a = JSON.parse(issue.body);
+  } catch (e) {}
+  if (btn) { btn.disabled = true; btn.textContent = busyText || '⏳ 处理中…'; }
+}
+function _adminBtnsIdle() {
+  try {
+    document.querySelectorAll('#adminContent button').forEach(function (b) { b.disabled = false; b.style.opacity = ''; });
+  } catch (e) {}
+}
+// 乐观更新：立刻把这张卡片标记为已处理，用户马上看到结果，不会再重复点
+function _markReviewCard(btn, text, color) {
+  try {
+    if (!btn || !btn.parentElement) return;
+    btn.parentElement.innerHTML = '<span style="font-size:.85rem;font-weight:600;color:' + (color || '#16a34a') + '">' + esc(text) + '</span>' +
+      '<span style="font-size:.75rem;color:var(--text-muted);margin-left:8px">正在同步…</span>';
+  } catch (e) {}
+}
+// 后台执行：不阻塞主流程，失败只记日志（用户已经看到成功反馈）
+function _bgTask(fn) {
+  setTimeout(function () { try { Promise.resolve(fn()).catch(function () {}); } catch (e) {} }, 0);
+}
+// 读 issue 正文：统一走带登录态的语义路由（/api/issue/:num 免脱敏 + 30s 缓存）
+async function _getIssueBody(num) {
+  const res = await ghApi('/api/issue/' + num, 'GET', null, { timeout: 12000, retries: 1 });
+  if (!res || !res.ok) throw new Error('读取失败（HTTP ' + (res ? res.status : '?') + '）');
+  const issue = await res.json();
+  let body = null;
+  try { body = JSON.parse(issue.body); } catch (e) { throw new Error('数据格式异常'); }
+  if (!body) throw new Error('数据为空');
+  return body;
+}
+// 定位某个学号对应的用户 issue（一次拉全量并缓存，避免多处重复调用）
+async function _findUserIssueBySid(sid) {
+  const users = await ghIssues('user', 'all');
+  const found = users.find(function (i) {
+    try { return String(JSON.parse(i.body).student_id || '') === String(sid); } catch (e) { return false; }
+  });
+  return found || null;
+}
+
+async function approveRunner(anum, sid, btnEl) {
+  if (_adminActing) return;                      // v1.67.0：连点只处理一次
+  _adminActing = true;
+  _adminBtnsBusy(btnEl, '⏳ 处理中…');
+  _markReviewCard(btnEl, '✅ 已通过');
+  try {
+    // 阶段一：读申请 + 找用户（互不依赖，并行 → 总耗时取较慢的一个）
+    const [a, userIssue] = await Promise.all([
+      _getIssueBody(anum),
+      _findUserIssueBySid(sid).catch(function () { return null; })
+    ]);
     a.status = 'approved';
     a.reviewed_at = new Date().toISOString();
-    await ghUpdateIssue(anum, JSON.stringify(a));
 
-    // 2. 找到对应用户，设置 runner_verified = true
-    const users = await ghIssues('user', 'all');
-    const userIssue = users.find(i => {
-      try { const u = JSON.parse(i.body); return u.student_id === sid; }
-      catch(e) { return false; }
-    });
+    // 阶段二：两条 issue 互相独立 → 并行写入
+    let trialExpire = null, u = null;
     if (userIssue) {
-      const u = JSON.parse(userIssue.body);
+      u = JSON.parse(userIssue.body);
       u.runner_verified = true;
       u.runner_apply_num = anum;
       // v1.63.0：跑腿认证通过再顺延 7 天（叠加在注册赠送的 7 天之上，最多 14 天）。
       //   这里必须用 addVipDays 而非 grantTrialVip —— 后者「已有会员就跳过」，
       //   会让「认证通过可获赠 7 天会员试用」这句承诺静默失效。
-      const trialExpire = addVipDays(u, 7);
-      await ghUpdateIssue(userIssue.number, JSON.stringify(u));
-      // 如果当前登录用户就是被审核人，更新本地状态
-      if (S.user && selfSid() === sid) {
-        S.user.runner_verified = true;
-        S.user.runner_apply_num = anum;
-        S.user.vip_expire = trialExpire;
-        S.user.vip_trial = true;
-        persistCurrentUser();
-        updateUI();
-      }
+      trialExpire = addVipDays(u, 7);
     }
+    await Promise.all([
+      ghUpdateIssue(anum, JSON.stringify(a)),
+      userIssue ? ghUpdateIssue(userIssue.number, JSON.stringify(u)) : Promise.resolve()
+    ]);
 
-    // v1.60.0：回刷该用户此前发布的订单，清掉它们身上的「待核验」快照
-    await backfillPublisherVerify(sid, true);
-    toast('✅ 已通过 ' + sid + ' 的跑腿认证，已赠送 7 天会员试用', 'success');
-    await loadRunnerReviews();
-  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+    // 如果当前登录用户就是被审核人，更新本地状态
+    if (S.user && selfSid() === sid) {
+      S.user.runner_verified = true;
+      S.user.runner_apply_num = anum;
+      if (trialExpire) { S.user.vip_expire = trialExpire; S.user.vip_trial = true; }
+      persistCurrentUser();
+      updateUI();
+    }
+    toast(userIssue ? ('✅ 已通过 ' + sid + ' 的跑腿认证，已赠送 7 天会员试用')
+                    : ('✅ 已通过 ' + sid + ' 的跑腿认证（未找到该学号的用户记录，请检查）'),
+          userIssue ? 'success' : 'info');
+    // 阶段三（后台）：回刷历史订单上的认证快照 + 重载列表 —— 原来这两步会把响应拖到十几秒
+    _bgTask(function () { return backfillPublisherVerify(sid, true); });
+    _bgTask(function () { return loadRunnerReviews(); });
+  } catch (e) {
+    _adminBtnsIdle();
+    toast('操作失败：' + e.message, 'error');
+    _bgTask(function () { return loadRunnerReviews(); });
+  } finally {
+    _adminActing = false;
+  }
 }
 
-async function rejectRunner(anum, sid) {
+async function rejectRunner(anum, sid, btnEl) {
+  if (_adminActing) return;
+  _adminActing = true;
+  _adminBtnsBusy(btnEl, '⏳ 处理中…');
+  _markReviewCard(btnEl, '❌ 已拒绝', '#dc2626');
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + anum, {
-      headers: {}
-    });
-    const issue = await res.json();
-    const a = JSON.parse(issue.body);
+    const [a, userIssue] = await Promise.all([
+      _getIssueBody(anum),
+      _findUserIssueBySid(sid).catch(function () { return null; })
+    ]);
     a.status = 'rejected';
     a.reviewed_at = new Date().toISOString();
-    await ghUpdateIssue(anum, JSON.stringify(a));
 
-    // 如果之前通过过，移除认证
-    const users = await ghIssues('user', 'all');
-    const userIssue = users.find(i => {
-      try { const u = JSON.parse(i.body); return u.student_id === sid; }
-      catch(e) { return false; }
-    });
-    if (userIssue) {
-      const u = JSON.parse(userIssue.body);
-      u.runner_verified = false;
-      await ghUpdateIssue(userIssue.number, JSON.stringify(u));
-      if (S.user && selfSid() === sid) {
-        S.user.runner_verified = false;
-        persistCurrentUser();
-        updateUI();
-      }
+    let u = null;
+    if (userIssue) { u = JSON.parse(userIssue.body); u.runner_verified = false; }
+    await Promise.all([
+      ghUpdateIssue(anum, JSON.stringify(a)),
+      userIssue ? ghUpdateIssue(userIssue.number, JSON.stringify(u)) : Promise.resolve()
+    ]);
+    if (S.user && selfSid() === sid) {
+      S.user.runner_verified = false;
+      persistCurrentUser();
+      updateUI();
     }
-
-    // v1.60.0：撤销认证时同步回刷，避免旧帖仍显示「认证跑腿」徽章
-    await backfillPublisherVerify(sid, false);
     toast('已拒绝 ' + sid + ' 的跑腿认证', 'info');
-    await loadRunnerReviews();
-  } catch(e) { toast('操作失败：' + e.message, 'error'); }
+    // v1.60.0：撤销认证时同步回刷，避免旧帖仍显示「认证跑腿」徽章（放后台，不拖着界面等）
+    _bgTask(function () { return backfillPublisherVerify(sid, false); });
+    _bgTask(function () { return loadRunnerReviews(); });
+  } catch (e) {
+    _adminBtnsIdle();
+    toast('操作失败：' + e.message, 'error');
+    _bgTask(function () { return loadRunnerReviews(); });
+  } finally {
+    _adminActing = false;
+  }
 }
 
 // ============ 用户管理 ============
@@ -9941,12 +10017,9 @@ async function saveMyNickname() {
     errEl.style.display = 'block'; return;
   }
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + S.user._issue_number, { headers: {} });
-    if (res.ok) {
-      const issue = await res.json();
-      const remoteUser = JSON.parse(issue.body);
-      mergeUserProfile(remoteUser);
-    }
+    // v1.67.0：改走带登录态的统一入口（原来裸 fetch，token 缺失时静默 401 → 昵称冷却判定用了过期数据）
+    const remoteUser = await readMyIssueBody();
+    if (remoteUser) mergeUserProfile(remoteUser);
     // 冷却：每 60 天（2个月）才能改一次，首次设置（无记录）不受限
     const NICKNAME_COOLDOWN_DAYS = 60;
     const lastTs = S.user.nickname_updated_at ? new Date(S.user.nickname_updated_at).getTime() : 0;
@@ -10236,6 +10309,8 @@ function savePublishDraft() {
   const draft = {
     type: g('publishType'), category: g('publishCategory'),
     title: g('publishTitle'), desc: g('publishDesc'),
+    // v1.67.0：补上「报酬金额」。原来漏了 price，用户填了金额关掉再打开就没了
+    price: g('publishPrice'),
     location: g('publishLocation'), urgency: g('publishUrgency'),
     payment: g('publishPayment'), deadline: g('publishDeadline'),
     genderLimit: g('publishGenderLimit'),
@@ -10243,7 +10318,7 @@ function savePublishDraft() {
     bounty: g('publishBounty')
   };
   // 全空表单不写草稿，避免清空后仍留一条空记录
-  if (!draft.title && !draft.desc && !draft.location && !draft.payment) { dropDraft(DRAFT_KEYS.pub); return; }
+  if (!draft.title && !draft.desc && !draft.location && !draft.payment && !draft.price) { dropDraft(DRAFT_KEYS.pub); return; }
   writeDraft(DRAFT_KEYS.pub, draft);
 }
 function restorePublishDraft() {
@@ -10253,12 +10328,17 @@ function restorePublishDraft() {
   if (d.type) { const t = document.getElementById('publishType'); if (t) t.value = d.type; updatePublishCategories(); }
   set('publishCategory', normalizeCat(d.category || ''));
   set('publishTitle', d.title); set('publishDesc', d.desc);
+  set('publishPrice', d.price);                                   // v1.67.0：恢复金额
   set('publishLocation', d.location); set('publishUrgency', d.urgency);
   set('publishPayment', d.payment); set('publishDeadline', d.deadline);
   set('publishGenderLimit', d.genderLimit);
   const be = document.getElementById('bountyEnable'); if (be && d.bountyEnable) { be.checked = true; toggleBountyInput(); set('publishBounty', d.bounty); }
   updateCharCount('publishTitle', 'titleCount', 50);
   updateCharCount('publishDesc', 'descCount', 500);
+  // v1.67.0：恢复后刷新与字段联动的 UI（金额提示/地址控件/附件入口），否则界面与内容不一致
+  try { checkPublishPrice(); } catch (e) {}
+  try { updatePublishAddrUI(); } catch (e) {}
+  try { updatePublishAttachmentVisibility(); } catch (e) {}
   try { if (window.toast) toast('已恢复上次未发布的草稿'); } catch (e) {}
 }
 function clearPublishDraft() { dropDraft(DRAFT_KEYS.pub); }
@@ -10328,9 +10408,14 @@ function showPublishModal(preType) {
   }
   setTimeout(() => { const f = document.querySelector('#publishModal input:not([type=hidden]),#publishModal textarea,#publishModal select'); if (f) f.focus(); }, 60);
   // 默认截止时间为明天同一时间
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  tomorrow.setMinutes(tomorrow.getMinutes() - tomorrow.getTimezoneOffset());
-  document.getElementById('publishDeadline').value = tomorrow.toISOString().slice(0, 16);
+  // v1.67.0：只在字段为空时才填默认值 —— 原来无条件覆盖，导致草稿里保存的截止时间永远恢复不出来
+  //   （restorePublishDraft 在上面已经写入了草稿值，这里不能把它冲掉）。
+  const _dlEl = document.getElementById('publishDeadline');
+  if (_dlEl && !_dlEl.value) {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    tomorrow.setMinutes(tomorrow.getMinutes() - tomorrow.getTimezoneOffset());
+    _dlEl.value = tomorrow.toISOString().slice(0, 16);
+  }
   updatePublishAddrUI();   // v1.52.0：按当前类型/是否已有默认地址刷新控件
 }
 
@@ -10357,6 +10442,9 @@ function closePublishModal() {
   document.getElementById('publishForm').reset();
   const _attHint = document.getElementById('publishAttachmentHint'); if (_attHint) _attHint.style.display = 'none';
   if (window.resetOcrState) resetOcrState();   // v1.16.0：清掉图片预览与 OCR chips，防"幽灵预览"
+  // v1.67.0：用户已退出编辑 → 若有「新版本就绪」被延后，此刻应用（顺带 blur，避免焦点残留导致判定为编辑中）
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+  setTimeout(function () { try { _applyPendingSwReload(); } catch (e) {} }, 300);
 }
 
 function updatePublishCategories() {
@@ -10621,12 +10709,17 @@ async function handlePublishInner(e) {
   let _pendingReview = false;
   if (!S.user.runner_verified && !isAdminUser()) {
     if (type === 'task') {
-      err.textContent = '发布「跑腿代办」需先通过跑腿认证（上传学生证照片）。认证通过后还可获赠 7 天会员试用！';
-      err.style.display = 'block';
-      showRunnerApply();
-      return;
+      // v1.67.0：本地快照可能是旧的（管理员刚通过跑腿认证，本机还没同步）→ 报错前向服务端复核一次。
+      //   只在「即将被拦住」时才多打这一次请求，正常发布零开销。
+      await refreshMyProfile(0);
+      if (!S.user.runner_verified && !isAdminUser()) {
+        err.textContent = '发布「跑腿代办」需先通过跑腿认证（上传学生证照片）。认证通过后还可获赠 7 天会员试用！';
+        err.style.display = 'block';
+        showRunnerApply();
+        return;
+      }
     }
-    if (type === 'secondhand' || type === 'borrow') {
+    if (!S.user.runner_verified && (type === 'secondhand' || type === 'borrow')) {
       _pendingReview = true;   // 先发后审：不阻断发布，帖子带「待核验」标记
     }
   }
@@ -10634,10 +10727,18 @@ async function handlePublishInner(e) {
   if ((type === 'task' || type === 'secondhand' || type === 'borrow') && !isVIP() && !isAdminUser()) {
     const todayPublished = await getTodayMyOrders('published');
     if (todayPublished >= 1) {
-      err.textContent = '每天可发布 1 单（防刷屏）。开通会员（¥1/月）即可无限发单！';
-      err.style.display = 'block';
-      // v1.64.0：按钮置灰/恢复已统一收口到外层 handlePublish 的 finally，这里只管提示
-      return;
+      // v1.67.0：本地「非会员」可能只是快照过期（管理员刚开通会员 / 多设备）→ 判罚前向服务端复核。
+      //   实测：U202012346 云端会员有效期到 2026-10-02，手机端却仍被「每天 1 单」拦住。
+      await refreshMyProfile(0);
+      if (!isVIP() && !isAdminUser()) {
+        const _vipTxt = S.user.vip_expire
+          ? ('有效期至 ' + new Date(S.user.vip_expire).toLocaleDateString('zh-CN'))
+          : '未开通';
+        err.textContent = '每天可发布 1 单（防刷屏）。开通会员（¥1/月）即可无限发单！（当前会员状态：' + _vipTxt + '）';
+        err.style.display = 'block';
+        // v1.64.0：按钮置灰/恢复已统一收口到外层 handlePublish 的 finally，这里只管提示
+        return;
+      }
     }
   }
   if (type !== 'qa' && !price) { err.textContent = '请填写报酬金额'; err.style.display = 'block'; return; }
@@ -10873,24 +10974,61 @@ function updateUI() {
 
 // 后台同步当前用户数据：解决多设备昵称/收款信息不同步
 async function syncCurrentUser() {
-  if (!S.user || !S.user._issue_number) return;
+  if (!S.user) return false;
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + S.user._issue_number, { headers: {} });
-    if (!res.ok) return;
-    const issue = await res.json();
-    const remoteUser = JSON.parse(issue.body);
-    // _issue_number 和 role 以本地为准（role 来自 Token）
+    // v1.67.0：改走 /api/me —— 服务端按 token 里签名的 num 读「本人」资料，返回完整字段。
+    //   为什么不再用裸 fetch 走 /gh/repos/.../issues/N：
+    //   ① 该路径对 user 类 issue 要求登录态，历史上多处调用漏带 token（或 token 恰好失效）→ 静默 401；
+    //   ② 即使带上，非管理员读「他人」issue 会被强脱敏，字段残缺。
+    //   用户实测症状：管理员已给某账号开通会员，手机端仍显示非会员、被「每天可发布 1 单」拦住。
+    const res = await ghApi('/api/me', 'GET', null, { timeout: 10000, retries: 1 });
+    if (!res || !res.ok) return false;
+    const remoteUser = await res.json();
+    if (!remoteUser || typeof remoteUser !== 'object') return false;
     const localRole = S.user.role;
-    const issueNumber = S.user._issue_number;
+    const issueNumber = remoteUser._issue_number || S.user._issue_number;
     mergeUserProfile(remoteUser);
-    if (!S.user.role && localRole) S.user.role = localRole;
+    if (issueNumber) S.user._issue_number = issueNumber;
+    // role 以 token（服务端签名）为准；token 未带时回落到本地
+    const _tp = tokenPayload();
+    S.user.role = (_tp && _tp.role) || S.user.role || localRole;
     persistCurrentUser();
     setAuthCookies();
     updateUI();
     // 已填楼栋的用户默认按同楼栋优先排序（v1.20.0）；用户若已手动切换过其他排序则不覆盖
     const _sel = document.getElementById('taskSortSelect');
     if (_sel && S.user && S.user.dorm && _sel.value === 'newest') _sel.value = 'dorm_first';
-  } catch(e) { console.warn('syncCurrentUser failed', e); }
+    return true;
+  } catch(e) { console.warn('syncCurrentUser failed', e); return false; }
+}
+
+// v1.67.0：带节流的资料同步。会员/认证状态由管理员在别处修改（开会员、通过认证），
+//   本地快照不会自己变新 —— 这里在「启动 / 切回页面 / 发布被拦前」主动拉一次。
+//   minGap=0 表示强制同步（用于「被拦住之前最后确认一次」这种关键时刻）。
+let _profileSyncAt = 0, _profileSyncBusy = false;
+async function refreshMyProfile(minGap) {
+  if (!S.user || !getToken()) return false;
+  const gap = (minGap == null) ? 30000 : minGap;
+  if (Date.now() - _profileSyncAt < gap) return false;
+  if (_profileSyncBusy) return false;
+  _profileSyncBusy = true;
+  try { await syncCurrentUser(); _profileSyncAt = Date.now(); return true; }
+  catch (e) { return false; }
+  finally { _profileSyncBusy = false; }
+}
+window.refreshMyProfile = refreshMyProfile;
+
+// v1.67.0：读「自己」的用户资料统一入口。
+//   历史上有 5 处各自裸 fetch 走 /gh/ 透传，一旦 token 缺失/失效就是静默 401（界面毫无反应）；
+//   这里统一走 /api/issue/:num（带登录态、30s 缓存、不做身份脱敏），失败返回 null 由调用方兜底。
+async function readMyIssueBody() {
+  if (!S.user || !S.user._issue_number) return null;
+  try {
+    const res = await ghApi('/api/issue/' + S.user._issue_number, 'GET', null, { timeout: 10000, retries: 1 });
+    if (!res || !res.ok) return null;
+    const issue = await res.json();
+    return JSON.parse(issue.body);
+  } catch (e) { return null; }
 }
 
 
@@ -11324,12 +11462,9 @@ async function saveMyPayment() {
   let expectPayment = null;
   let pulledRemote = false;
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + S.user._issue_number, {
-      headers: {}
-    });
-    if (res.ok) {
-      const issue = await res.json();
-      const remoteUser = JSON.parse(issue.body);
+    // v1.67.0：统一走带登录态的读取入口（原来裸 fetch，token 缺失时静默 401 → 乐观锁锚点拿不到）
+    const remoteUser = await readMyIssueBody();
+    if (remoteUser) {
       expectPayment = remoteUser.payment_info || null;
       pulledRemote = true;
       // 用云端最新数据覆盖本地，再写入新的收款信息
@@ -11374,9 +11509,9 @@ async function saveMyPayment() {
 // 从云端拉取最新用户数据，防止覆盖他人并发修改
 async function pullRemoteUser() {
   try {
-    const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + S.user._issue_number, { headers: {} });
-    if (res.ok) {
-      const remote = JSON.parse((await res.json()).body);
+    // v1.67.0：统一走带登录态的读取入口
+    const remote = await readMyIssueBody();
+    if (remote) {
       mergeUserProfile(remote);
       return true;
     }
@@ -12446,10 +12581,49 @@ document.addEventListener('visibilitychange', () => {
     startSmartPolling();
   }
   // v1.65.0 iOS 微信无 SW 兜底：切回页面且距上次刷新超 60s 时静默重拉当前页数据
-  if (!document.hidden && S.page && !_pullBusy) {
+  // v1.67.0：正在填表/编辑时不刷新（原来会把用户填了一半的发布表单直接冲掉）
+  if (!document.hidden && S.page && !_pullBusy && !_isUserEditing()) {
     if (Date.now() - _lastVisibleRefresh > 60000) _visibleRefresh();
   }
+  // v1.67.0：切回页面顺手同步云端资料（会员/认证/昵称），长期挂在前台时状态也能收敛
+  if (!document.hidden && S.user && getToken()) { try { refreshMyProfile(60000); } catch (e) {} }
+  // v1.67.0：切到后台时若「新版本就绪」还在等待，此刻应用更新最不打扰
+  if (document.hidden) { try { _applyPendingSwReload(); } catch (e) {} }
 });
+
+// ============ v1.67.0 编辑保护：自动刷新/自动更新绝不打断用户正在做的事 ============
+//   背景：v1.65.0 的 SW 自动更新会在任意时刻 location.reload()，用户发单发到一半被直接弹回首页；
+//   同一时间点的可见性兜底刷新也会把页面状态冲掉。现在编辑中一律延后，等空闲了再应用。
+function _isUserEditing() {
+  try {
+    const pm = document.getElementById('publishModal');
+    if (pm && pm.classList.contains('active')) return true;
+    const fm = document.getElementById('forumPublishModal');
+    if (fm && fm.style.display && fm.style.display !== 'none') return true;
+    if (document.querySelector('.modal-overlay.active, .notify-panel.active, .ai-panel.open')) return true;
+    const ae = document.activeElement;
+    if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable)) {
+      // 元素已不可见（弹窗刚关）不算「编辑中」，否则会永远等不到空闲
+      if (ae.offsetParent !== null || ae.getClientRects().length) return true;
+    }
+  } catch (e) {}
+  return false;
+}
+let _pendingSwReload = false;
+function _applyPendingSwReload() {
+  if (!_pendingSwReload) return;
+  if (_isUserEditing()) return;
+  _pendingSwReload = false;
+  try { sessionStorage.setItem('hust_sw_reload_at', String(Date.now())); } catch (e) {}
+  location.reload();
+}
+function _startPendingSwWatch() {
+  if (window._pendingSwTimer) return;
+  window._pendingSwTimer = setInterval(function () {
+    if (!_pendingSwReload) { clearInterval(window._pendingSwTimer); window._pendingSwTimer = null; return; }
+    _applyPendingSwReload();
+  }, 8000);
+}
 
 function _visibleRefresh() {
   _lastVisibleRefresh = Date.now();
@@ -13108,6 +13282,14 @@ if ('serviceWorker' in navigator) {
         if (sessionStorage.getItem('hust_sw_had_controller') !== '1') return;
         const last = parseInt(sessionStorage.getItem('hust_sw_reload_at') || '0', 10);
         if (Date.now() - last < 30000) return;
+        // v1.67.0：用户正在填表/编辑时绝不重载（v1.65.0 曾把发单到一半的用户直接弹回首页）。
+        //   改为「就绪待更新」：关弹窗、输入框失焦、切到后台或 8s 轮询到空闲时再应用。
+        if (_isUserEditing()) {
+          _pendingSwReload = true;
+          _startPendingSwWatch();
+          try { if (window.toast) toast('新版本已就绪，填完后自动更新', 'info', 4000); } catch (e) {}
+          return;
+        }
         sessionStorage.setItem('hust_sw_reload_at', String(Date.now()));
         location.reload();
       });
