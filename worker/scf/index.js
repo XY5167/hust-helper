@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.49.0';
+const VERSION = '1.50.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -230,6 +230,26 @@ function protectPasswordField(newBodyStr, curBodyStr) {
     const neu = JSON.parse(newBodyStr);
     if (cur.password_hash && !neu.password_hash) neu.password_hash = cur.password_hash;
     if (cur.password && !neu.password) neu.password = cur.password;
+    return JSON.stringify(neu);
+  } catch (e) { return newBodyStr; }
+}
+
+// v1.50.0：用户资料写入的「身份字段保护」——防「残缺覆盖」把账号写废。
+// 事故背景：后端对非管理员读取 user issue 会强脱敏（删 student_id/name/phone/dorm），
+//   前端历史实现把这份残缺对象整体 PATCH 回云端；一旦落库，findUserBySid 按学号匹配
+//   将再也找不到该用户 —— 账号直接无法登录（不可逆）。
+// 策略：新 body 里缺失或为空的身份字段，一律沿用云端已有值；其余字段按新值写入。
+const USER_IDENTITY_FIELDS = ['student_id', 'name'];
+function protectUserIdentity(newBodyStr, curBodyStr) {
+  try {
+    const cur = JSON.parse(curBodyStr);
+    if (!cur || typeof cur !== 'object') return newBodyStr;
+    const neu = JSON.parse(newBodyStr);
+    if (!neu || typeof neu !== 'object') return newBodyStr;
+    USER_IDENTITY_FIELDS.forEach(function (f) {
+      const nv = neu[f];
+      if ((nv === undefined || nv === null || nv === '') && cur[f]) neu[f] = cur[f];
+    });
     return JSON.stringify(neu);
   } catch (e) { return newBodyStr; }
 }
@@ -1827,13 +1847,21 @@ const server = http.createServer(async (req, res) => {
           return sendJSON(res, 404, { error: 'ISSUE_NOT_FOUND' }, headers);
         }
         // v1.42.0 所有权断言：仅创建者/发布者/接单者或管理员可改写，阻断「拿自己 token 改别人订单/信用」
+        // v1.50.0：订单里的 publisher_id / taker_id 存的是「用户 issue 编号」，而历史数据里
+        //   publisher_student_id 可能因「强脱敏写回」事故而缺失（详见 protectUserIdentity 注释），
+        //   导致订单发布者本人反而被判无权修改（评价/确认收货/取消全部 403）。
+        //   token 载荷里的 num 就是本人的用户 issue 编号，由服务端签名保护、不可伪造，
+        //   与学号一样是可靠的等价身份标识 —— 一并接受，无需为此放宽任何真正的越权边界。
         const owner = issueOwnerSids(cur.data);
-        if (tk && tk.role !== 'admin' && owner.length && !owner.includes(String(tk.sid))) {
+        const selfIds = tk ? [String(tk.sid || ''), String(tk.num || '')] : [];
+        if (tk && tk.role !== 'admin' && owner.length && !owner.some(function (s) { return selfIds.indexOf(s) !== -1; })) {
           return sendJSON(res, 403, { error: 'FORBIDDEN', hint: '无权修改他人数据' }, headers);
         }
         // v1.41.4 写保护：合并保留 password_hash，杜绝整对象写回锁号
         if (ghBody && ghBody.body && issueHasUserLabel(cur.data)) {
           ghBody = Object.assign({}, ghBody, { body: protectPasswordField(ghBody.body, cur.data.body) });
+          // v1.50.0：身份字段保护，防止残缺对象写回后账号无法登录
+          ghBody = Object.assign({}, ghBody, { body: protectUserIdentity(ghBody.body, cur.data.body) });
         }
         // v1.41.4 乐观锁 CAS：_expect 字段断言，消除「读-改-写」竞态
         if (ghBody && ghBody._expect && typeof ghBody._expect === 'object') {
@@ -1922,11 +1950,12 @@ const server = http.createServer(async (req, res) => {
       if (cached) return sendJSON(res, 200, cached, Object.assign({}, headers, { 'x-cache': 'HIT' }));
     }
 
-    // 写保护：PATCH 用户 Issue 合并保留 password_hash
+    // 写保护：PATCH 用户 Issue 合并保留 password_hash（v1.50.0 起同时保护学号/姓名）
     if (method === 'PATCH' && body && body.body) {
       const cur = await ghProxy(ghPath, 'GET', null);
       if (cur.status === 200 && issueHasUserLabel(cur.data)) {
         body = Object.assign({}, body, { body: protectPasswordField(body.body, cur.data.body) });
+        body = Object.assign({}, body, { body: protectUserIdentity(body.body, cur.data.body) });
       }
     }
 
@@ -1945,9 +1974,15 @@ const server = http.createServer(async (req, res) => {
         const tk = bearerPayload(req);
         if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED' }, headers);
         if (singleMatch) {
-          // 单条 issue：user/admin 类且非管理员则强脱敏，杜绝泄露他人手机/姓名
+          // 单条 issue：user/admin 类且非本人/非管理员则强脱敏，杜绝泄露他人手机/姓名
+          // v1.50.0 事故修复：此前对「本人读取自己的资料」也做同样的强脱敏，
+          //   前端把这份缺 student_id/name/dorm 的对象整体覆盖本地用户态，导致
+          //   ① 发布出的帖子缺 publisher_student_id → 本人反被订单判无权修改；
+          //   ② 该残缺对象被原样 PATCH 回云端 → 抹掉自己的学号姓名、账号无法登录。
+          //  自己读自己（token.num === issue.number）与管理员一样返回完整资料。
           if (issueHasUserLabel(data)) {
-            if (tk.role === 'admin') return sendJSON(res, status, desensitizeIssue(data), headers);
+            const isSelf = !!(tk && tk.num && data && String(data.number) === String(tk.num));
+            if (tk.role === 'admin' || isSelf) return sendJSON(res, status, desensitizeIssue(data), headers);
             return sendJSON(res, status, desensitizeIssuePrivate(data), headers);
           }
           return sendJSON(res, status, desensitizeIssue(data), headers);

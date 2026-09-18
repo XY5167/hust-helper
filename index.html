@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.60.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.61.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2923,7 +2923,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.60.0';
+const APP_VERSION = '1.61.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3024,6 +3024,8 @@ function cacheGetStale(key) {
   updateUI();
   // 后台同步最新用户数据，保证多设备昵称/收款信息一致
   if (S.user && S.user._issue_number) syncCurrentUser();
+  // v1.61.0：本地用户态自愈（历史脏数据修复，见 healSelfProfile 注释）
+  if (S.user && S.user._issue_number) healSelfProfile();
   // v1.56.0：会话静默核验 + 滑动续签
   //   ① 核验：token 可能已过期/被服务端拒绝，但本地仍残留用户信息 → 界面"假装已登录"，
   //      直到点发布才撞 401。此处静默清理，不弹模态（用户可能只是在浏览，不该被打断）。
@@ -3065,6 +3067,57 @@ function cacheGetStale(key) {
 // ---- 会话 Token 管理（与用户资料分离，绝不存储密码）----
 function getToken() { try { return localStorage.getItem('hust_token') || getCookieToken(); } catch (e) { return null; } }
 function setToken(t) { try { localStorage.setItem('hust_token', t); } catch (e) {} }
+
+// ============ v1.61.0 用户身份兜底（事故级修复）============
+// 事故链：后端对「非管理员读取 user issue」做强脱敏（删 student_id/name/phone/dorm）→
+//   前端把这份残缺对象整体覆盖 S.user 并持久化 → 后果有两个：
+//   ① 发布出的帖子 publisher_student_id = undefined（JSON 序列化时整个字段消失）
+//      → 后端所有权断言只认学号 → 订单发布者本人反被判「无权修改」，评价/确认收货/取消全 403；
+//   ② 这份残缺对象再被 PATCH 回云端 → 抹掉自己的学号姓名 → findUserBySid 找不到 → 账号永久无法登录。
+// 修复：selfSid() 从「服务端签名的 token」取学号作为兜底；mergeUserProfile() 用安全合并
+//   替代原先的 Object.assign 整体覆盖，身份字段绝不被空值/脱敏值清空。
+function selfSid() {
+  try { if (S.user && S.user.student_id) return String(S.user.student_id); } catch (e) {}
+  const tp = tokenPayload();
+  return (tp && tp.sid) ? String(tp.sid) : '';
+}
+function mergeUserProfile(remote) {
+  if (!remote || typeof remote !== 'object') return S.user;
+  // 身份字段：远端为空（被脱敏或未填）时保留本地已有值，绝不被空值清空
+  const IDENTITY_KEYS = ['student_id', 'name', 'dorm', 'phone', 'email', 'real_name', 'default_address'];
+  const prev = (S.user && typeof S.user === 'object') ? S.user : {};
+  const next = Object.assign({}, prev, remote);
+  IDENTITY_KEYS.forEach(function (k) {
+    const rv = remote[k];
+    const remoteEmpty = (rv === undefined || rv === null || rv === '');
+    const lv = prev[k];
+    if (remoteEmpty && lv !== undefined && lv !== null && lv !== '') next[k] = lv;
+  });
+  if (!next.student_id) { const s = selfSid(); if (s) next.student_id = s; }
+  S.user = next;
+  return S.user;
+}
+// v1.61.0：本地用户态自愈。历史上 S.user 曾被后端「强脱敏的本人资料」整体覆盖，
+//   丢掉 student_id/name/dorm（后果：发布出的帖子缺 publisher_student_id，本人反被订单判无权修改）。
+//   此处带 Bearer 走 /api/issue/:num —— 该路径不做隐私脱敏，能取回完整资料。
+async function healSelfProfile() {
+  try {
+    if (!S.user) return;
+    const num = S.user._issue_number;
+    const lacks = !S.user.student_id || !S.user.name || S.user.dorm === undefined || S.user.dorm === null;
+    if (!lacks || !num) return;
+    const res = await ghApi('/api/issue/' + num, 'GET', null, { timeout: 10000, retries: 1 });
+    if (!res || !res.ok) return;
+    const issue = await res.json();
+    let remote = null;
+    try { remote = JSON.parse(issue.body); } catch (e) { return; }
+    if (!remote) return;
+    mergeUserProfile(remote);
+    S.user._issue_number = num;
+    try { localStorage.setItem('hust_current_user', JSON.stringify(S.user)); } catch (e) {}
+    if (typeof updateUI === 'function') updateUI();
+  } catch (e) { /* 自愈失败不阻断主流程 */ }
+}
 
 // v1.42.22：onAuthRequired 取消 10s 节流。
 //   历史：v1.42.18 加 10s 节流（防 30s 轮询后台写操作反复弹模态）→ v1.42.19 收窄到"用户主动操作"语义
@@ -3351,8 +3404,8 @@ function canSeePrivate(o) {
   if (!o) return false;
   if (window.isAdminUser && isAdminUser()) return true;
   if (!S.user) return false;
-  const myId = S.user._issue_number || S.user.student_id;
-  const mySid = S.user.student_id;
+  const myId = S.user._issue_number || selfSid();
+  const mySid = selfSid();
   return !!(o && (
     (o.publisher_id && (o.publisher_id == myId || o.publisher_id == mySid))
     || (o.taker_id && (o.taker_id == myId || o.taker_id == mySid))
@@ -6310,7 +6363,7 @@ async function showDetail(issueNum) {
     // ============ 私信对话特殊渲染 ============
     if (isChat) {
       const myId = S.user ? (S.user._issue_number || S.user.student_id) : null;
-      const mySid = S.user ? S.user.student_id : null;
+      const mySid = S.user ? selfSid() : null;
       const pubId = o.publisher_id;
       const pubSid = o.publisher_student_id;
       const isAdmin = S.user && S.user.student_id === ADMIN_STUDENT_ID;
@@ -6526,7 +6579,7 @@ async function showDetail(issueNum) {
     let qaBountyHTML = '';
     if (isQA && o.solved) {
       const answererSid = o.best_comment_author;
-      const mySid = S.user ? S.user.student_id : null;
+      const mySid = S.user ? selfSid() : null;
       const isPub = S.user && (o.publisher_id == (S.user._issue_number || S.user.student_id) || o.publisher_student_id == mySid);
       const isAnswerer = S.user && answererSid === mySid;
       const isAdmin = S.user && S.user.student_id === ADMIN_STUDENT_ID;
@@ -6690,7 +6743,7 @@ async function loadComments(issueNum) {
 
     const isAdmin = S.user && S.user.student_id === ADMIN_STUDENT_ID;
     const myId = S.user ? (S.user._issue_number || S.user.student_id) : null;
-    const mySid = S.user ? S.user.student_id : null;
+    const mySid = S.user ? selfSid() : null;
     const pubId = order ? order.publisher_id : null;
     const takerId = order ? order.taker_id : null;
     const pubSid = order ? order.publisher_student_id : null;
@@ -6869,7 +6922,7 @@ async function sendComment(issueNum) {
     if (ores.ok) {
       const o = JSON.parse((await ores.json()).body);
       if (o.type === 'chat') {
-        const mySid = S.user.student_id;
+        const mySid = selfSid();
         const peerSid = (o.publisher_student_id === mySid) ? o.taker_student_id : o.publisher_student_id;
         if (peerSid) {
           const users = await ghIssues('user', 'all');
@@ -7714,8 +7767,8 @@ async function createChatOrder(targetSid, targetName, targetIssueNum, sourceOrde
   _creatingChat = true;
 
   try {
-    const myId = S.user._issue_number || S.user.student_id;
-    const mySid = S.user.student_id;
+    const myId = S.user._issue_number || selfSid();
+    const mySid = selfSid();
 
     // 先查找是否已有未关闭的相同对话
     const existing = await findExistingChat(mySid, targetSid);
@@ -7737,9 +7790,9 @@ async function createChatOrder(targetSid, targetName, targetIssueNum, sourceOrde
       payment: '',
       images: [],
       status: 'taken', // 直接设为已接单，这样双方都可以评论
-      publisher_id: S.user._issue_number || S.user.student_id,
-      publisher_name: S.user.nickname || S.user.name,
-      publisher_student_id: S.user.student_id,
+      publisher_id: S.user._issue_number || selfSid(),
+      publisher_name: S.user.nickname || S.user.name || selfSid(),
+      publisher_student_id: selfSid(),
       publisher_dorm: S.user.dorm || '',
       taker_id: targetIssueNum || targetSid,
       taker_name: targetName,
@@ -8730,8 +8783,8 @@ async function submitVipApply() {
 // 获取今天我发布的订单数 / 接的订单数
 async function getTodayMyOrders(type) {
   // type: 'published' 发布的 | 'taken' 接的
-  const myId = S.user._issue_number || S.user.student_id;
-  const mySid = S.user.student_id;
+  const myId = S.user._issue_number || selfSid();
+  const mySid = selfSid();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   try {
@@ -9209,7 +9262,7 @@ async function persistDefaultAddress(addr) {
       if (remote) {
         prevDefault = remote.default_address || null;
         pulledRemote = true;
-        S.user = Object.assign({}, remote, { _issue_number: S.user._issue_number });
+        mergeUserProfile(remote);
       }
     }
   } catch (e) { /* 拉不到就按本地现状写回 */ }
@@ -9314,7 +9367,7 @@ async function setChatCleanup(days) {
       if (res.ok) {
         const issue = await res.json();
         let remote = null; try { remote = JSON.parse(issue.body); } catch (e) {}
-        if (remote) S.user = Object.assign({}, remote, { _issue_number: S.user._issue_number });
+        if (remote) mergeUserProfile(remote);
       }
     } catch (e) {}
     S.user.chat_cleanup_days = d;
@@ -9717,7 +9770,7 @@ async function saveMyNickname() {
     if (res.ok) {
       const issue = await res.json();
       const remoteUser = JSON.parse(issue.body);
-      S.user = Object.assign({}, remoteUser, { _issue_number: S.user._issue_number });
+      mergeUserProfile(remoteUser);
     }
     // 冷却：每 60 天（2个月）才能改一次，首次设置（无记录）不受限
     const NICKNAME_COOLDOWN_DAYS = 60;
@@ -9843,6 +9896,8 @@ async function handleAuth(e) {
         clearUserScopedData();   // v1.60.0 换号：清掉上一个账号残留的通知/缓存
         setToken(regData.token);
         S.user = u;
+        // v1.61.0：注册响应若缺学号，用刚签发的 token 兜底（否则新账号发的帖子都会缺 publisher_student_id）
+        if (S.user && !S.user.student_id) { const _p = tokenPayload(); if (_p && _p.sid) S.user.student_id = _p.sid; }
         localStorage.setItem('hust_current_user', JSON.stringify(S.user));
         setAuthCookies();
         updateUI();
@@ -9895,11 +9950,15 @@ async function handleAuth(e) {
       clearUserScopedData();   // v1.60.0 换号：先清掉上一个账号的本地用户态数据（通知/私信已读/缓存）
       setToken(data.token);
       S.user = data.user;
+      // v1.61.0：学号以服务端签名的 token 为准兜底——发布帖子时要用它写 publisher_student_id，
+      //   缺失会导致帖子发布者本人被订单鉴权判「无权修改」（评价/确认收货全部失败）
+      if (S.user && !S.user.student_id) { const _p = tokenPayload(); if (_p && _p.sid) S.user.student_id = _p.sid; }
       localStorage.setItem('hust_current_user', JSON.stringify(S.user));
       setAuthCookies();
       updateUI();
       closeAuthModal();
       toast('登录成功', 'success');
+      if (S.user && S.user._issue_number) healSelfProfile();   // v1.61.0：补齐可能缺失的姓名/宿舍
     } catch (ex) { err.textContent = '登录失败：' + ex.message; err.style.display = 'block'; return; }
   }
   loadStats();
@@ -10495,10 +10554,12 @@ async function handlePublish(e) {
     status: 'open',
     ai_moderation: _aiMod.verdict !== 'safe' ? _aiMod : null,
     campus: S._forumCampus || 'main',   // v1.39.3 订单带校区，供首页按校区筛选
-    publisher_id: S.user._issue_number || S.user.student_id,
-    publisher_name: S.user.nickname || S.user.name,
-    publisher_student_id: S.user.student_id,
-    publisher_real_name: S.user.name,
+    publisher_id: S.user._issue_number || selfSid(),
+    publisher_name: S.user.nickname || S.user.name || selfSid(),
+    // v1.61.0：学号绝不允许写出空值——一旦为空，后端所有权断言就认不出「发布者本人」，
+    //   本人对这条订单的评价/确认收货/取消会被判 403（只能靠管理员账号兜底）。
+    publisher_student_id: selfSid(),
+    publisher_real_name: S.user.name || S.user.nickname || '',
     publisher_dorm: S.user.dorm || '',
     publisher_runner_verified: S.user.runner_verified || false,
     publisher_pending_review: _pendingReview,   // v1.59.0 先发后审：未认证卖家发布时为 true，认证后自然消失
@@ -10623,7 +10684,7 @@ async function syncCurrentUser() {
     // _issue_number 和 role 以本地为准（role 来自 Token）
     const localRole = S.user.role;
     const issueNumber = S.user._issue_number;
-    S.user = Object.assign({}, remoteUser, { _issue_number: issueNumber });
+    mergeUserProfile(remoteUser);
     if (!S.user.role && localRole) S.user.role = localRole;
     localStorage.setItem('hust_current_user', JSON.stringify(S.user));
     setAuthCookies();
@@ -11063,7 +11124,7 @@ async function saveMyPayment() {
       expectPayment = remoteUser.payment_info || null;
       pulledRemote = true;
       // 用云端最新数据覆盖本地，再写入新的收款信息
-      S.user = Object.assign({}, remoteUser, { _issue_number: S.user._issue_number });
+      mergeUserProfile(remoteUser);
       S.user.payment_info = info;
       S.user.payment_image = imageData;
     } else {
@@ -11107,7 +11168,7 @@ async function pullRemoteUser() {
     const res = await fetch(API_BASE + '/repos/' + REPO + '/issues/' + S.user._issue_number, { headers: {} });
     if (res.ok) {
       const remote = JSON.parse((await res.json()).body);
-      S.user = Object.assign({}, remote, { _issue_number: S.user._issue_number });
+      mergeUserProfile(remote);
       return true;
     }
   } catch(e) {}
