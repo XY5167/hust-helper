@@ -3094,6 +3094,11 @@ function mergeUserProfile(remote) {
     if (remoteEmpty && lv !== undefined && lv !== null && lv !== '') next[k] = lv;
   });
   if (!next.student_id) { const s = selfSid(); if (s) next.student_id = s; }
+  // 安全加固：旧版后端的强脱敏响应只删身份字段，password/password_hash 会一起被带进来，
+  //   进而落到 localStorage 并原样写回。这里主动剥离——写回云端时后端 protectPasswordField
+  //   会从云端补回，不影响登录。
+  delete next.password;
+  delete next.password_hash;
   S.user = next;
   return S.user;
 }
