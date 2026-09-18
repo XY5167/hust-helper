@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.58.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.59.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -121,6 +121,22 @@ input,select,textarea{font-family:inherit;font-size:1rem}
 .user-name{font-weight:600;font-size:.88rem}
 .user-verified{font-size:.7rem;background:var(--success);color:#fff;padding:2px 7px;border-radius:99px}
 .user-runner-badge{font-size:.68rem;background:#f97316;color:#fff;padding:2px 8px;border-radius:99px;margin-left:4px;font-weight:600}
+/* v1.59.0 先发后审：未认证卖家的帖子标记（灰色弱化，不吓退买家但提示身份未核） */
+.user-pending-badge{font-size:.68rem;background:#eef2f7;color:#5b6b7f;border:1px solid #cfd8e3;padding:1px 7px;border-radius:99px;margin-left:4px;font-weight:500}
+/* v1.59.0 出售 / 求购 方向切换（发布表单） */
+.deal-switch{display:flex;gap:8px}
+.deal-opt{flex:1;display:flex;align-items:center;gap:6px;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:.84rem;cursor:pointer;background:var(--bg);transition:all .15s;margin:0}
+.deal-opt.on{border-color:var(--primary);background:#eef7f6;font-weight:600}
+.deal-opt input{margin:0}
+/* v1.59.0 求购标记（列表卡片 / 详情页） */
+.want-badge{font-size:.68rem;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;padding:1px 7px;border-radius:99px;margin-left:4px;font-weight:600}
+/* v1.59.0 冷启动：无库存时展示的预设热门科目（虚线底 = 可点、非真实筛选结果） */
+.filter-btn-preset{border-style:dashed;color:var(--text-secondary)}
+.filter-preset-hint{font-size:.72rem;color:#0369a1;background:#e0f2fe;padding:2px 8px;border-radius:99px;margin-left:2px;white-space:nowrap}
+/* v1.59.0 首屏一句话定位条（告诉陌生人这里是干什么的） */
+.forum-position{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin:10px 0}
+.forum-position-title{font-size:1rem;font-weight:700;color:var(--text)}
+.forum-position-sub{font-size:.78rem;color:var(--text-secondary);margin-top:4px;line-height:1.5}
 
 /* Buttons */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border-radius:var(--radius-xs);font-size:.88rem;font-weight:500;border:none;transition:all var(--t)}
@@ -562,6 +578,9 @@ html[data-theme="dark"] .task-hero{background:var(--brand)}
 
 /* Filter Bar */
 .filter-bar{display:flex;gap:6px;margin-bottom:22px;flex-wrap:wrap}
+/* v1.59.0 修复：筛选 chip 被 flex 压缩成逐字竖排（二手页 10 个分类时尤其明显）
+   —— 禁止收缩 + 不换行，让 chip 保持自然宽度并整行折行 */
+.filter-bar .filter-btn{flex-shrink:0;white-space:nowrap}
 .filter-btn{padding:7px 14px;border:1.5px solid var(--border);border-radius:99px;background:var(--bg-card);font-size:.83rem;font-weight:500;color:var(--text-secondary);transition:all .15s}
 .filter-btn:hover{border-color:var(--text-muted)}
 .filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
@@ -1404,10 +1423,10 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
         <div class="forum-hero-mark" aria-hidden="true">互助</div>
         <div class="forum-hero-eyebrow">华中科技大学 · 校园互助</div>
         <div class="forum-banner-track" id="forumBannerTrack" data-page-node-id="jExt9dz3RGyAe3em11pufR">
-          <div class="forum-banner-slide" onclick="openForumCat('life')" data-page-node-id="SRbpFMSQf2E6XVjc5I7nO7">
-            <div class="forum-banner-tag" data-page-node-id="RrHLh4JNIL51rJMlT9m012">失物招领</div>
-            <div class="forum-banner-title" data-page-node-id="Hhw4eRkRNQhSnYzJMq4dFd">捡到校园卡 / 伞 / 书？</div>
-            <div class="forum-banner-sub" data-page-node-id="Q9JwcUzHlHljO9cUO84IvU">发到「生活分享」找主人 ›</div>
+          <div class="forum-banner-slide" onclick="navigate('ershou')" data-page-node-id="SRbpFMSQf2E6XVjc5I7nO7">
+            <div class="forum-banner-tag" data-page-node-id="RrHLh4JNIL51rJMlT9m012">二手教材</div>
+            <div class="forum-banner-title" data-page-node-id="Hhw4eRkRNQhSnYzJMq4dFd">课本太贵？学长的书 5 折</div>
+            <div class="forum-banner-sub" data-page-node-id="Q9JwcUzHlHljO9cUO84IvU">拍照自动认科目，挂上去只要 1 分钟 ›</div>
           </div>
           <div class="forum-banner-slide" onclick="openForumCat('study')" data-page-node-id="jk9f6ei5W7XxW9JzJ6AZgW">
             <div class="forum-banner-tag" data-page-node-id="uFX1NqSCDCG0XW6tZ9MXHF">期末互助</div>
@@ -1421,6 +1440,13 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
           </div>
         </div>
         <div class="forum-banner-dots" id="forumBannerDots" data-page-node-id="WrOPX56SDKVUGG1aNgPAsa"></div>
+      </div>
+
+      <!-- v1.59.0 首屏一句话定位：让陌生人 3 秒内知道「这里是干什么的、为什么要注册」 -->
+      <div class="forum-position">
+        <div class="forum-position-title">📚 华科二手教材平台</div>
+        <div class="forum-position-sub">搜课本 · 卖旧书 · 拍照自动分科目</div>
+        <div class="forum-position-sub">顺带：跑腿代拿 · 有问必答 · 失物招领</div>
       </div>
 
       <!-- 数据条 -->
@@ -1465,17 +1491,17 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 
       <!-- 8 宫格分类（P1-8 实心色块底 + 白字，跨平台对比度更稳） -->
       <div class="forum-cat-grid" data-page-node-id="H2tWMnKzOsbBFl9rAQbWWx">
-        <button class="forum-cat" onclick="openForumCat('tucao')" data-page-node-id="isX3SHRTQJJQGpoSALKRDE">
-          <span class="forum-cat-icon" style="background:#ea580c;color:#fff" data-page-node-id="qyviTc05enedVduMAlqQhd">💬</span>
-          <span class="forum-cat-label" data-page-node-id="wEoJBGHsZvD7biLJECGUaM">校园吐槽</span>
+        <button class="forum-cat" onclick="navigate('ershou')" data-page-node-id="7onEjvf8KyQqnEWjUQfysj">
+          <span class="forum-cat-icon" style="background:#16a34a;color:#fff" data-page-node-id="RHdMkUPHCa1BAAg9G5C5Ap">🔄</span>
+          <span class="forum-cat-label" data-page-node-id="8GbSTSlzvJlS4DHYUOe7Gf">二手教材</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('study')" data-page-node-id="gZAzCZ2pqHJCIlkSPR0tq7">
           <span class="forum-cat-icon" style="background:#2563eb;color:#fff" data-page-node-id="4CaTpDIUukTsDOHIFSctSw">📚</span>
           <span class="forum-cat-label" data-page-node-id="jIXHMkmvpYnyHxZlaj6ds0">学习求助</span>
         </button>
-        <button class="forum-cat" onclick="navigate('ershou')" data-page-node-id="7onEjvf8KyQqnEWjUQfysj">
-          <span class="forum-cat-icon" style="background:#16a34a;color:#fff" data-page-node-id="RHdMkUPHCa1BAAg9G5C5Ap">🔄</span>
-          <span class="forum-cat-label" data-page-node-id="8GbSTSlzvJlS4DHYUOe7Gf">闲置交易</span>
+        <button class="forum-cat" onclick="openForumCat('tucao')" data-page-node-id="isX3SHRTQJJQGpoSALKRDE">
+          <span class="forum-cat-icon" style="background:#ea580c;color:#fff" data-page-node-id="qyviTc05enedVduMAlqQhd">💬</span>
+          <span class="forum-cat-label" data-page-node-id="wEoJBGHsZvD7biLJECGUaM">校园吐槽</span>
         </button>
         <button class="forum-cat" onclick="openForumCat('lost')" data-page-node-id="LwxHN9ur3SdZLZXB1AInZk">
           <span class="forum-cat-icon" style="background:#0ea5e9;color:#fff" data-page-node-id="JDsdzwvv3PMFS4ZdhBGJ2M">🎒</span>
@@ -1507,6 +1533,16 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
 
       <!-- 业务卡片 -->
       <div class="forum-biz-cards" data-page-node-id="FZ7ex3pGOj5intJGKSH2Mj">
+        <button class="forum-biz-card forum-biz-secondhand" onclick="navigate('ershou')" data-page-node-id="Q7MGttxtBxCE1tIW3ISJ8c">
+          <div class="forum-biz-main" data-page-node-id="hhQRmVSVVMODWz1HjWLPlX">
+            <span class="forum-biz-ico" data-page-node-id="HOHyc7A3go60SSCY7d5IYy">🛒</span>
+            <div data-page-node-id="Q28ZzWdQwRBSPvf1ccle1i">
+              <div class="forum-biz-title" data-page-node-id="BRNgKAcEfQr6ZiqSwjW39K">二手教材</div>
+              <div class="forum-biz-desc" data-page-node-id="PUtRWODfnEpaTaogBffhoI">同校自提 · 教材 5 折起 · 也能发求购</div>
+            </div>
+          </div>
+          <span class="forum-biz-arrow" data-page-node-id="kyFQBW58a5kreCqQ7gxixW">›</span>
+        </button>
         <button class="forum-biz-card forum-biz-task" onclick="navigate('help')" data-page-node-id="8nTWxQ8QyiHbhwdErnuqWS">
           <div class="forum-biz-main" data-page-node-id="ItgDyZb5bdS62Aw6yVrSPq">
             <span class="forum-biz-ico" data-page-node-id="XjZp9AvWkTUTBwBDxv843G">🏃</span>
@@ -1516,16 +1552,6 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
             </div>
           </div>
           <span class="forum-biz-arrow" data-page-node-id="Qof5FxO26D0ym6fE05M3Ku">›</span>
-        </button>
-        <button class="forum-biz-card forum-biz-secondhand" onclick="navigate('ershou')" data-page-node-id="Q7MGttxtBxCE1tIW3ISJ8c">
-          <div class="forum-biz-main" data-page-node-id="hhQRmVSVVMODWz1HjWLPlX">
-            <span class="forum-biz-ico" data-page-node-id="HOHyc7A3go60SSCY7d5IYy">🛒</span>
-            <div data-page-node-id="Q28ZzWdQwRBSPvf1ccle1i">
-              <div class="forum-biz-title" data-page-node-id="BRNgKAcEfQr6ZiqSwjW39K">闲置交易</div>
-              <div class="forum-biz-desc" data-page-node-id="PUtRWODfnEpaTaogBffhoI">同校自提 · 教材 5 折起</div>
-            </div>
-          </div>
-          <span class="forum-biz-arrow" data-page-node-id="kyFQBW58a5kreCqQ7gxixW">›</span>
         </button>
       </div>
 
@@ -1770,6 +1796,7 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <button class="filter-btn active" data-goods-sub="all" onclick="switchGoodsSubTab('all')" data-page-node-id="sl1fdbl0c3yVUPdBplkeWY">全部</button>
       <button class="filter-btn" data-goods-sub="sale" onclick="switchGoodsSubTab('sale')" data-page-node-id="jOpTdTI4UI3TDO78gobEjf">🛒 出售转让</button>
       <button class="filter-btn" data-goods-sub="rent" onclick="switchGoodsSubTab('rent')" data-page-node-id="mr96DIwOcUIFilBUpmXBQH">📦 短期租借</button>
+      <button class="filter-btn" data-goods-sub="want" onclick="switchGoodsSubTab('want')">🙋 求购</button>
     </div>
     <div class="filter-bar" id="goodsCategoryFilters" style="display:none;margin-top:4px" data-page-node-id="rArWB4nsqIbtSx9SqPRm9Q"></div>
     <!-- v1.41.0 二手教材科目筛选：从 AI 识别出的科目动态聚合 -->
@@ -1987,6 +2014,15 @@ html:not([data-theme="dark"]) .trust-ico, html:not([data-theme="dark"]) .safety-
       <div class="form-group" data-page-node-id="3R0Elmg908A1jzXn2X5BGM">
         <label data-page-node-id="4A9OzcJuDqNKwEqpIymxDP">子分类</label>
         <select id="publishCategory" onchange="updateFoodPublishTip()" data-page-node-id="uG0tSqYIukuNHJ7bmvzec0"></select>
+      </div>
+      <!-- v1.59.0 需求侧补齐：出售 / 求购 双向（仅物品流转类型显示，显隐由 updateDealTypeVisibility 控制） -->
+      <div class="form-group" id="dealTypeGroup" style="display:none">
+        <label>交易方向</label>
+        <div class="deal-switch">
+          <label class="deal-opt"><input type="radio" name="dealType" value="sell" checked onchange="updateDealTypeUI()"><span>🛒 我要出售 / 出租</span></label>
+          <label class="deal-opt"><input type="radio" name="dealType" value="want" onchange="updateDealTypeUI()"><span>🙋 我要求购 / 求租</span></label>
+        </div>
+        <p class="form-hint" id="dealTypeHint">发布后买家可直接在详情页联系你。</p>
       </div>
       <!-- v1.41.0 二手书籍信息：传图后 AI 自动识别填充，用户可随时手改 -->
       <div class="form-group" id="bookMetaGroup" style="display:none" data-page-node-id="F6XTQTAFYc65woxDjTD63s">
@@ -2872,7 +2908,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.58.0';
+const APP_VERSION = '1.59.0';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -4566,8 +4602,10 @@ async function loadOrders(type, cat) {
       orders = orders.filter(o => o.type === 'qa' || o.type === 'academic');
     } else if (type === 'goods') {
       const sub = S.goodsSubTab || 'all';
-      if (sub === 'sale') orders = orders.filter(o => o.type === 'secondhand');
-      else if (sub === 'rent') orders = orders.filter(o => o.type === 'borrow');
+      // v1.59.0：新增「求购」子筛选；出售/租借两个 tab 里不再混入求购帖
+      if (sub === 'sale') orders = orders.filter(o => o.type === 'secondhand' && o.deal_type !== 'want');
+      else if (sub === 'rent') orders = orders.filter(o => o.type === 'borrow' && o.deal_type !== 'want');
+      else if (sub === 'want') orders = orders.filter(o => o.deal_type === 'want');
       else orders = orders.filter(o => o.type === 'secondhand' || o.type === 'borrow');
     } else if (type === 'find') {
       orders = orders.filter(o => o.type === 'find');
@@ -5209,6 +5247,10 @@ function renderOrders(orders) {
   if (!grid) return;
   const pager = document.getElementById('taskPagination');
 
+  // v1.59.0：科目筛选条必须放在「空列表」判断之前 —— 原先它在函数末尾，
+  // 而零库存时会走下面的提前 return，导致预设科目永远不显示（核心卖点在冷启动时不可见）。
+  renderBookSubjectFilters();
+
   if (orders.length === 0) {
     const emptyMap = { task: '暂无跑腿订单', goods: '暂无闲置物品', qa: '暂无问答', find: '暂无找人信息' };
     const hintMap = { task: '点击右下角发布第一个需求', goods: '点击右下角发布闲置物品', qa: '点击右下角去提问', find: '点击右下角发布组队/拼车/招募' };
@@ -5249,7 +5291,7 @@ function renderOrders(orders) {
       + (imgList.length ? '<div class="order-card-cover-wrap"><img class="order-card-cover" src="' + safeImgSrc(imgList[0]) + '" loading="lazy" alt=""><span class="order-card-condition">' + esc(o.condition || '9成新') + '</span></div>' : '')
       + '<div class="order-card-body">'
       + '<div class="order-card-header">'
-      + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + recTag + dormTag + shTag
+      + '<span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + (o.deal_type === 'want' ? '<span class="want-badge">🙋 求购</span>' : '') + recTag + dormTag + shTag
       // v1.57.0 收藏星标：卡片右上角（不冒泡到详情）
       + (o._issue_number ? '<span class="' + favBtnClass(favHas(o._issue_number)) + ' fav-btn-card" onclick="event.stopPropagation();favToggleCard(' + o._issue_number + ',this,\'' + escAttr(o.title || '') + '\',\'' + escAttr(o.type || '') + '\')" title="收藏">' + favStar(favHas(o._issue_number)) + '</span>' : '')
       + '<span class="order-card-status status-' + o.status + '">' + (o.type === 'qa' || o.type === 'find' || o.type === 'academic' ? (o.solved ? '✅ 已解决' : (o.type === 'find' ? '🔍 寻找中' : '💬 待解答')) : o.type === 'chat' ? '💬 对话中' : sl[o.status]) + '</span>'
@@ -5263,7 +5305,7 @@ function renderOrders(orders) {
       + (canSeePrivate(o) ? esc(o.publisher_name || '未知') : maskName(o.publisher_name, o.publisher_student_id))
       + '</span>'
       + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '')
-      + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '')
+      + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (o.publisher_pending_review ? '<span class="user-pending-badge">待核验</span>' : ''))
       + (o.campus ? '<span class="campus-badge">🏫 同校</span>' : '')
       + (o.location ? ' · 📍' + esc(o.location) : '')
       + '</div></div>'
@@ -5288,7 +5330,7 @@ function renderOrders(orders) {
       + (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : '')
       + '</div>'
       + '<div class="order-card-footer">'
-      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_name || '未知') : maskName(o.publisher_name, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
+      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_name || '未知') : maskName(o.publisher_name, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (o.publisher_pending_review ? '<span class="user-pending-badge">待核验</span>' : '')) + '</span>'
       + '<span>' + timeAgo(o.created_at) + '</span>'
       + (o.taker_credit_score != null && (o.status === 'taken' || o.status === 'awaiting_confirm') ? ' <span class="taker-credit">接单人信用 ' + o.taker_credit_score + '</span>' : '')
       + '</div>'
@@ -5296,10 +5338,12 @@ function renderOrders(orders) {
   }).join('');
 
   if (pager) renderTaskPager(pager, totalPages, orders.length);
-  renderBookSubjectFilters();        // v1.41.0 教材科目 chips（基于缓存全量聚合，选科后不会只剩自己）
+  // v1.59.0：renderBookSubjectFilters() 已上移到函数开头（空列表也要渲染）
 }
 
 // ============ v1.41.0 二手教材科目筛选（AI 分类动态聚合）============
+// v1.59.0 冷启动修复：零库存时不再隐藏筛选条，改用「预设热门科目」把空状态变成需求收集入口
+const HOT_BOOK_SUBJECTS = ['微积分', '线性代数', '大学物理', '大学英语', '概率论', '数据结构', 'C 语言', '马克思主义基本原理'];
 function renderBookSubjectFilters() {
   const bar = document.getElementById('bookSubjectFilters');
   if (!bar) return;
@@ -5313,7 +5357,19 @@ function renderBookSubjectFilters() {
     }
   });
   const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  if (top.length === 0) { bar.innerHTML = ''; bar.style.display = 'none'; S.bookSubject = ''; return; }
+  // v1.59.0：零库存时不再整条隐藏 —— 那会让「AI 科目分类」这个核心卖点在没书时完全不可见。
+  // 改为展示预设热门科目，点一下直接引导发起「求购」，把空状态变成需求收集入口。
+  if (top.length === 0) {
+    let h0 = '<span class="filter-label">📚 科目：</span>';
+    HOT_BOOK_SUBJECTS.slice(0, 6).forEach(function (s) {
+      h0 += '<button class="filter-btn filter-btn-preset" data-book-subject="' + esc(s) + '"'
+        + ' onclick="wantBookSubject(this.getAttribute(\'data-book-subject\'))">' + esc(s) + '</button>';
+    });
+    h0 += '<span class="filter-preset-hint">暂无在售 · 点科目发求购 →</span>';
+    bar.innerHTML = h0;
+    bar.style.display = 'flex';
+    return;
+  }
   let html = '<span class="filter-label">📚 科目：</span>'
     + '<button class="filter-btn' + (S.bookSubject ? '' : ' active') + '" onclick="filterBookSubject(\'\')">全部</button>';
   top.forEach(function (kv) {
@@ -5329,6 +5385,24 @@ function filterBookSubject(sub) {
   _taskCurrentPage = 1;
   applySearchAndSort();
   if (window.toast) toast(sub && S.bookSubject ? '📚 已筛选：' + sub : '📚 已显示全部科目');
+}
+
+// v1.59.0：点预设科目时站内没有库存 → 直接把用户带进「求购」发布，把需求留在平台上
+function wantBookSubject(sub) {
+  const s = String(sub || '');
+  showPublishModal('secondhand');
+  setTimeout(function () {
+    const ty = document.getElementById('publishType');
+    if (ty && ty.value !== 'secondhand') { ty.value = 'secondhand'; updatePublishCategories(); }
+    const r = document.querySelector('input[name="dealType"][value="want"]');
+    if (r) { r.checked = true; }
+    updateDealTypeUI();
+    const subj = document.getElementById('publishBookSubject');
+    if (subj) subj.value = s;
+    const ti = document.getElementById('publishTitle');
+    if (ti && !ti.value) ti.value = '求一本「' + s + '」的教材';
+    if (window.toast) toast('🙋 已切到「求购」：书名写清楚，有书的同学会主动找你', 'info');
+  }, 150);
 }
 
 function renderTaskPager(pager, totalPages, totalCount) {
@@ -6305,13 +6379,13 @@ async function showDetail(issueNum) {
       + stepsHTML + guaranteeHTML
       + '<div class="detail-header"><span class="detail-type type-' + (o.category || 'other') + '">' + tl[o.type] + '</span>'
       + '<span style="margin-left:8px;font-size:.78rem;color:var(--text-muted)">' + (isQA ? (o.solved ? '✅ 已解决' : '💬 待解答') : sl[o.status]) + '</span></div>'
-      + '<h3 class="detail-title">' + esc(o.title) + '</h3>'
+      + '<h3 class="detail-title">' + (o.deal_type === 'want' ? '<span class="want-badge" style="font-size:.75rem;vertical-align:middle">🙋 求购</span> ' : '') + esc(o.title) + '</h3>'
       + (isQA ? (o.bounty > 0 ? '<div class="detail-price" style="color:#d97706">🏆 悬赏 ¥' + o.bounty.toFixed(2) + '（采纳最佳答案后线下支付）</div>' : '')
               : '<div class="detail-price">' + (Number(o.price) > 0 ? '¥' + Number(o.price).toFixed(2) : (o.type === 'borrow' ? '免费借' : (o.type === 'secondhand' ? '价格面议' : '免费互助'))) + '</div>')
       + '<div class="detail-meta">'
       + (isQA ? '' : '<span>📌 ' + esc(o.location || '未指定') + '</span>')
       + (isQA || !o.gender_limit || o.gender_limit === 'any' ? '' : '<span style="font-size:.78rem;background:#e0e7ff;color:#3730a3;padding:2px 9px;border-radius:99px">👤 性别要求：' + (o.gender_limit === 'male' ? '仅限男生' : '仅限女生') + '</span>')
-      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_real_name || o.publisher_name || maskName(o.publisher_name, o.publisher_student_id) || maskName(o.publisher_student_id, '') || '未知') : maskName(o.publisher_real_name || o.publisher_name || o.publisher_student_id, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + '</span>'
+      + '<span>👤 发布：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.publisher_real_name || o.publisher_name || maskName(o.publisher_name, o.publisher_student_id) || maskName(o.publisher_student_id, '') || '未知') : maskName(o.publisher_real_name || o.publisher_name || o.publisher_student_id, o.publisher_student_id)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (o.publisher_pending_review ? '<span class="user-pending-badge">待核验</span>' : '')) + '</span>'
       + (isQA ? '' : (o.taker_name ? '<span>🤝 接单：<a href="javascript:void(0)" onclick="showUserProfile(\'' + esc(o.taker_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + (canSeePrivate(o) ? esc(o.taker_real_name || o.taker_name || '未知') : maskName(o.taker_real_name || o.taker_name, o.taker_student_id)) + '</a>' + (o.taker_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : '') + (o.taker_credit_score != null ? ' <span class="taker-credit">信用 ' + o.taker_credit_score + '</span>' : '') + '</span>' : ''))
       + (isQA ? '' : (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期，原预计 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : ''))
       + (isQA ? '' : (o.status === 'taken' && o.overdue ? '<span style="font-size:.75rem;color:#dc2626;margin-left:6px">已超时，可联系对方或投诉</span>' : ''))
@@ -9861,6 +9935,41 @@ function updatePublishCategories() {
   if (window.clearAiTags) window.clearAiTags();   // v1.51.0：切换类型后旧标签失效，清空防误导
   updateFoodPublishTip();   // v1.19.0：外卖发布提示显隐
   updatePublishAddrUI();    // v1.52.0：默认地址控件显隐（qa/find 类型隐藏）
+  updateDealTypeVisibility();   // v1.59.0：出售/求购 方向切换显隐
+}
+
+// ---- v1.59.0 出售 / 求购（需求侧补齐）----
+// 仅「物品流转」（出售 / 租借）显示方向选择；跑腿、问答、找人没有这个维度
+function updateDealTypeVisibility() {
+  const g = document.getElementById('dealTypeGroup');
+  if (!g) return;
+  const t = document.getElementById('publishType');
+  const isFlow = !!t && (t.value === 'secondhand' || t.value === 'borrow');
+  g.style.display = isFlow ? 'block' : 'none';
+  if (isFlow) updateDealTypeUI();
+}
+
+function getDealType() {
+  const r = document.querySelector('input[name="dealType"]:checked');
+  return (r && r.value === 'want') ? 'want' : 'sell';
+}
+
+function updateDealTypeUI() {
+  const want = getDealType() === 'want';
+  document.querySelectorAll('#dealTypeGroup .deal-opt').forEach(function (el) {
+    const inp = el.querySelector('input');
+    el.classList.toggle('on', !!(inp && inp.checked));
+  });
+  const hint = document.getElementById('dealTypeHint');
+  const title = document.getElementById('publishTitle');
+  const price = document.getElementById('publishPrice');
+  const desc = document.getElementById('publishDesc');
+  if (hint) hint.textContent = want
+    ? '没有书也能先发需求：写清书名 / 课程，有书的同学会主动来找你。'
+    : '发布后买家可直接在详情页联系你。';
+  if (title) title.placeholder = want ? '想求的书 / 物品，如：求一本高等数学第七版' : '简要描述你的物品';
+  if (price) price.placeholder = want ? '心理价位' : '金额';
+  if (desc) desc.placeholder = want ? '说明心理价位、期望成色、什么时候要' : '详细说明成色、版本、交易地点等';
 }
 
 // ---- v1.19.0 发布弹窗外卖提示（task + food 时显示）----
@@ -10015,20 +10124,26 @@ async function handlePublish(e) {
     }
   }
 
-  // 跑腿认证检查：发布「跑腿代办 / 物品流转（出售、租借）」需先通过跑腿认证（证明华科学生身份）
-  // 问答、找人（纯交流类）无需认证。认证通过还可以获赠 7 天会员试用。
-  if ((type === 'task' || type === 'secondhand' || type === 'borrow') && !S.user.runner_verified && !isAdminUser()) {
-    err.textContent = '发布「跑腿代办 / 物品流转」需先通过跑腿认证（上传学生证照片）。认证通过后还可获赠 7 天会员试用！';
-    err.style.display = 'block';
-    showRunnerApply();
-    return;
+  // v1.59.0 发布门槛调整（先发后审）：物品流转（二手出售 / 借阅）不再强制先认证，
+  // 改为「允许先发布 + 标记待核验」，认证通过后标记自动消失 —— 目的是不让认证卡死冷启动的供给。
+  // 跑腿代办仍要求认证（涉及线下代拿代买，风险面与物品流转不同）。问答、找人（纯交流类）无需认证。
+  let _pendingReview = false;
+  if (!S.user.runner_verified && !isAdminUser()) {
+    if (type === 'task') {
+      err.textContent = '发布「跑腿代办」需先通过跑腿认证（上传学生证照片）。认证通过后还可获赠 7 天会员试用！';
+      err.style.display = 'block';
+      showRunnerApply();
+      return;
+    }
+    if (type === 'secondhand' || type === 'borrow') {
+      _pendingReview = true;   // 先发后审：不阻断发布，帖子带「待核验」标记
+    }
   }
   // 每日发单限制（频次约束）：每天最多 1 单（防刷屏）。VIP 可解除本上限。
-  // 每日发单限制：已认证非 VIP 用户每天只能发布 1 单（交易类），VIP 与管理员不限
   if ((type === 'task' || type === 'secondhand' || type === 'borrow') && !isVIP() && !isAdminUser()) {
     const todayPublished = await getTodayMyOrders('published');
     if (todayPublished >= 1) {
-      err.textContent = '您已通过跑腿认证，每天可发布 1 单。开通会员（¥1/月）即可无限发单！';
+      err.textContent = '每天可发布 1 单（防刷屏）。开通会员（¥1/月）即可无限发单！';
       err.style.display = 'block';
       return;
     }
@@ -10116,6 +10231,7 @@ async function handlePublish(e) {
 
   const order = {
     type, category: cat, title, description: desc, price: price || 0,
+    deal_type: (type === 'secondhand' || type === 'borrow') ? getDealType() : null,   // v1.59.0 出售/求购（需求侧）
     ai_book_meta: ai_book_meta,   // v1.41.0：书名/科目/年级，供二手教材按科目筛选与搜索
     bounty: bounty || 0,
     location: loc, urgency, deadline, payment,
@@ -10148,6 +10264,7 @@ async function handlePublish(e) {
     publisher_real_name: S.user.name,
     publisher_dorm: S.user.dorm || '',
     publisher_runner_verified: S.user.runner_verified || false,
+    publisher_pending_review: _pendingReview,   // v1.59.0 先发后审：未认证卖家发布时为 true，认证后自然消失
     publisher_vip: isVIP(),
     taker_id: null, taker_name: null,
     created_at: new Date().toISOString()
@@ -10160,9 +10277,17 @@ async function handlePublish(e) {
 
   try {
     const label = type === 'qa' ? 'qa' : 'order';
-    const prefix = type === 'qa' ? '[问答] ' : (type === 'borrow' ? '[借物] ' : '[订单] ');
+    // v1.59.0：求购帖用独立前缀，便于在列表与搜索里一眼区分（供给侧 vs 需求侧）
+    const _isWant = (type === 'secondhand' || type === 'borrow') && getDealType() === 'want';
+    const prefix = type === 'qa' ? '[问答] ' : (_isWant ? '[求购] ' : (type === 'borrow' ? '[借物] ' : '[订单] '));
     const created = await ghCreateIssue(prefix + title, JSON.stringify(order), [label, type, cat]);
     toast('发布成功！', 'success');
+    // v1.59.0 先发后审：如实告知未认证卖家「已上线但带标记」，并把认证转成自愿动作而非前置门槛
+    if (_pendingReview) {
+      setTimeout(function () {
+        toast('📎 你的帖子已上线（带「待核验」标记）。完成学生证认证后标记消失，买家下单更放心～', 'info');
+      }, 900);
+    }
     // v1.55.0：异步给新帖算向量并写回（不阻塞发布；失败也无妨，后台补齐会兜底）
     try { enqueuePostVector(created, order); } catch (e) {}
     try { localStorage.setItem('hust_last_publish', String(Date.now())); } catch(e) {}
@@ -10351,7 +10476,7 @@ function renderMyOrders(orders, tab, subTab) {
       ? '<div style="margin-bottom:8px;display:flex;gap:6px;overflow:hidden">' + imgList2.slice(0, 3).map(img => '<img src="' + safeImgSrc(img) + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" loading="lazy">').join('') + (imgList2.length > 3 ? '<div style="width:80px;height:80px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--text-muted)">+' + (imgList2.length - 3) + '</div>' : '') + '</div>'
       : '';
     return '<div class="order-card" style="margin-bottom:12px' + (isChat ? ';border-left:3px solid #8b5cf6' : '') + '" onclick="showDetail(' + o._issue_number + ')">'
-      + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span><span class="order-card-status status-' + o.status + '">' + (o.type === 'qa' || o.type === 'academic' ? (o.solved ? '✅ 已解决' : '💬 待解答') : sl[o.status]) + '</span></div>'
+      + '<div class="order-card-header"><span class="order-card-type type-' + (o.category || 'other') + '">' + (ct[o.category] || tl[o.type]) + '</span>' + (o.deal_type === 'want' ? '<span class="want-badge">🙋 求购</span>' : '') + '<span class="order-card-status status-' + o.status + '">' + (o.type === 'qa' || o.type === 'academic' ? (o.solved ? '✅ 已解决' : '💬 待解答') : sl[o.status]) + '</span></div>'
       + thumbHTML2
       + '<div class="order-card-title">' + esc(o.title) + ' ' + role + '</div>'
       + metaHTML
