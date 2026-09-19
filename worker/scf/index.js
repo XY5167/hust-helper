@@ -297,23 +297,32 @@ function protectServerFields(newBodyStr, curBodyStr) {
 }
 // v1.53.0：订单「状态机写操作」豁免判定。
 //   背景：v1.42.0 的所有权断言（仅创建者/发布者/接单者可写）挡住了几类
-//   「任何登录用户都必须参与」的正常业务写 —— 执行者在写入瞬间还不是当事方：
+//   「任何登录用户 / 另一侧当事人」都必须参与的正常业务写 —— 执行者在写入瞬间不在 owner 集合里：
 //     a) 接单：点「确认接单」时订单还是 open，owner 里只有发布者 → 必然 403
 //        （此前只有管理员账号测过，role=admin 被豁免，所以线上一直没暴露；
 //          普通学号用户点接单 100% 报「无权修改他人数据」）。
 //     b) 自动过期：任何客户端渲染列表时都会把超期未接的单标为 expired。
-//     c) 纯注记：浏览量 +1、超时标记（overdue/overdue_reason/overdue_at）。
-//   豁免仅限以下三种形态，且要求「目标状态 + 写入身份」自洽，其余改写一律仍走 403：
+//     c) 48h 自动确认完成：由任意在线客户端触发。
+//     d) 纯注记：浏览量 +1、超时标记（overdue/overdue_reason/overdue_at）。
+//     e) 问答答主：issueOwnerSids 只认 publisher_*/taker_*，而问答单从不写 taker_*
+//        （答主记在 first_answer_sid / best_comment_author）→ 答主点「确认收款」必 403，
+//        悬赏闭环最后一环永远走不通。
+//     f) 超时自动结算悬赏：同样由任意在线客户端触发。
+//   豁免仅限以下形态，且都要求「目标状态 / 变更字段 / 写入身份」三者自洽，其余改写一律仍走 403：
 //     1) open → taken   且 接单人身份（taker_student_id / taker_id）必须是调用者本人（防冒名接单）
-//     2) open → expired 且 当前无接单人
-//     3) 仅注记字段（views / overdue / overdue_reason / overdue_at）变化
-//     4) 纯 issue state 变更（ghCloseIssue 发的 { state:'closed' }，无 body）且订单已是终态(expired/cancelled)
+//     2) open → expired 且 当前无接单人 且 截止时间确已过（含 5 分钟缓冲，防恶意提前过期）
+//     3) awaiting_confirm → completed 且 awaiting_confirm_at 已超 48h
+//     4) 仅注记字段（views / overdue*）变化
+//     5) 问答答主（publisher 之外的另一侧当事人）仅改悬赏收款确认字段
+//     6) 问答悬赏超 7 天未采纳 → 允许被标为已结算（自动结算）
+//     7) 纯 issue state 变更（ghCloseIssue 发的 { state:'closed' }，无 body）且已是终态(expired/cancelled)
 function stateWriteExemption(curData, ghBody, tk) {
   let cur = null;
   try { cur = JSON.parse((curData && curData.body) || '{}'); } catch (e) { return false; }
   if (!cur || typeof cur !== 'object') return false;
   const ids = tk ? [String(tk.sid || ''), String(tk.num || '')].filter(Boolean) : [];
-  // 4) 纯 state 变更（没有 body 字段）
+  const DAY = 24 * 60 * 60 * 1000;
+  // 7) 纯 state 变更（没有 body 字段）
   if (!ghBody || ghBody.body === undefined) {
     return cur.status === 'expired' || cur.status === 'cancelled';
   }
@@ -331,21 +340,37 @@ function stateWriteExemption(curData, ghBody, tk) {
     const dl = cur.deadline ? new Date(cur.deadline).getTime() : 0;
     return !!dl && dl + 5 * 60 * 1000 <= Date.now();
   }
-  // 2b) 48h 未确认 → 自动确认完成（前端 checkAwaitingConfirmOrders 由任意在线客户端触发，
+  // 3) 48h 未确认 → 自动确认完成（前端 checkAwaitingConfirmOrders 由任意在线客户端触发，
   //     非当事方客户端此前必然 403 → 只要双方都不在线就永远不会自动完成）
   if (cur.status === 'awaiting_confirm' && neu.status === 'completed') {
     const t = cur.awaiting_confirm_at ? new Date(cur.awaiting_confirm_at).getTime() : 0;
     return !!t && Date.now() - t > 48 * 60 * 60 * 1000;
   }
-  // 3) 纯注记写入
-  const ANNOT = ['views', 'overdue', 'overdue_reason', 'overdue_at'];
+  // —— 变更字段集合（下面 4/5 两条都要用）
   const keys = {};
   Object.keys(cur).forEach(function (k) { keys[k] = 1; });
   Object.keys(neu).forEach(function (k) { keys[k] = 1; });
   const changed = Object.keys(keys).filter(function (k) {
     return JSON.stringify(cur[k] === undefined ? null : cur[k]) !== JSON.stringify(neu[k] === undefined ? null : neu[k]);
   });
-  if (changed.length && changed.every(function (k) { return ANNOT.indexOf(k) !== -1; })) return true;
+  const onlyKeys = function (allow) {
+    return changed.length > 0 && changed.every(function (k) { return allow.indexOf(k) !== -1; });
+  };
+  // 4) 纯注记写入
+  if (onlyKeys(['views', 'overdue', 'overdue_reason', 'overdue_at'])) return true;
+  // 5) 问答答主确认收款（答主不在 owner 集合里，必须按 first_answer_sid / best_comment_author 认人）
+  if (cur.type === 'qa' || cur.type === 'academic') {
+    const authors = [cur.best_comment_author, cur.first_answer_sid]
+      .filter(Boolean).map(String);
+    if (authors.some(function (a) { return ids.indexOf(a) !== -1; })) {
+      if (onlyKeys(['bounty_received', 'bounty_received_at', 'bounty_paid', 'bounty_paid_at'])) return true;
+    }
+    // 6) 悬赏超 7 天未采纳 → 自动结算（任意在线客户端触发；加时间断言防提前结算）
+    if (!cur.solved && cur.first_answer_sid && neu.solved) {
+      const created = cur.created_at ? new Date(cur.created_at).getTime() : 0;
+      if (created && Date.now() - created > 7 * DAY) return true;
+    }
+  }
   return false;
 }
 // v1.42.0：从 issue body 提取「有权修改此 issue 的学号集合」，用于写操作所有权断言。
