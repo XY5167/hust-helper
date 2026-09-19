@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.67.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.67.2" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2922,7 +2922,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.67.1';
+const APP_VERSION = '1.67.2';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -10449,7 +10449,9 @@ function showPublishModal(preType) {
   // v1.67.0：只在字段为空时才填默认值 —— 原来无条件覆盖，导致草稿里保存的截止时间永远恢复不出来
   //   （restorePublishDraft 在上面已经写入了草稿值，这里不能把它冲掉）。
   const _dlEl = document.getElementById('publishDeadline');
-  if (_dlEl && !_dlEl.value) {
+  // v1.67.2：问答/找人不显示截止时间，别再给这个隐藏字段塞默认值（残留值会被草稿保存、来回切换类型时串味）
+  const _dlType = (document.getElementById('publishType') || {}).value || '';
+  if (_dlEl && !_dlEl.value && _dlType !== 'qa' && _dlType !== 'find') {
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
     tomorrow.setMinutes(tomorrow.getMinutes() - tomorrow.getTimezoneOffset());
     _dlEl.value = tomorrow.toISOString().slice(0, 16);
@@ -10691,10 +10693,13 @@ async function handlePublishInner(e) {
     }
   } catch(e) {}
   const price = (type === 'qa' || type === 'find') ? 0 : parseFloat(document.getElementById('publishPrice').value);
-  const loc = document.getElementById('publishLocation').value.trim();
-  const urgency = document.getElementById('publishUrgency').value;
-  const deadline = document.getElementById('publishDeadline').value.trim();
-  const payment = document.getElementById('publishPayment').value.trim();
+  // v1.67.2：问答/找人隐藏的字段（地点/加急/截止/支付方式）一律置空 —— 切换类型或恢复草稿
+  //   会在这些隐藏 input 里留下残留值，提交时会被静默写进订单（用户在表单里根本看不到它们）。
+  const _noDeal = (type === 'qa' || type === 'find');
+  const loc = _noDeal ? '' : document.getElementById('publishLocation').value.trim();
+  const urgency = _noDeal ? '' : document.getElementById('publishUrgency').value;
+  const deadline = _noDeal ? '' : document.getElementById('publishDeadline').value.trim();
+  const payment = _noDeal ? '' : document.getElementById('publishPayment').value.trim();
   // v1.25.0 性别限制（仅展示，不强限）
   const genderLimit = document.getElementById('publishGenderLimit') ? document.getElementById('publishGenderLimit').value : 'any';
   // v1.18.0 交接码（仅跑腿类）
@@ -10779,9 +10784,11 @@ async function handlePublishInner(e) {
       }
     }
   }
-  if (type !== 'qa' && !price) { err.textContent = '请填写报酬金额'; err.style.display = 'block'; return; }
+  // v1.67.2：找人（find）与问答一样是纯交流类、无报酬 —— 旧条件只豁免 qa，导致「找人」发布
+  //   被拦在「请填写报酬金额」，而金额输入框对该类型是隐藏的，用户根本无从填写（P0）。
+  if (type !== 'qa' && type !== 'find' && !price) { err.textContent = '请填写报酬金额'; err.style.display = 'block'; return; }
   // v1.49.0 金额上限（服务端亦校验）：防异常高额单
-  if (type !== 'qa' && price > 2000) { err.textContent = '报酬金额不能超过 ¥2000'; err.style.display = 'block'; return; }
+  if (type !== 'qa' && type !== 'find' && price > 2000) { err.textContent = '报酬金额不能超过 ¥2000'; err.style.display = 'block'; return; }
   // v1.18.0 大额跑腿单硬拦截（管理员豁免；二手/借物不限）
   if (type === 'task' && price > 500 && !isAdminUser()) {
     err.textContent = '大额跑腿单（>¥500）风险过高，请降低金额或分次发布。';
