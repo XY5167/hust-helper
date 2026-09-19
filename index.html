@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.67.0" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.67.1" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2922,7 +2922,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.67.0';
+const APP_VERSION = '1.67.1';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3107,6 +3107,20 @@ function selfSid() {
   try { if (S.user && S.user.student_id) return String(S.user.student_id); } catch (e) {}
   const tp = tokenPayload();
   return (tp && tp.sid) ? String(tp.sid) : '';
+}
+// v1.67.1：发布/写订单 body 时获取「公开名」（昵称优先；没有就生成不可逆的兜底名）。
+//   绝不回退到 S.user.name —— 否则真名会被写入订单 body，对所有浏览者可见。
+//   兜底名规则：'同学' + 学号末 4 位（如 '同学7826'），学号也缺失则 '同学' + 编号末 4 位。
+//   渲染端 publisherDisplayName/takerDisplayName 已对 ^同学[0-9A-Za-z]+$ 直通不再打码（防止二次脱敏）。
+function publicNameOrFallback(user, _issueNumber) {
+  const u = user || (typeof S !== 'undefined' ? S.user : null) || {};
+  const nick = (u.nickname || '').trim();
+  if (nick) return nick;
+  const sid = (u.student_id || selfSid() || '').trim();
+  if (sid && sid.length >= 4) return '同学' + sid.slice(-4);
+  const num = String(_issueNumber || (u._issue_number || ''));
+  if (num && num.length >= 4) return '同学' + num.slice(-4);
+  return '同学';
 }
 function mergeUserProfile(remote) {
   if (!remote || typeof remote !== 'object') return S.user;
@@ -3501,9 +3515,12 @@ function ghFetchWithRetry(url, opts, retriesLeft, timeoutMs) {
 }
 
 // v1.26.0 R7：姓名/学号脱敏工具（隐私保护）
+//   v1.67.1 增强：识别 publicNameOrFallback 生成的不可逆兜底名（"同学"+数字），
+//     这种名字不含真名，原样返回 —— 防止被二次打码变成「同***」之类的乱码。
 function maskName(name, sid) {
   const n = String(name || '').trim();
   if (!n) return '匿名用户';
+  if (/^同学[0-9A-Za-z]{2,}$/.test(n)) return n;   // 不可逆兜底名，原样
   if (/^[\u4e00-\u9fa5]{2,}$/.test(n)) return n.charAt(0) + '**';
   if (/^[A-Za-z]/.test(n)) return n.charAt(0).toUpperCase() + '***';
   return n.length > 1 ? n.charAt(0) + '***' : n;
@@ -3521,25 +3538,33 @@ function canSeePrivate(o) {
   return isOrderParty(o);   // v1.62.0：统一判定，空值互等已从根上消除
 }
 
-// v1.66.0 订单名字显示规则（用户要求：真名只有接单/双方可见，浏览界面只看昵称）：
-//   订单双方 / 管理员 → 显示真名（publisher_real_name）
-//   其他浏览者 → 显示昵称（publisher_name = 发布时 nickname||name 的快照）；
-//     若快照名与真名相同（该用户没设过昵称，回退成了真名）→ 打码，避免裸奔真名
+// v1.67.1 订单名字显示规则（用户硬要求：真名只有接单/双方可见，浏览界面只看昵称）：
+//   订单双方 / 管理员 → 显示真名（publisher_real_name 优先；历史缺快照时回退 publisher_name）
+//   其他浏览者 → 只能看到昵称（publisher_name）；
+//     真名判别：使用 publisher_real_name 作为「真名参照」——
+//       - rn 存在且与 nm 明显不同（不同字符串） → nm 是合法昵称，原样显示；
+//       - rn 缺失（v1.66.0 之前的历史订单）→ nm 极可能是真名（当时发布代码就是 name 优先），打码；
+//       - rn 存在但与 nm 相同 → nm 就是真名（用户没设过昵称），打码；
+//       - 兜底兜底名（"同学"+数字） → 原样（不会含真名）
 function publisherDisplayName(o) {
   if (!o) return '未知';
   if (canSeePrivate(o)) return String(o.publisher_real_name || o.publisher_name || '未知');
   const nm = String(o.publisher_name || '').trim();
-  const rn = String(o.publisher_real_name || '').trim();
   if (!nm) return '同学';
-  return (rn && nm === rn) ? maskName(nm, o.publisher_student_id) : nm;
+  if (/^同学[0-9A-Za-z]{2,}$/.test(nm)) return nm;   // 兜底名（v1.67.1+ 发布代码生成）
+  const rn = String(o.publisher_real_name || '').trim();
+  if (rn && rn !== nm) return nm;                       // 有真名快照且 nm 不是真名 → 昵称安全
+  return maskName(nm, o.publisher_student_id);          // 其余一律打码（防 v1.66.0 之前历史脏数据）
 }
 function takerDisplayName(o) {
   if (!o) return '未知';
   if (canSeePrivate(o)) return String(o.taker_real_name || o.taker_name || '未知');
   const nm = String(o.taker_name || '').trim();
-  const rn = String(o.taker_real_name || '').trim();
   if (!nm) return '同学';
-  return (rn && nm === rn) ? maskName(nm, o.taker_student_id) : nm;
+  if (/^同学[0-9A-Za-z]{2,}$/.test(nm)) return nm;
+  const rn = String(o.taker_real_name || '').trim();
+  if (rn && rn !== nm) return nm;
+  return maskName(nm, o.taker_student_id);
 }
 
 // v1.25.1 探测后端能力（附件上传等），避免显示不可用的入口
@@ -3990,7 +4015,7 @@ async function submitForumComment() {
       type: 'forum_comment',
       author_id: S.user._issue_number || selfSid(),
       author_sid: selfSid(),
-      author_nickname: S.user.nickname || S.user.name,
+      author_nickname: publicNameOrFallback(S.user, S.user._issue_number),
       is_anonymous: false,
       content: text,
       created_at: new Date().toISOString()
@@ -4118,8 +4143,11 @@ async function submitForumPost() {
       is_anonymous: anon,
       author_id: S.user._issue_number || selfSid(),
       author_sid: selfSid(),
-      author_nickname: S.user.nickname || S.user.name,
-      author_name: S.user.name,
+      author_nickname: publicNameOrFallback(S.user, S.user._issue_number),
+      // v1.67.1：author_name 不再直接存真名（S.user.name），改用 publicNameOrFallback。
+      //   浏览者看到的 nickname 已经安全；author_name 仅在 forumDisplayName 兜底打码时被使用，
+      //   改用不可逆的兜底名后 body 里再也不会有真实姓名。
+      author_name: publicNameOrFallback(S.user, S.user._issue_number),
       images: S._forumImages || [],
       upvotes: 0, views: 0, comment_count: 0,
       created_at: new Date().toISOString(), status: 'open'
@@ -4458,7 +4486,7 @@ async function loadHomeLeaderboard() {
       if (!u || typeof u !== 'object') continue;
       const cs = u.credit_score != null ? u.credit_score : 100;
       users.push({
-        nickname: u.nickname || u.name || '匿名校友',
+        nickname: u.nickname || ('同学' + (String(u.student_id || '')).slice(-4)),
         credit_score: cs,
         sid: u.student_id
       });
@@ -7095,7 +7123,7 @@ async function sendComment(issueNum) {
         try { const u = await uploadToImgBB(f); if (u) imageUrls.push(u); } catch (e) { console.error('图片上传失败', e); }
       }
     }
-    const body = JSON.stringify({ name: S.user.nickname || S.user.name, student_id: selfSid(), text: text, images: imageUrls.length ? imageUrls : undefined });
+    const body = JSON.stringify({ name: publicNameOrFallback(S.user, S.user._issue_number), student_id: selfSid(), text: text, images: imageUrls.length ? imageUrls : undefined });
     if (USE_PROXY) {
       await ghApi('/api/comments/' + issueNum, 'POST', { body });
     } else {
@@ -7937,7 +7965,8 @@ async function createChatOrder(targetSid, targetName, targetIssueNum, sourceOrde
       images: [],
       status: 'taken', // 直接设为已接单，这样双方都可以评论
       publisher_id: S.user._issue_number || selfSid(),
-      publisher_name: S.user.nickname || S.user.name || selfSid(),
+      // v1.67.1：nickname 为空时禁止回退到 S.user.name（真名），改用 publicNameOrFallback
+      publisher_name: publicNameOrFallback(S.user, S.user._issue_number),
       publisher_student_id: selfSid(),
       publisher_dorm: S.user.dorm || '',
       taker_id: targetIssueNum || targetSid,
@@ -8024,6 +8053,14 @@ function closeAdminModal() {
 
 let _adminUsersCache = null; // 管理面板用户缓存 { ts, users }，30s TTL，命中秒开
 
+// v1.67.1：管理员视图的用户展示名 —— 用户 issue body 里 nickname 优先（与发布端 publicNameOrFallback 一致），
+//   name/real_name 是注册/资料里可能填的真名（不展示在前端卡片上），最后回退到学号。
+//   旧代码全用 esc(u.name)，结果所有没填真名的用户都显示「?」——昵称其实是 nickname。
+function userDisplayName(u) {
+  if (!u) return '?';
+  return u.nickname || u.name || u.student_id || '?';
+}
+
 function adminSkeletonHTML() {
   let s = '<div class="admin-skeleton">';
   for (let i = 0; i < 4; i++) {
@@ -8060,7 +8097,7 @@ function renderAdminPanel(users, ct) {
     html += '<div style="max-height:300px;overflow-y:auto;margin-bottom:16px">';
     for (const u of pendingDeduped) {
       html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
-        + '<div><strong>' + esc(u.name) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span>'
+        + '<div><strong>' + esc(userDisplayName(u)) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span>'
         + (u.email_verified ? ' <span style="font-size:.72rem;color:#15803d;background:#dcfce7;padding:1px 6px;border-radius:99px">📧邮箱已验证</span>' : (u.status === 'pending' ? ' <span style="font-size:.72rem;color:#b45309;background:#fef3c7;padding:1px 6px;border-radius:99px">👤人工待核</span>' : ''))
         + (u.email ? '<br><span style="font-size:.8rem;color:var(--text-secondary)">📧 ' + esc(u.email) + '</span>' : '')
         + (u.phone ? ' <span style="font-size:.8rem;color:var(--text-secondary)">📱 ' + esc(u.phone) + '</span>' : '')
@@ -8515,7 +8552,7 @@ async function loadUserManagement() {
       html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
         + '<div style="min-width:0;flex:1">'
         + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
-        + '<strong>' + esc(u.name || '?') + '</strong>'
+        + '<strong>' + esc(userDisplayName(u)) + '</strong>'
         + vipBadge
         + runnerBadge
         + '</div>'
@@ -8530,12 +8567,12 @@ async function loadUserManagement() {
       // 私信按钮（不给管理员自己显示）
       const isNotSelf = u.student_id !== ADMIN_STUDENT_ID;
       if (isNotSelf && u._state === 'open' && u.status === 'approved') {
-        html += '<button class="btn btn-sm btn-primary" onclick="adminStartChat(\'' + esc(u.student_id) + '\',\'' + esc(u.name || '') + '\',\'' + (u._issue_number || '') + '\')" style="white-space:nowrap">💬 私信</button>';
+        html += '<button class="btn btn-sm btn-primary" onclick="adminStartChat(\'' + esc(u.student_id) + '\',\'' + esc(userDisplayName(u)) + '\',\'' + (u._issue_number || '') + '\')" style="white-space:nowrap">💬 私信</button>';
       }
       if (u._state === 'open') {
-        html += '<button class="btn btn-sm btn-danger" onclick="kickUser(' + u._issue_number + ',\'' + esc(u.name || u.student_id) + '\')" style="white-space:nowrap">🚫 踢出</button>';
+        html += '<button class="btn btn-sm btn-danger" onclick="kickUser(' + u._issue_number + ',\'' + esc(userDisplayName(u)) + '\')" style="white-space:nowrap">🚫 踢出</button>';
       } else {
-        html += '<button class="btn btn-sm btn-success" onclick="reactivateUser(' + u._issue_number + ',\'' + esc(u.name || u.student_id) + '\')" style="white-space:nowrap">🔄 恢复</button>';
+        html += '<button class="btn btn-sm btn-success" onclick="reactivateUser(' + u._issue_number + ',\'' + esc(userDisplayName(u)) + '\')" style="white-space:nowrap">🔄 恢复</button>';
       }
       html += '</div></div>';
     }
@@ -8621,11 +8658,11 @@ async function loadVipManagement() {
       html += '<div style="max-height:250px;overflow-y:auto;margin-bottom:20px">';
       for (const u of vipUsers) {
         html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fffbeb;border-radius:8px;margin-bottom:8px;border:1px solid #fde68a">'
-          + '<div><strong>' + esc(u.name) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span>'
+          + '<div><strong>' + esc(userDisplayName(u)) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span>'
           + '<br><span style="font-size:.8rem;color:var(--text-secondary)">到期：' + new Date(u.vip_expire).toLocaleDateString('zh-CN') + '</span></div>'
           + '<div style="display:flex;gap:6px">'
-          + '<button class="btn btn-sm btn-outline" onclick="extendVip(' + u._issue_number + ',\'' + esc(u.name) + '\')">续费 1 个月</button>'
-          + '<button class="btn btn-sm btn-outline" onclick="cancelVip(' + u._issue_number + ',\'' + esc(u.name) + '\')" style="color:var(--danger);border-color:var(--danger)">取消会员</button>'
+          + '<button class="btn btn-sm btn-outline" onclick="extendVip(' + u._issue_number + ',\'' + esc(userDisplayName(u)) + '\')">续费 1 个月</button>'
+          + '<button class="btn btn-sm btn-outline" onclick="cancelVip(' + u._issue_number + ',\'' + esc(userDisplayName(u)) + '\')" style="color:var(--danger);border-color:var(--danger)">取消会员</button>'
           + '</div></div>';
       }
       html += '</div>';
@@ -8639,8 +8676,8 @@ async function loadVipManagement() {
     }
     for (const u of normalUsers) {
       html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:8px;margin-bottom:8px">'
-        + '<div><strong>' + esc(u.name) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span></div>'
-        + '<button class="btn btn-sm btn-primary" onclick="activateVip(' + u._issue_number + ',\'' + esc(u.name) + '\')">⭐ 开通会员</button>'
+        + '<div><strong>' + esc(userDisplayName(u)) + '</strong> <span style="color:var(--text-muted)">' + esc(u.student_id) + '</span></div>'
+        + '<button class="btn btn-sm btn-primary" onclick="activateVip(' + u._issue_number + ',\'' + esc(userDisplayName(u)) + '\')">⭐ 开通会员</button>'
         + '</div>';
     }
     html += '</div>';
@@ -9157,10 +9194,11 @@ async function confirmTakeOrder() {
     if (isOrderPublisher(o)) { toast('不能接自己的订单', 'error'); return; }
     o.status = 'taken';
     o.taker_id = S.user._issue_number || selfSid();
-    o.taker_name = S.user.nickname || S.user.name;
+    // v1.67.1：禁止回退到 S.user.name（真名），taker_name 仅存昵称/兜底名
+    o.taker_name = publicNameOrFallback(S.user, S.user._issue_number);
     o.taker_student_id = selfSid();
     o.taker_credit_score = S.user.credit_score != null ? S.user.credit_score : 100; // v1.29.0 接单时持久化信用分，供卡片/详情展示信任信号
-    o.taker_real_name = S.user.name;
+    o.taker_real_name = S.user.name;    // v1.67.1：真名只存到 taker_real_name；taker_name 不再含真名
     o.taker_runner_verified = S.user.runner_verified || false;
     o.taken_at = new Date().toISOString();
     // 接单时自动把接单人的收款码写入订单
@@ -10855,11 +10893,12 @@ async function handlePublishInner(e) {
     status: 'open',
     campus: S._forumCampus || 'main',   // v1.39.3 订单带校区，供首页按校区筛选
     publisher_id: S.user._issue_number || selfSid(),
-    publisher_name: S.user.nickname || S.user.name || selfSid(),
+    // v1.67.1：nickname 为空时禁止回退到 S.user.name（真名），改用 publicNameOrFallback 生成不可逆兜底名
+    publisher_name: publicNameOrFallback(S.user, S.user._issue_number),
     // v1.61.0：学号绝不允许写出空值——一旦为空，后端所有权断言就认不出「发布者本人」，
     //   本人对这条订单的评价/确认收货/取消会被判 403（只能靠管理员账号兜底）。
     publisher_student_id: selfSid(),
-    publisher_real_name: S.user.name || S.user.nickname || '',
+    publisher_real_name: S.user.name || '',    // v1.67.1：真名只存到 publisher_real_name；publisher_name 不再含真名
     publisher_dorm: S.user.dorm || '',
     // v1.64.0：把发布者的收款方式快照进订单（仅交易类：二手/借物/跑腿）。
     //   原因：后端已把 payment_info/payment_image 加入用户资料强脱敏清单（防批量爬收款码），
