@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.52.1';
+const VERSION = '1.53.0';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -294,6 +294,59 @@ function protectServerFields(newBodyStr, curBodyStr) {
     if (curVip && (!newVip || newVip < curVip)) neu.vip_expire = cur.vip_expire;
     return JSON.stringify(neu);
   } catch (e) { return newBodyStr; }
+}
+// v1.53.0：订单「状态机写操作」豁免判定。
+//   背景：v1.42.0 的所有权断言（仅创建者/发布者/接单者可写）挡住了几类
+//   「任何登录用户都必须参与」的正常业务写 —— 执行者在写入瞬间还不是当事方：
+//     a) 接单：点「确认接单」时订单还是 open，owner 里只有发布者 → 必然 403
+//        （此前只有管理员账号测过，role=admin 被豁免，所以线上一直没暴露；
+//          普通学号用户点接单 100% 报「无权修改他人数据」）。
+//     b) 自动过期：任何客户端渲染列表时都会把超期未接的单标为 expired。
+//     c) 纯注记：浏览量 +1、超时标记（overdue/overdue_reason/overdue_at）。
+//   豁免仅限以下三种形态，且要求「目标状态 + 写入身份」自洽，其余改写一律仍走 403：
+//     1) open → taken   且 接单人身份（taker_student_id / taker_id）必须是调用者本人（防冒名接单）
+//     2) open → expired 且 当前无接单人
+//     3) 仅注记字段（views / overdue / overdue_reason / overdue_at）变化
+//     4) 纯 issue state 变更（ghCloseIssue 发的 { state:'closed' }，无 body）且订单已是终态(expired/cancelled)
+function stateWriteExemption(curData, ghBody, tk) {
+  let cur = null;
+  try { cur = JSON.parse((curData && curData.body) || '{}'); } catch (e) { return false; }
+  if (!cur || typeof cur !== 'object') return false;
+  const ids = tk ? [String(tk.sid || ''), String(tk.num || '')].filter(Boolean) : [];
+  // 4) 纯 state 变更（没有 body 字段）
+  if (!ghBody || ghBody.body === undefined) {
+    return cur.status === 'expired' || cur.status === 'cancelled';
+  }
+  let neu = null;
+  try { neu = JSON.parse(ghBody.body); } catch (e) { return false; }
+  if (!neu || typeof neu !== 'object') return false;
+  // 1) 接单
+  if (cur.status === 'open' && neu.status === 'taken') {
+    const claim = [neu.taker_student_id, neu.taker_id].filter(Boolean).map(String);
+    return claim.length > 0 && claim.some(function (x) { return ids.indexOf(x) !== -1; });
+  }
+  // 2) 自动过期：必须「当前无接单人」且「截止时间确实已过」（含前端同款 5 分钟缓冲）
+  //    —— 否则任何登录用户都能把别人的新订单恶意标成过期
+  if (cur.status === 'open' && neu.status === 'expired' && !cur.taker_id && !cur.taker_student_id) {
+    const dl = cur.deadline ? new Date(cur.deadline).getTime() : 0;
+    return !!dl && dl + 5 * 60 * 1000 <= Date.now();
+  }
+  // 2b) 48h 未确认 → 自动确认完成（前端 checkAwaitingConfirmOrders 由任意在线客户端触发，
+  //     非当事方客户端此前必然 403 → 只要双方都不在线就永远不会自动完成）
+  if (cur.status === 'awaiting_confirm' && neu.status === 'completed') {
+    const t = cur.awaiting_confirm_at ? new Date(cur.awaiting_confirm_at).getTime() : 0;
+    return !!t && Date.now() - t > 48 * 60 * 60 * 1000;
+  }
+  // 3) 纯注记写入
+  const ANNOT = ['views', 'overdue', 'overdue_reason', 'overdue_at'];
+  const keys = {};
+  Object.keys(cur).forEach(function (k) { keys[k] = 1; });
+  Object.keys(neu).forEach(function (k) { keys[k] = 1; });
+  const changed = Object.keys(keys).filter(function (k) {
+    return JSON.stringify(cur[k] === undefined ? null : cur[k]) !== JSON.stringify(neu[k] === undefined ? null : neu[k]);
+  });
+  if (changed.length && changed.every(function (k) { return ANNOT.indexOf(k) !== -1; })) return true;
+  return false;
 }
 // v1.42.0：从 issue body 提取「有权修改此 issue 的学号集合」，用于写操作所有权断言。
 // 订单类：创建者(student_id) / 发布者(publisher_*) / 接单者(taker_*)；用户类：student_id 即本人。
@@ -2011,7 +2064,10 @@ const server = http.createServer(async (req, res) => {
         const owner = issueOwnerSids(cur.data);
         const selfIds = tk ? [String(tk.sid || ''), String(tk.num || '')] : [];
         if (tk && tk.role !== 'admin' && owner.length && !owner.some(function (s) { return selfIds.indexOf(s) !== -1; })) {
-          return sendJSON(res, 403, { error: 'FORBIDDEN', hint: '无权修改他人数据' }, headers);
+          // v1.53.0：订单状态机豁免（接单 / 自动过期 / 纯注记）。详见 stateWriteExemption 注释。
+          if (!stateWriteExemption(cur.data, ghBody, tk)) {
+            return sendJSON(res, 403, { error: 'FORBIDDEN', hint: '无权修改他人数据' }, headers);
+          }
         }
         // v1.41.4 写保护：合并保留 password_hash，杜绝整对象写回锁号
         if (ghBody && ghBody.body && issueHasUserLabel(cur.data)) {

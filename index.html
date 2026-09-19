@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.67.3" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.67.4" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2922,7 +2922,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.67.3';
+const APP_VERSION = '1.67.4';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3567,6 +3567,25 @@ function takerDisplayName(o) {
   const rn = String(o.taker_real_name || '').trim();
   if (rn && rn !== nm) return nm;
   return maskName(nm, o.taker_student_id);
+}
+
+// v1.67.4 公共浏览面（广场/二手/互助信息流、首页动态墙）专用展示名：
+//   一律只给昵称 / 不可逆兜底名，**任何身份**（含订单当事人、管理员）都不在浏览列表里暴露真名。
+//   真名只保留在「订单详情 / 我的订单」按身份规则显示（接单后对当事人可见）。
+//   背景：v1.67.1 只收紧了非当事方分支，但列表卡片仍有两处直接吐真名：
+//     a) 头像首字用了原始 o.publisher_name；
+//     b) 卡片 byline 走 `canSeePrivate(o) ? o.publisher_name : …` ——
+//        管理员（canSeePrivate 恒为真）浏览信息流时会看到别人的真名（用户实测截图）。
+function publicFeedName(o, role) {
+  if (!o) return '未知';
+  const isTaker = role === 'taker';
+  const nm = String((isTaker ? o.taker_name : o.publisher_name) || '').trim();
+  const rn = String((isTaker ? o.taker_real_name : o.publisher_real_name) || '').trim();
+  const sid = (isTaker ? (o.taker_student_id || o.taker_id) : (o.publisher_student_id || o.publisher_id)) || '';
+  if (!nm) return '同学';
+  if (/^同学[0-9A-Za-z]{2,}$/.test(nm)) return nm;   // 不可逆兜底名，原样
+  if (rn && rn !== nm) return nm;                     // 订单里有真名快照且与之不同 → nm 是昵称，安全
+  return maskName(nm, sid);                           // 其余（nm 很可能就是真名）→ 打码
 }
 
 // v1.25.1 探测后端能力（附件上传等），避免显示不可用的入口
@@ -4340,7 +4359,7 @@ async function loadHomeLiveData() {
       if (completed.length === 0) act.innerHTML = '<div class="live-act-empty">暂无已完成记录，快来发布第一单～</div>';
       else act.innerHTML = completed.slice(0,5).map(function(c){
         const o = c.o;
-        const who = esc(publisherDisplayName(o));
+        const who = esc(publicFeedName(o));
         const what = esc(o.title || (o.category === 'qa' ? '有问必答' : '互助任务'));
         const catLabel = { task:'跑腿', secondhand:'二手', borrow:'租借', qa:'问答', find:'找人' }[o.category] || '互助';
         return '<div class="live-act-item"><span class="live-act-dot"></span><span>' + who + ' 的『' + what + '』' + catLabel + '任务已完成 ✓</span></div>';
@@ -5636,10 +5655,10 @@ function renderOrders(orders) {
       // v1.40.1 紧凑化：在 header 后插入头像+byline 行（仿 forum-card-head）
       // v1.57.0 发布者整行可点进主页（此前只有昵称小蓝字可点，头像是死的）
       + '<div class="order-card-author" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="cursor:pointer" title="查看 TA 的主页">'
-      + '<div class="order-card-avatar">' + esc((o.publisher_name || '匿').charAt(0)) + '</div>'
+      + '<div class="order-card-avatar">' + esc((publicFeedName(o) || '匿').charAt(0)) + '</div>'
       + '<div class="order-card-byline">'
       + '<span style="color:var(--primary)">'
-      + (canSeePrivate(o) ? esc(o.publisher_name || '未知') : esc(publisherDisplayName(o)))
+      + esc(publicFeedName(o))
       + '</span>'
       + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '')
       + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (pubPending(o) ? '<span class="user-pending-badge">待核验</span>' : ''))
@@ -5667,7 +5686,7 @@ function renderOrders(orders) {
       + (o.status === 'taken' && o.estimate_finish_label ? '<span class="est-badge' + (o.overdue ? ' overdue' : '') + '">' + (o.overdue ? '⚠️ 已逾期 ' : '⏰ 预计 ') + esc(o.estimate_finish_label) + ' 完成</span>' : '')
       + '</div>'
       + '<div class="order-card-footer">'
-      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(publisherDisplayName(o)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (pubPending(o) ? '<span class="user-pending-badge">待核验</span>' : '')) + '</span>'
+      + '<span>发布者：<a href="javascript:void(0)" onclick="event.stopPropagation();showUserProfile(\'' + esc(o.publisher_student_id || '') + '\')" style="color:var(--primary);text-decoration:underline">' + esc(publicFeedName(o)) + '</a>' + (o.publisher_vip ? '<span style="color:#f59e0b" title="VIP会员">⭐</span>' : '') + (o.publisher_runner_verified ? '<span class="user-runner-badge">认证跑腿</span>' : (pubPending(o) ? '<span class="user-pending-badge">待核验</span>' : '')) + '</span>'
       + '<span>' + timeAgo(o.created_at) + '</span>'
       + (o.taker_credit_score != null && (o.status === 'taken' || o.status === 'awaiting_confirm') ? ' <span class="taker-credit">接单人信用 ' + o.taker_credit_score + '</span>' : '')
       + '</div>'
@@ -6586,11 +6605,13 @@ async function showDetail(issueNum) {
     }
 
     let actions = '';
-    const currentUid = S.user ? (S.user._issue_number || selfSid()) : null;
-    const isPublisher = currentUid && (o.publisher_id === currentUid || o.publisher_student_id === currentUid);
+    // v1.67.4：身份判定统一走 isOrderPublisher/isOrderTaker/isOrderParty（内部 = 我的身份集合 ∩
+    //   订单两侧字段，空值不入集合）。此前手写 `o.publisher_id === currentUid` 会在
+    //   「订单里只存了 *_student_id」或「本机 _issue_number 丢失」时误判 → 当事人看不到自己的按钮。
+    const isPublisher = isOrderPublisher(o);
     const isOverdue = o.deadline && new Date(new Date(o.deadline).getTime() + 2 * 60 * 60 * 1000) < new Date();
     if (!isQA) {
-      if (S.user && o.status === 'open' && o.publisher_id !== currentUid) {
+      if (S.user && o.status === 'open' && !isOrderPublisher(o)) {
         actions += '<button class="btn btn-primary" onclick="takeOrder(' + issueNum + ')">接单</button>';
         // 接单前询问：非发布者的任何人都可以向发布者发起私聊确认
         const pubSid = o.publisher_student_id || '';
@@ -6598,18 +6619,18 @@ async function showDetail(issueNum) {
         const pubIssueNum = o.publisher_id || '';
         actions += '<button class="btn btn-outline" onclick="createChatOrder(\'' + esc(pubSid) + '\',\'' + esc(pubName) + '\',\'' + esc(pubIssueNum) + '\',\'' + esc(o.title) + '\')">💬 询问发布者</button>';
       }
-      if (S.user && o.status === 'taken' && o.taker_id === currentUid) {
+      if (S.user && o.status === 'taken' && isOrderTaker(o)) {
         actions += '<button class="btn btn-success" onclick="completeOrder(' + issueNum + ')">确认完成</button>';
       }
       // v1.18.0：待发布者确认状态
-      if (S.user && o.status === 'awaiting_confirm' && o.taker_id === currentUid) {
+      if (S.user && o.status === 'awaiting_confirm' && isOrderTaker(o)) {
         actions += '<button class="btn btn-success" disabled style="opacity:.75">✅ 已完成，等待发布者确认</button>';
       }
-      if (S.user && o.status === 'awaiting_confirm' && o.publisher_id === currentUid) {
+      if (S.user && o.status === 'awaiting_confirm' && isOrderPublisher(o)) {
         actions += '<button class="btn btn-success" onclick="finalizeOrder(' + issueNum + ')">' + (o.type === 'secondhand' ? '✅ 确认收款并完成' : '✅ 确认收到') + '</button>';
         actions += '<button class="btn btn-danger" onclick="disputeAwaitingOrder(' + issueNum + ')">❌ 拒绝确认</button>';
       }
-      if (S.user && (o.publisher_id === currentUid || o.taker_id === currentUid)) {
+      if (S.user && (isOrderPublisher(o) || isOrderTaker(o))) {
         if (o.status === 'open' || o.status === 'taken') {
           actions += '<button class="btn btn-danger" onclick="cancelOrder(' + issueNum + ')">取消订单</button>';
         }
@@ -6820,7 +6841,7 @@ async function showDetail(issueNum) {
       + '</div>'
       + (o.status === 'awaiting_confirm'
         ? '<div style="margin-top:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:.83rem;color:#92400e">'
-          + (o.publisher_id === currentUid
+          + (isOrderPublisher(o)
             // v1.60.0：二手是「买家付钱给卖家」，不能沿用跑腿的「你先付款给对方」
             ? (o.type === 'secondhand'
                 ? '📦 买家已接单，请与买家完成交易（<b>买家向你付款</b>）。收到款项并交付物品后，点「确认收款并完成」结束订单（48h 内未确认将自动完成）。若有纠纷，请点「拒绝确认」并投诉。'
@@ -9105,6 +9126,7 @@ async function takeOrderInner(inum) {
     }
   }
   // 跑腿认证检查：已认证跑腿才能接单（VIP 不豁免，管理员不受限）
+  // 注：产品文案（VIP 弹窗 / AI 问答）明确「交易类＝跑腿+二手」都需认证，故此处保持全类型一致。
   const isAdmin = selfSid() === ADMIN_STUDENT_ID;
   if (!S.user.runner_verified && !isAdmin) {
     toast('⚠️ 接单需先通过跑腿认证（上传学生证）。认证通过还可获赠 7 天会员试用！', 'info');
@@ -9219,7 +9241,7 @@ async function confirmTakeOrder() {
     // 乐观更新：直接从缓存中更新该订单状态
     if (_cachedOrders) {
       const idx = _cachedOrders.findIndex(x => x._issue_number === inum);
-      if (idx !== -1) { _cachedOrders[idx].status = 'taken'; _cachedOrders[idx].taker_name = S.user.name; _cachedOrders[idx].taker_student_id = selfSid(); _cachedOrders[idx].estimate_finish_label = est.label; renderCurrentOrders(); }
+      if (idx !== -1) { _cachedOrders[idx].status = 'taken'; _cachedOrders[idx].taker_name = publicNameOrFallback(S.user, S.user._issue_number); _cachedOrders[idx].taker_student_id = selfSid(); _cachedOrders[idx].estimate_finish_label = est.label; renderCurrentOrders(); }
     }
     if (S.page === 'my') loadMyOrders();
     else if (S.page === 'task') { /* 已通过缓存更新，但异步再拉一次确保数据一致 */ setTimeout(() => refreshCurrentTab(), 1500); }
