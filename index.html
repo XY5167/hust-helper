@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.67.4" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.67.5" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2922,7 +2922,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.67.4';
+const APP_VERSION = '1.67.5';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3006,6 +3006,12 @@ function cacheGetStale(key) {
 // 初始化
 (function() {
   // 恢复会话 Token（过期则清掉，强制重新登录）
+  // v1.67.5：localStorage 里那张可能已过期，但 cookie 里那张可能更新（续签时只写成功了一边、
+  //   或 localStorage 被清过一轮）。先试 cookie，仍然无效才彻底清理 —— 别把有效登录态一起干掉。
+  if (getToken() && !tokenPayload()) {
+    const _ck = getCookieToken();
+    if (_ck && _ck !== getToken()) setToken(_ck);
+  }
   if (getToken() && !tokenPayload()) { clearToken(); }
   const saved = localStorage.getItem('hust_current_user');
   if (saved) {
@@ -3038,7 +3044,18 @@ function cacheGetStale(key) {
     // 前端加固：localStorage 被手机端清空时，从 cookie 兜底恢复（随后 syncCurrentUser 补全资料）
     const ct = getCookieToken(), cuid = getCookieUid();
     if (ct) setToken(ct);
-    if (ct && cuid) S.user = { _issue_number: parseInt(cuid, 10) };
+    // v1.67.5：身份优先用 token 里「服务端签名的 num/sid」重建。
+    //   原来只依赖 hust_uid cookie：一旦 uid cookie 丢失（或当年登录时 _issue_number 尚未取到、
+    //   压根没写进去），就会出现「token 完全有效，但 S.user 为空」→ 界面显示未登录，
+    //   用户点发布被要求重新登录。token 里的 num/sid 不可伪造，是权威身份来源。
+    const _tp0 = ct ? tokenPayload() : null;
+    if (ct && _tp0 && _tp0.sid) {
+      S.user = { student_id: String(_tp0.sid) };
+      if (_tp0.num) S.user._issue_number = _tp0.num;
+      else if (cuid) S.user._issue_number = parseInt(cuid, 10);
+    } else if (ct && cuid) {
+      S.user = { _issue_number: parseInt(cuid, 10) };
+    }
   }
   // 用 Token 中的角色刷新本地（管理员 UI 判定以服务端为准）
   const tp = tokenPayload();
@@ -3059,15 +3076,32 @@ function cacheGetStale(key) {
   //   ② 续签：会话确认有效后，看剩余寿命是否该换新，避免被动掉登录。
   if (S.user && getToken()) {
     setTimeout(function () {
-      ghApi('/api/me', 'GET', null, { timeout: 8000, retries: 0 }).then(function (res) {
-        if (res && res.status === 401) { try { clearToken(); } catch (e) {} }
-        else if (res && res.ok) { maybeRenewToken(); }
+      // v1.67.5：探针失败不再「一次 401 就清号」。先看上游/网络是否只是抖动：
+      //   5xx 与网络异常 → fail-open 保留登录态；确凿 401 → 复检一次，两次都 401 才清。
+      const _probe = function () {
+        return ghApi('/api/me', 'GET', null, { timeout: 8000, retries: 0 }).catch(function () { return null; });
+      };
+      _probe().then(function (res) {
+        if (res && res.ok) { _sessionCheckedAt = Date.now(); maybeRenewToken(); return; }
+        if (!res || res.status >= 500) return;            // 上游/网络故障：不动登录态
+        if (res.status !== 401) return;
+        return _probe().then(function (res2) {
+          if (res2 && res2.ok) { _sessionCheckedAt = Date.now(); maybeRenewToken(); return; }
+          if (res2 && res2.status === 401) { try { clearToken(); } catch (e) {} }
+        });
       }).catch(function () {});
     }, 1500);
   }
   // 切回页面时再次同步（防止用户在其他设备修改后本设备未刷新）
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && S.user && S.user._issue_number) syncCurrentUser();
+    if (document.hidden) return;
+    // v1.67.5：回到前台先补「自愈 + 续签」。
+    //   原来 maybeRenewToken() 只在「启动探针成功」那一条路径上调用 —— 手机端页面长期挂在后台
+    //   （PWA / 不重载的标签页）时，续签永远不会发生，30 天 TTL 一到，用户点发布就被要求重新登录。
+    //   同时这里也补一次身份自愈：存储被清过一轮时，靠有效 token 直接把 S.user 还原回来。
+    try { if (!S.user && restoreSessionFromToken()) updateUI(); } catch (e) {}
+    try { if (S.user) maybeRenewToken(); } catch (e) {}
+    if (S.user && S.user._issue_number) syncCurrentUser();
   });
   // 初始化 EmailJS
   try { emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY }); } catch(e) { console.warn('EmailJS init failed:', e); }
@@ -3092,8 +3126,28 @@ function cacheGetStale(key) {
 // 通过 Worker 代理（缓存读 + 透传写 + WebSocket 通知）
 // Token 通过请求头传给 Worker
 // ---- 会话 Token 管理（与用户资料分离，绝不存储密码）----
-function getToken() { try { return localStorage.getItem('hust_token') || getCookieToken(); } catch (e) { return null; } }
-function setToken(t) { try { localStorage.setItem('hust_token', t); } catch (e) {} }
+// v1.67.5 内存兜底（手机端「发单要重新登录」的头号原因）：
+//   隐私模式 / 部分 App 内置 WebView 会禁用 localStorage 写入，甚至 document.cookie 也写不进去，
+//   而 setToken/setCookie 都是 try-catch 静默失败 → getToken() 恒返回 null。
+//   表现：用户刚登录成功、界面显示已登录，一填完表单点「发布」就被要求重新登录
+//   （requireAuth 里 !getToken() 直接判定登录态失效）。
+//   现在本进程内先记内存，保证「同一次会话内登录态一定可用」；持久化只是「下次打开还在」的加成。
+//   用 var 声明：启动 IIFE 早于本行执行且会调用 setToken，var 有变量提升才不会踩 let 的 TDZ。
+var _memToken = null;
+function getToken() {
+  if (_memToken) return _memToken;
+  try {
+    const t = localStorage.getItem('hust_token');
+    if (t) { _memToken = t; return t; }
+  } catch (e) {}
+  const ct = getCookieToken();
+  if (ct) { _memToken = ct; return ct; }   // cookie 命中也记进内存，避免每次再读存储
+  return null;
+}
+function setToken(t) {
+  if (t) _memToken = t;
+  try { if (t) localStorage.setItem('hust_token', t); else localStorage.removeItem('hust_token'); } catch (e) {}
+}
 
 // ============ v1.61.0 用户身份兜底（事故级修复）============
 // 事故链：后端对「非管理员读取 user issue」做强脱敏（删 student_id/name/phone/dorm）→
@@ -3269,8 +3323,34 @@ function onAuthRequired(reason) {
     if (typeof showAuthModal === 'function') setTimeout(function () { showAuthModal(); }, 100);
   } catch (e) {}
 }
+// v1.67.5：用「服务端签名的 token」自愈登录态。
+//   场景：手机端 localStorage 被清空，或只残留了 token cookie（uid cookie 丢失）→
+//         启动时 S.user 没能被还原，界面显示未登录，用户点发布就被要求重新登录 ——
+//         可 token 其实完全有效（能通过 /api/me，能写订单）。
+//   token 里的 sid / num 由服务端 HMAC 签名，不可伪造，足够支撑写操作所需的身份；
+//   昵称、手机号等展示/联系方式字段随后由 syncCurrentUser / healSelfProfile 补回。
+//   返回 true 表示「现在有可用登录态」。
+function restoreSessionFromToken() {
+  try {
+    if (!getToken()) return false;
+    const tp = tokenPayload();
+    if (!tp || !tp.sid) return false;                 // 解析不出或已过期 → 只能重新登录
+    if (!S.user) S.user = {};
+    if (!S.user.student_id) S.user.student_id = String(tp.sid);
+    if (!S.user._issue_number && tp.num) S.user._issue_number = tp.num;
+    if (tp.role) S.user.role = tp.role;
+    if (!S.user._issue_number) { try { ensureUserIssueNumber(); } catch (e) {} }
+    try { persistCurrentUser(); } catch (e) {}
+    try { syncCurrentUser(); } catch (e) {}            // 后台补全资料，失败不影响登录态
+    return true;
+  } catch (e) { return false; }
+}
+window.restoreSessionFromToken = restoreSessionFromToken;
 function requireAuth() {
+  // v1.67.5：存储被清 / 只丢了一边时，先尝试自愈，而不是直接把用户推去重新登录
+  if (!getToken()) { const ct = getCookieToken(); if (ct) setToken(ct); }
   if (!S.user || !getToken()) {
+    if (restoreSessionFromToken()) { try { updateUI(); } catch (e) {} return true; }
     onAuthRequired('登录态已过期，请重新登录后操作');
     return false;
   }
@@ -3283,23 +3363,39 @@ function requireAuth() {
 //   做法：写操作前向 /api/me 打一次轻量探针；401 说明 token 已废 → 清干净 + 弹登录框。
 //   网络异常一律 fail-open（返回 true），绝不因为探针失败而阻断用户的正常操作。
 let _sessionCheckedAt = 0;
+// v1.67.5：一次 401 不再直接判定「登录态失效」。
+//   后端 /api/me 在 GitHub 上游抖动（403 限流 / 5xx / 网络异常）时此前也会回 401，
+//   而 ghApi 收到 401 会 clearToken()（连 token + cookie + S.user 一起抹掉）。
+//   于是「网络抖一下 → 登录态被清 → 用户发单被要求重新登录」。
+//   现在：401 后强制复检一次，只有连续两次确凿 401 才登出；5xx / 网络异常一律 fail-open 放行。
 async function ensureSessionValid(opts) {
   const ro = opts || {};
-  if (!S.user) { showAuthModal(); return false; }
+  if (!getToken()) { const ct = getCookieToken(); if (ct) setToken(ct); }
+  if (!S.user) {
+    if (restoreSessionFromToken()) { try { updateUI(); } catch (e) {} }
+    else { showAuthModal(); return false; }
+  }
   if (!getToken()) { onAuthRequired('登录态已过期，请重新登录后操作'); return false; }
   if (!ro.force && Date.now() - _sessionCheckedAt < 30000) return true;  // 30s 内已校验过，跳过
-  try {
-    const res = await ghApi('/api/me', 'GET', null, { timeout: 8000, retries: 0 });
-    if (res.status === 401) {
+  const probe = async function () {
+    try { return await ghApi('/api/me', 'GET', null, { timeout: 8000, retries: 0 }); }
+    catch (e) { return null; }
+  };
+  const res = await probe();
+  if (!res) return true;                 // 网络异常：fail-open，绝不因探针失败阻断用户操作
+  if (res.ok) { _sessionCheckedAt = Date.now(); try { maybeRenewToken(); } catch (e) {} return true; }
+  if (res.status >= 500) return true;    // 后端 / 上游故障：不是登录态问题，放行
+  if (res.status === 401) {
+    const res2 = await probe();          // 复检一次，排除瞬时抖动
+    if (res2 && res2.status === 401) {
       clearToken();
       onAuthRequired('登录态已过期，请重新登录后操作');
       return false;
     }
-    if (res.ok) _sessionCheckedAt = Date.now();
-    return true;
-  } catch (e) {
-    return true; // fail-open
+    if (res2 && res2.ok) { _sessionCheckedAt = Date.now(); try { maybeRenewToken(); } catch (e) {} }
+    return true;                         // 复检通过 / 结果含糊 → 放行，宁可让写入自己报错
   }
+  return true;
 }
 window.ensureSessionValid = ensureSessionValid;
 
@@ -3319,7 +3415,10 @@ function maybeRenewToken() {
     .then(function (d) {
       if (d && d.token) {
         setToken(d.token);
+        // v1.67.5：原来只续 hust_token cookie，uid cookie 仍是旧的（甚至已过期）。
+        //   手机端 localStorage 被清空后要靠 cookie 兜底还原身份，缺一半就会「有 token 但没身份」。
         try { setCookie('hust_token', d.token, 30); } catch (e) {}
+        try { setAuthCookies(); } catch (e) {}
       }
     })
     .catch(function () {})
@@ -3332,6 +3431,7 @@ window.maybeRenewToken = maybeRenewToken;
 //   在操作，401 路径会反复触发弹模态。改为彻底退出登录状态，下一次用户主动操作时由
 //   requireAuth 干净地引导重新登录。
 function clearToken() {
+  _memToken = null;   // v1.67.5：内存兜底也要清，否则失效 token 会一直留在内存里被当有效票据用
   try { localStorage.removeItem('hust_token'); } catch (e) {}
   try { localStorage.removeItem('hust_current_user'); } catch (e) {}
   clearAuthCookies();
@@ -3446,6 +3546,11 @@ function clearAuthCookies() { setCookie('hust_token', '', -1); setCookie('hust_u
   };
 })();
 
+// v1.67.5：「一撞 401 就清登录态」的连续计数（用 var 提升，避免启动 IIFE / 早期调用踩 TDZ）。
+//   后台轮询（通知 90s、投诉 180s、订单自动确认）撞上任意上游抖动导致的 401，
+//   原来都会把 token + cookie + S.user 一次性抹掉 —— 表现为「手机挂在后台一阵子，
+//   回来一发单就被要求重新登录」。现在只有短时间内连续两次 401 才认定确实失效。
+var _auth401At = 0, _auth401Count = 0;
 function ghApi(path, method, body, reqOpts) {
   const ro = reqOpts || {};
   const timeoutMs = ro.timeout || 15000;
@@ -3467,14 +3572,27 @@ function ghApi(path, method, body, reqOpts) {
       //   真正的"登录态"恢复由 requireAuth 把关：用户点发布/评论/接单等时如果 S.user
       //   为空或 token 失效，requireAuth 会正确弹模态。
       if (res.status === 401) {
-        // 仅做一次静默清理：如果 token 在 localStorage 但服务端拒了（说明已失效或被改），
-        // 主动清掉，避免后续每次都带一个无效 Authorization 头。
+        // v1.67.5：只有「短时间内连续两次 401」才认定登录态确实失效并清理。
+        //   单次 401 可能来自上游抖动（后端 /api/me 曾把 GitHub 403/5xx 也回成 401），
+        //   直接 clearToken() 会让用户莫名其妙被登出 —— 手机端尤其明显（页面长期挂着、
+        //   后台轮询撞上一次抖动就掉登录，用户下次点发布就被要求重新登录）。
         try {
           if (getToken() && S && S.user) {
-            // 异步清理：失败也不影响本次返回
-            setTimeout(function () { try { clearToken(); } catch(e){} }, 0);
+            const _now = Date.now();
+            if (_auth401At && (_now - _auth401At) < 120000) {
+              _auth401Count++;
+              if (_auth401Count >= 2) {
+                _auth401At = 0; _auth401Count = 0;
+                setTimeout(function () { try { clearToken(); } catch (e) {} }, 0);
+              }
+            } else {
+              _auth401Count = 1;
+            }
+            _auth401At = _now;
           }
         } catch (e) {}
+      } else if (res.ok) {
+        _auth401At = 0; _auth401Count = 0;   // 有成功请求即清零，避免跨时段的孤立 401 累积
       }
       if (res.status === 429) {
         try { if (window.toast) toast('请求过于频繁，请稍后再试', 'error'); } catch (e) {}

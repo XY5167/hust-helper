@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.53.0';
+const VERSION = '1.53.1';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -1246,9 +1246,22 @@ const server = http.createServer(async (req, res) => {
         if (meMatch) {
           const tk = bearerPayload(req);
           if (!tk) return sendJSON(res, 401, { error: 'UNAUTHORIZED' }, headers);
-          const { status, data } = await ghProxy(`/repos/${REPO}/issues/${tk.num}`, 'GET', null);
-          if (status !== 200 || !data) return sendJSON(res, 401, { error: 'UNAUTHORIZED' }, headers);
-          const u = desensitizeUser(JSON.parse(data.body));
+          let _r;
+          try { _r = await ghProxy(`/repos/${REPO}/issues/${tk.num}`, 'GET', null); }
+          catch (e) { return sendJSON(res, 502, { error: 'PROFILE_FETCH_FAILED' }, headers); }
+          // v1.53.1：只有「确实查不到这个用户」才算登录态失效（401）。
+          //   原实现把 GitHub 上游的任何非 200（403 限流 / 5xx / 网络抖动）也回成 401，
+          //   而前端见 401 会 clearToken()，把 token + cookie + S.user 一起抹掉 ——
+          //   结果「网络抖一下就被静默登出，手机端再发单就要求重新登录」。
+          //   上游故障现在回 502，前端对 5xx 一律 fail-open（保留登录态、放行写入）。
+          if (_r.status === 401 || _r.status === 404) {
+            return sendJSON(res, 401, { error: 'UNAUTHORIZED', hint: '账号不存在或登录态已失效' }, headers);
+          }
+          if (_r.status !== 200 || !_r.data) return sendJSON(res, 502, { error: 'PROFILE_FETCH_FAILED' }, headers);
+          let _u = {};
+          try { _u = JSON.parse(_r.data.body || '{}'); }
+          catch (e) { return sendJSON(res, 502, { error: 'PROFILE_PARSE_FAILED' }, headers); }
+          const u = desensitizeUser(_u);
           u._issue_number = tk.num;
           return sendJSON(res, 200, u, headers);
         }
@@ -1493,7 +1506,11 @@ const server = http.createServer(async (req, res) => {
           let u = {};
           try {
             const { status, data } = await ghProxy(`/repos/${REPO}/issues/${tk.num}`, 'GET', null);
-            if (status !== 200 || !data) return sendJSON(res, 401, { error: 'UNAUTHORIZED', hint: '账号不存在' }, headers);
+            // v1.53.1：上游 403 限流 / 5xx 不该被报成「账号不存在」（前端会把有效登录态丢掉）
+            if (status === 401 || status === 404) {
+              return sendJSON(res, 401, { error: 'UNAUTHORIZED', hint: '账号不存在' }, headers);
+            }
+            if (status !== 200 || !data) return sendJSON(res, 502, { error: 'RENEW_CHECK_FAILED' }, headers);
             try { u = JSON.parse(data.body || '{}'); } catch (e) { u = {}; }
           } catch (e) {
             return sendJSON(res, 502, { error: 'RENEW_CHECK_FAILED' }, headers);
