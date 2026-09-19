@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.67.5" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.67.6" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2922,7 +2922,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.67.5';
+const APP_VERSION = '1.67.6';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -7882,7 +7882,7 @@ async function markOrderIncomplete(inum) {
     toast('已标记为未完成并给出差评' + creditMsg, 'success');
     closeDetailModal();
     optimisticUpdateMyOrder(inum, 'expired');
-    cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+    cacheBust(myOrdersCacheKey());
     cacheBust('orders_' + (S.taskTab || 'task'));
     cacheBust('stats'); loadStats();
   } catch(e) { toast('操作失败：' + e.message, 'error'); }
@@ -9516,7 +9516,7 @@ async function submitCompleteOrder(inum, hasHandoff) {
       toast('交接码正确！已通知发布者确认，确认后订单完成', 'success');
       closeDetailModal();
       optimisticUpdateMyOrder(inum, 'awaiting_confirm');
-      cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+      cacheBust(myOrdersCacheKey());
       cacheBust('stats'); loadStats();
       if (S.page === 'task') setTimeout(() => refreshCurrentTab(), 1500);
       // 通知发布者（历史对话保留，最终完成时才清评论）
@@ -9528,7 +9528,7 @@ async function submitCompleteOrder(inum, hasHandoff) {
       toast('订单完成！', 'success');
       closeDetailModal();
       optimisticUpdateMyOrder(inum, 'completed');
-      cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+      cacheBust(myOrdersCacheKey());
       cacheBust('orders_' + (S.taskTab || 'task'));
       cacheBust('stats'); loadStats();
       deleteAllComments(inum).catch(()=>{});
@@ -9556,7 +9556,7 @@ async function finalizeOrder(inum) {
     toast('已确认收到，订单完成！', 'success');
     closeDetailModal();
     optimisticUpdateMyOrder(inum, 'completed');
-    cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+    cacheBust(myOrdersCacheKey());
     cacheBust('orders_' + (S.taskTab || 'task'));
     cacheBust('stats'); loadStats();
     deleteAllComments(inum).catch(()=>{});
@@ -9580,7 +9580,7 @@ async function disputeAwaitingOrder(inum) {
     toast('已拒绝确认，订单回到已接单状态', 'info');
     closeDetailModal();
     optimisticUpdateMyOrder(inum, 'taken');
-    cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+    cacheBust(myOrdersCacheKey());
     cacheBust('orders_' + (S.taskTab || 'task'));
     showReportModal(inum);   // 直接打开投诉弹窗
   } catch(e) { toast(e.message, 'error'); }
@@ -9631,7 +9631,7 @@ async function cancelOrder(inum) {
     toast('订单已取消' + deductMsg, 'info');
     closeDetailModal();
     optimisticUpdateMyOrder(inum, 'cancelled');
-    cacheBust('myorders_' + (S.myTab||'all') + '_' + (S.myPublishedSubTab||''));
+    cacheBust(myOrdersCacheKey());
     cacheBust('orders_' + (S.taskTab || 'task'));
     cacheBust('stats'); loadStats();
     // === 后台静默同步，不阻塞界面 ===
@@ -9844,7 +9844,7 @@ async function runChatAutoCleanup(days) {
       } catch (e) { console.warn('chat cleanup failed #' + it.number, e); }
     }
     if (done > 0) {
-      try { cacheBust('myorders'); } catch (e) {}
+      try { cacheBust(myOrdersCacheKey()); } catch (e) {}
       if (S.page === 'my') loadMyOrders();
       toast('已自动清理 ' + done + ' 个超期私信对话', 'info');
     }
@@ -9859,7 +9859,7 @@ async function userEndChat(inum) {
     await ghCloseIssue(inum);
     toast('对话已清空并结束', 'success');
     closeDetailModal();
-    try { cacheBust('myorders'); } catch (e) {}
+    try { cacheBust(myOrdersCacheKey()); } catch (e) {}
     if (S.page === 'my') loadMyOrders();
   } catch (e) { toast('操作失败：' + e.message, 'error'); }
 }
@@ -11110,6 +11110,10 @@ async function handlePublishInner(e) {
     try { enqueuePostVector(created, order); } catch (e) {}
     try { localStorage.setItem('hust_last_publish', String(Date.now())); } catch(e) {}
     try { localStorage.setItem('hust_safety_tip_seen', '1'); } catch(e) {}
+    // v1.67.6：发布成功后失效「我的订单」缓存（含内存缓存），否则刚发的帖子会被旧缓存挡住，
+    //   尤其问答/找人这类会切到「我的」页查看的场景。若当前就停在「我的」页则立即重拉。
+    try { cacheBust(myOrdersCacheKey()); } catch (e) {}
+    if (S.page === 'my') { try { _cachedMyOrders = null; loadMyOrders(); } catch (e) {} }
     clearPublishDraft();
     // v1.52.0：勾了「保存为我的默认地址」→ 异步写入用户资料（不阻塞发布流程；须在 closePublishModal 重置表单之前读）
     try {
@@ -11285,6 +11289,23 @@ async function ensureUserIssueNumber() {
     }
   } catch(e) { reportError('用户初始化失败，请刷新页面', e, 'ensure'); }
   return false;
+}
+
+// v1.67.6：「我的订单」缓存 key 统一出口。
+//   真实 key 形如 myorders_all_order（loadMyOrders 里 tab 恒为 'all'）。
+//   原来 8 处 cacheBust 各写各的：6 处用 'myorders_' + S.myTab + '_' + S.myPublishedSubTab
+//   （S.myPublishedSubTab 未初始化时拼成 myorders_all_，依然对不上），2 处直接写成 'myorders'
+//   → 清了等于没清，已取消/已结束的条目会以「幽灵行」继续留在列表里。
+function myOrdersCacheKey() {
+  return 'myorders_all_' + (S.myPublishedSubTab || 'order');
+}
+// v1.67.6：问答单的 status 恒为 'open'（靠 solved 标记是否解决），
+//   若直接拿 o.status 归类，已解决的问答会永远算不进「已完成」、却被算进「待接单」，
+//   与卡片上显示的「✅ 已解决」自相矛盾。这里统一成"给人看的状态"口径。
+function effectiveMyOrderStatus(o) {
+  if (!o) return '';
+  if (o.type === 'qa' || o.type === 'academic') return o.solved ? 'completed' : 'open';
+  return o.status || '';
 }
 
 function renderMyOrders(orders, tab, subTab) {
@@ -11481,7 +11502,7 @@ async function loadMyOrders(myTab) {
 
   if (!listEl) return;
 
-  const cacheKey = 'myorders_' + tab + '_' + subTab;
+  const cacheKey = myOrdersCacheKey();
   const cached = cacheGet(cacheKey);
   // 先秒开缓存，后台拉取最新
   if (cached && cached.length > 0) {
@@ -11498,7 +11519,23 @@ async function loadMyOrders(myTab) {
   }
 
   try {
-    const issues = await ghIssues('order');
+    // v1.67.6 P0：发布时问答单打的是 `qa` 标签、其余类型才是 `order`
+    //   （见 handlePublish：`const label = type === 'qa' ? 'qa' : 'order'`）。
+    //   原来这里只拉 'order' → 用户自己发的问答单在「我的订单」里完全看不到。
+    //   实测：万里(U202012346/#77) 发了 #97[订单]大创比赛 + #102[问答]保研要求，
+    //   「我的订单」只显示 1 条，正是漏了问答单。
+    //   现在并行拉两类标签并按 issue number 去重；qa 拉取失败不影响主列表（降级不报错）。
+    const [orderIssues, qaIssues] = await Promise.all([
+      ghIssues('order'),
+      ghIssues('qa').catch(function () { return []; })
+    ]);
+    const _seenNum = {};
+    const issues = (orderIssues || []).concat(qaIssues || []).filter(function (it) {
+      const n = it && it.number;
+      if (!n || _seenNum[n]) return false;
+      _seenNum[n] = 1;
+      return true;
+    });
     // 顺便检测订单状态变化和新私信（复用数据，不额外请求）
     try { checkOrderNotifications(issues); checkChatNotifications(issues); } catch(e) {}
     const uid = (S.user._issue_number || selfSid());
@@ -11596,7 +11633,8 @@ function updateMyStatusCounts(orders) {
   const c = { all: orders.length, open: 0, taken: 0, awaiting_confirm: 0, completed: 0 };
   orders.forEach(o => {
     if (!o || o.type === 'chat') return;
-    if (c[o.status] !== undefined) c[o.status]++;
+    const st = effectiveMyOrderStatus(o);
+    if (c[st] !== undefined) c[st]++;
   });
   ['all', 'open', 'taken', 'awaiting_confirm', 'completed'].forEach(k => {
     const el = document.getElementById('cnt-' + k);
@@ -11615,7 +11653,7 @@ function renderMyOrdersWithFilter() {
   if (_cachedMyOrders == null) return;
   const f = S.myStatusFilter || 'all';
   let list = _cachedMyOrders;
-  if (f !== 'all') list = list.filter(o => o && o.type !== 'chat' && o.status === f);
+  if (f !== 'all') list = list.filter(o => o && o.type !== 'chat' && effectiveMyOrderStatus(o) === f);
   renderMyOrders(list, 'all', S.myPublishedSubTab || 'order');
   updateMyStatusChips();
 }
