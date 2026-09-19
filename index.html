@@ -4,7 +4,7 @@
 <meta charset="UTF-8" data-page-node-id="BnH69tzCJbsQrxyJ9bFeI8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="xoRUEKCeW2QhKDduojXksT">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; font-src 'self' https: data:; connect-src 'self' https://cdn.jsdelivr.net https://api.emailjs.com https://api.imgbb.com https://*.tencentscf.com https://xy5167.github.io; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
-<meta name="version" content="1.67.2" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
+<meta name="version" content="1.67.3" data-page-node-id="D8nsU6zoFjwRKEPkaJr3Mu">
 <link rel="icon" type="image/png" href="favicon.png" data-page-node-id="z8ICz56qsCZoVwqJqg5r0Z">
 <link rel="apple-touch-icon" href="icons/icon-192.png" data-page-node-id="iqLPz11QDoHGofpp2edT3q">
 <link rel="manifest" href="manifest.webmanifest" data-page-node-id="QUhtZM4G5w3kwPoNLZoK65">
@@ -2922,7 +2922,7 @@ async function aiMatchSecondhand(issueNum, title, content, category, campus, pri
 }
 
 // ============ 本地缓存层（减少 API 调用，让刷新更丝滑） ============
-const APP_VERSION = '1.67.2';
+const APP_VERSION = '1.67.3';
 // 版本检测：后台检查同域 version.txt，避免 raw.githubusercontent.com CDN 缓存不同步
 (function checkVersion() {
   const now = Date.now();
@@ -3346,7 +3346,9 @@ function clearToken() {
 //   私信已读(hust_chat_seen)、点赞/推荐反馈、hust_c_* 缓存等仍留在本地
 //   → 新账号一登录就看见上一个账号的消息和铃铛红点（用户实测：注册新号后旧号消息还在）。
 //   注意：主题/折叠偏好等「设备级」设置**不清**，避免换个号连界面习惯都被重置。
-const USER_SCOPED_LS = ['hust_notifications', 'hust_chat_seen', 'hust_rec_feedback', 'hust_forum_liked', 'hust_last_publish', 'hust_forum_draft', 'hust_publish_draft'];
+const USER_SCOPED_LS = ['hust_notifications', 'hust_chat_seen', 'hust_rec_feedback', 'hust_forum_liked', 'hust_last_publish', 'hust_forum_draft'];
+// v1.67.3：草稿按发布类型分桶（hust_publish_draft_task/secondhand/borrow/qa/find），按前缀清理
+const USER_SCOPED_LS_PUBLISH_PREFIX = 'hust_publish_draft';
 const USER_SCOPED_SS = ['hust_publish_draft'];   // 草稿历史上有存 sessionStorage 的版本
 function _purgeByPrefix(store, prefixes) {
   const kill = [];
@@ -3363,7 +3365,7 @@ function _purgeByPrefix(store, prefixes) {
 }
 function clearUserScopedData() {
   try { USER_SCOPED_LS.forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} }); } catch (e) {}
-  try { _purgeByPrefix(localStorage, ['hust_c_']); } catch (e) {}
+  try { _purgeByPrefix(localStorage, ['hust_c_', USER_SCOPED_LS_PUBLISH_PREFIX]); } catch (e) {}
   try { USER_SCOPED_SS.forEach(function (k) { try { sessionStorage.removeItem(k); } catch (e) {} }); } catch (e) {}
   try { _purgeByPrefix(sessionStorage, ['hust_cmt_', 'hust_reg_', 'hust_home_section_']); } catch (e) {}
   // 内存镜像一起清，否则不刷新页面时铃铛红点/通知面板仍是上一个账号的
@@ -10297,6 +10299,15 @@ function logout() {
 //            （发匿名帖/树洞内容的人不想在本地留痕）。
 const DRAFT_TTL_MS = 7 * 24 * 3600 * 1000;
 const DRAFT_KEYS = { pub: 'hust_publish_draft', forum: 'hust_forum_draft' };
+// v1.67.3：发布草稿按类型分桶（task/secondhand/borrow/qa/find），避免互助↔二手之间内容串味
+//   原 `hust_publish_draft` 是单一全局 key，导致用户在互助填的草稿会同步到二手发布弹窗里。
+//   现在 savePublishDraft 按当前 publishType 写对应桶；restorePublishDraft 只读当前 type 桶；
+//   showPublishModal 在调用 restore 之前先按 preType 锁定类型 —— 类型与草稿解耦后，
+//   preType 再也不会被 draft.type 覆盖。
+function publishDraftKey(type) {
+  return 'hust_publish_draft_' + (type || 'any');
+}
+const PUBLISH_DRAFT_TYPES = ['task', 'secondhand', 'borrow', 'qa', 'find'];
 
 function draftsEnabled() {
   try { return localStorage.getItem('hust_draft_off') !== '1'; } catch (e) { return true; }
@@ -10319,6 +10330,8 @@ function onDraftToggle(on) {
 }
 function clearMyDrafts(silent) {
   try { Object.keys(DRAFT_KEYS).forEach(function (k) { localStorage.removeItem(DRAFT_KEYS[k]); }); } catch (e) {}
+  // v1.67.3：清掉所有类型桶的发布草稿 + 旧版单 key 残留
+  try { PUBLISH_DRAFT_TYPES.forEach(function (t) { localStorage.removeItem(publishDraftKey(t)); }); } catch (e) {}
   try { sessionStorage.removeItem('hust_publish_draft'); } catch (e) {}  // 清掉旧版本遗留的 session 草稿
   if (!silent) { try { if (window.toast) toast('草稿已清除'); } catch (e) {} }
 }
@@ -10344,8 +10357,10 @@ window.syncDraftToggleUI = syncDraftToggleUI;
 
 function savePublishDraft() {
   const g = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+  // v1.67.3：不再存 type/category —— 类型由 showPublishModal 的 preType 决定，
+  //   草稿按当前 type 分桶存，避免互助↔二手等内容串味
   const draft = {
-    type: g('publishType'), category: g('publishCategory'),
+    category: g('publishCategory'),
     title: g('publishTitle'), desc: g('publishDesc'),
     // v1.67.0：补上「报酬金额」。原来漏了 price，用户填了金额关掉再打开就没了
     price: g('publishPrice'),
@@ -10356,15 +10371,24 @@ function savePublishDraft() {
     bounty: g('publishBounty')
   };
   // 全空表单不写草稿，避免清空后仍留一条空记录
-  if (!draft.title && !draft.desc && !draft.location && !draft.payment && !draft.price) { dropDraft(DRAFT_KEYS.pub); return; }
-  writeDraft(DRAFT_KEYS.pub, draft);
+  if (!draft.title && !draft.desc && !draft.location && !draft.payment && !draft.price) { dropDraft(publishDraftKey(g('publishType'))); return; }
+  writeDraft(publishDraftKey(g('publishType')), draft);
 }
 function restorePublishDraft() {
-  const d = readDraft(DRAFT_KEYS.pub);
+  // v1.67.3：按当前 publishType 分桶读取 —— 只恢复内容字段，不再覆盖 type/category
+  //   （否则 draft.type 会盖掉 showPublishModal 的 preType，导致用户从二手跳到互助
+  //    打开发布弹窗时看到二手的旧内容，这是本次 P0 bug 的根因）。
+  const curType = (document.getElementById('publishType') || {}).value || '';
+  const d = readDraft(publishDraftKey(curType));
   if (!d) return;
   const set = (id, v) => { const e = document.getElementById(id); if (e && v != null) e.value = v; };
-  if (d.type) { const t = document.getElementById('publishType'); if (t) t.value = d.type; updatePublishCategories(); }
-  set('publishCategory', normalizeCat(d.category || ''));
+  // 校验 category 是否仍属于当前 type 的下拉项（防止旧版本遗留的非法分类被恢复）
+  const catEl = document.getElementById('publishCategory');
+  const normalizedCat = normalizeCat(d.category || '');
+  if (catEl && normalizedCat) {
+    const ok = Array.from(catEl.options).some(function (o) { return o.value === normalizedCat; });
+    if (ok) catEl.value = normalizedCat;
+  }
   set('publishTitle', d.title); set('publishDesc', d.desc);
   set('publishPrice', d.price);                                   // v1.67.0：恢复金额
   set('publishLocation', d.location); set('publishUrgency', d.urgency);
@@ -10379,7 +10403,11 @@ function restorePublishDraft() {
   try { updatePublishAttachmentVisibility(); } catch (e) {}
   try { if (window.toast) toast('已恢复上次未发布的草稿'); } catch (e) {}
 }
-function clearPublishDraft() { dropDraft(DRAFT_KEYS.pub); }
+function clearPublishDraft() {
+  // v1.67.3：清掉所有类型桶的发布草稿 + 旧版单 key
+  try { PUBLISH_DRAFT_TYPES.forEach(function (t) { dropDraft(publishDraftKey(t)); }); } catch (e) {}
+  try { dropDraft('hust_publish_draft'); } catch (e) {}
+}
 
 // ---- 论坛发帖草稿（v1.56.0 新增；此前论坛刷新即丢）----
 function saveForumDraft() {
@@ -10423,6 +10451,13 @@ function showPublishModal(preType) {
   if (!S.user) { showAuthModal(); return; }
   if (!checkApproved()) return;
   document.getElementById('publishModal').classList.add('active');
+  // v1.67.3：先把 preType 应用到 publishType —— 这是「不让 draft 覆盖预选类型」的关键。
+  //   原实现先 restorePublishDraft() 再应用 preType，结果 draft.type 把 preType 顶掉，
+  //   导致在二手保存的草稿会同步到互助打开发布弹窗里看见（P0）。
+  if (preType) {
+    const _ps = document.getElementById('publishType');
+    if (_ps) { for (const _o of _ps.options) { if (_o.value === preType) { _ps.value = preType; break; } } }
+  }
   updatePublishCategories();
   updatePublishAttachmentVisibility(); // v1.25.1 根据后端能力显示附件入口
   // v1.18.0：首次发布显示安全须知条
@@ -10439,11 +10474,8 @@ function showPublishModal(preType) {
     });
   }
   syncDraftToggleUI();
+  // v1.67.3：先确定 type、再读对应桶 —— 顺序是关键，restorePublishDraft 内部不再覆盖 type
   restorePublishDraft();
-  if (preType) {
-    const _ps = document.getElementById('publishType');
-    if (_ps) { for (const _o of _ps.options) { if (_o.value === preType) { _ps.value = preType; updatePublishCategories(); break; } } }
-  }
   setTimeout(() => { const f = document.querySelector('#publishModal input:not([type=hidden]),#publishModal textarea,#publishModal select'); if (f) f.focus(); }, 60);
   // 默认截止时间为明天同一时间
   // v1.67.0：只在字段为空时才填默认值 —— 原来无条件覆盖，导致草稿里保存的截止时间永远恢复不出来
