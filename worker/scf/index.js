@@ -52,7 +52,7 @@ const TOKENHUB_BASE_URL = (process.env.TOKENHUB_BASE_URL || 'https://open.bigmod
 const TOKENHUB_MODEL = process.env.TOKENHUB_MODEL || 'glm-4.7-flash';
 const AI_RATE_LIMIT = parseInt(process.env.AI_RATE_LIMIT || '20', 10); // 每 IP 每分钟最多 20 次 AI 调用
 const OCR_RATE_LIMIT = parseInt(process.env.OCR_RATE_LIMIT || '10', 10); // 每 IP 每分钟最多 10 次 OCR（额度保护）
-const VERSION = '1.52.0';
+const VERSION = '1.52.1';
 
 // v1.42.7：服务端敏感词字典（与前端 index.html SENSITIVE_WORDS 同步，命中直接 block，不耗 AI 额度）
 // 注意：必须与前端保持一致，否则用户绕前端直发会被服务端兜住
@@ -1033,7 +1033,11 @@ async function ensureLabelsExist(labels) {
   const wanted = labels.filter(l => l && typeof l === 'string');
   if (!wanted.length) return labels;
   const names = await fetchLabelNames();
-  if (!names) return labels;
+  // v1.52.1 关键修复：fetchLabelNames 失败时旧实现直接 return labels（把未经验证的 label
+  //   透传给 GitHub → 必返回 422 Validation Failed → 前端「内容被服务端拒绝」）。
+  //   改为返回 []：宁可新建的 issue 不带标签，也不能让发布彻底失败（issue body 里的 type/cat
+  //   字段足以在前端做筛选与展示）。注释里"fail-open"的承诺这才真正兑现。
+  if (!names) return [];
   const missing = wanted.filter(n => !names.has(n));
   for (const n of missing) {
     const color = LABEL_COLORS[Math.abs(hashStr(n)) % LABEL_COLORS.length];
